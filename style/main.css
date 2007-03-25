@@ -1,0 +1,512 @@
+<?php
+$defSkinDir = 'main/';
+$defSkinName = 'orange';
+$defNavPos = 'right';
+$logoFontStyle = 'italic';
+$logoFontWeight = 'normal';
+$logoFontSize = '1.1em';
+
+$opts = array();
+if ( !empty($_SERVER['QUERY_STRING']) ) {
+	$opts = explode('-', $_SERVER['QUERY_STRING']);
+}
+$skinName = empty($opts[0]) ? $defSkinName : $opts[0];
+$navPos = empty($opts[1]) ? $defNavPos : $opts[1];
+$colorFile = "style/$skinName.inc";
+if ( !is_readable($colorFile) ) {
+	$colorFile = "style/$defSkinName.inc";
+}
+require_once $colorFile;
+
+$skin = new Skin( $skinName == 'neg' ? 'neg/' : $defSkinDir );
+?>
+/* цялата страница и тялото й */
+html, body {
+	color: <?php echo $mainFgColor?>;
+	background-color: <?php echo $mainBgColor?>;
+}
+/* тялото на страницата */
+body {
+	line-height: 1.3em;
+	padding: 0.2em 0 0 0;
+	margin: 0;
+}
+
+/* заглавия */
+h1, h2, h3, h4, h5, h6 {
+	font-weight: normal;
+	color: <?php echo $headerFgColor?>;
+	background-color: <?php echo $headerBgColor?>;
+	line-height: 1.3em;
+	text-align: center;
+	border: thin solid <?php echo $headerBordColor?>;
+	padding: 0 1em;
+	margin-top: 1.5em;
+}
+h1 { font-size: 1.7em; }
+h2 { font-size: 1.4em; }
+h3 { font-size: 1.3em; }
+h4 { font-size: 1.2em; }
+h5 { font-size: 1.1em; }
+h6 { font-size: 1em; }
+/* хоризонтални линии */
+hr {
+	border-style: solid;
+	border-width: thin 0 0 0;
+	border-color: <?php echo $logoFgColor?>;
+}
+
+/* кутии за групиране */
+fieldset {
+	margin: 1em 0;
+	padding: 0.5em 1em;
+	border: thin solid <?php echo $fieldsetBordColor?>;
+}
+fieldset ul, #footer ul {
+	margin: 0 0 0 1em;
+	padding: 0 0.6em;
+}
+/* заглавията в кутиите за групиране */
+legend { font-style: italic; }
+.readercomment legend { font-style: normal; }
+
+dd { margin-left: 1.5em; }
+/* абзаци */
+p {
+	text-indent: 2.5em;
+	text-align: justify;
+	margin: 0;
+}
+em em {
+	font-weight: bold;
+}
+pre { line-height: 1em; margin: 0; }
+pre p { display: inline; }
+/* полета за цитати */
+blockquote, q { font-style: italic; }
+/* какво да се появява преди и след цитатите */
+q:before { content: '„'; }
+q:after { content: '“'; }
+
+/* полета за код */
+code {
+	color: <?php echo $codeFgColor?>;
+	background-color: <?php echo $codeBgColor?>;
+	border: thin dotted <?php echo $codeBordColor?>;
+	padding: .1em .4em;
+}
+
+/* картинки */
+img { border: none; vertical-align: middle; }
+p img { margin: 0.2em auto; }
+
+/* елементи на формуляри */
+input, textarea, select {
+	color: inherit;
+	background-color: inherit;
+}
+/* фокусирани елементи на формуляри */
+input:focus, textarea:focus, select:focus {
+	color: inherit;
+	background-color: <?php echo $formElemFocusBgColor?>;
+}
+/* бутони за пращане на формуляр */
+input[type=submit] {
+	color: <?php echo $submitButtonFgColor?>;
+	background-color: <?php echo $submitButtonBgColor?>;
+	font-weight: bold;
+	background-image: url('<?php echo $skin->imageDir()?>button_bg_<?php echo $skinName?>.png');
+}
+/* етикети — наименования на елементите */
+label { cursor: pointer; }
+/* span-ове, имащи атрибут „title“ */
+span[title] { border-bottom: thin dotted <?php echo $mainFgColor?>; }
+
+/* препратките с техните състояния */
+a { color: <?php echo $linkFgColor?>; background-color: inherit; }
+a:active { color: <?php echo $alinkFgColor?>; background-color: inherit; }
+a:visited { color: <?php echo $vlinkFgColor?>; background-color: inherit; }
+a:hover { text-decoration: none; }
+/* препратки в заглавия */
+h1 a, h1 a:visited, h2 a, h2 a:visited {
+	color: inherit;
+	background-color: inherit;
+}
+/* препратки за определени действия и състояния */
+a.edit:before { content: url('<?php echo $skin->image('edit')?>'); }
+a.delete:before { content: url('<?php echo $skin->image('delete')?>'); }
+a.new:before { content: url('<?php echo $skin->image('new')?>') ' '; }
+a.ok:before { content: url('<?php echo $skin->image('ok')?>'); }
+
+/* елемент, обхващащ основното съдържание */
+#main-content-wrapper {
+	float: left;
+	width: 100%;
+	margin-bottom: 1.5em;
+}
+
+/* основното съдържание на страниците, без менюто и разните ленти */
+#main-content {
+	margin: 0 <?php echo $navPos == 'right' ? '11.5em 0 1em' : '1em 0 11.5em'?>;
+	padding: 0;
+}
+
+/* съобщения, информиращи потребителя за нещо */
+#messages {
+	font-size: 1.1em;
+	margin-bottom: 1em;
+}
+
+/* навигационното меню */
+#navigation {
+	width: 10em;
+	padding: 0;
+	margin: 0 0 1em <?php echo $navPos == 'right' ? '-10em' : '-100%'?>;
+	float: left;
+}
+
+#navigation dl {
+	color: <?php echo $navFgColor?>;
+	background-color: <?php echo $navBgColor?>;
+	font-size: .9em;
+	padding: 0;
+	margin: 0;
+	border: thin solid <?php echo $navTitleBgColor?>;
+}
+#navigation dt, .tab.selected {
+	color: <?php echo $navTitleFgColor?>;
+	background-color: <?php echo $navTitleBgColor?>;
+	font-weight: bold;
+	padding-left: .2em;
+}
+#navigation dd {
+	margin-left: 0;
+	padding-left: .6em;
+}
+#navigation dd.selected, option[selected=selected] {
+	color: <?php echo $headerFgColor?>;
+	background-color: <?php echo $headerBgColor?>;
+	border-top: thin solid <?php echo $headerBordColor?>;
+	border-bottom: thin solid <?php echo $headerBordColor?>;
+}
+
+/* полето с името на библиотеката */
+#logo {
+	text-align: center;
+}
+#logo a {
+	color: <?php echo $logoFgColor?>;
+	background-color: inherit;
+	font-style: <?php echo $logoFontStyle?>;
+	font-size: <?php echo $logoFontSize?>;
+	font-weight: <?php echo $logoFontWeight?>;
+	text-decoration: none;
+	display: block;
+}
+
+#nav-main dd a, .tab a {
+	color: <?php echo $navLinkFgColor?>;
+	background-color: inherit;
+	display: block;
+	text-decoration: none;
+}
+
+/* личните инструменти */
+dl#personal {
+	font-size: .9em;
+	background-color: <?php echo $mainBgColor?>;
+	border: 0;
+	position: absolute;
+	top: 0;
+	right: <?php echo $navPos == 'right' ? '12em' : '1em'?>;
+	padding: 0;
+	margin: 0;
+	display: inline;
+}
+#personal dt { display: none; }
+#personal dd {
+	color: <?php echo $toolbarFgColor?>;
+	background-color: <?php echo $toolbarBgColor?>;
+	border: thin solid <?php echo $toolbarBordColor?>;
+	border-top-width: 0;
+	padding: 0 0.4em;
+	margin: 0 0.2em 0 0;
+	display: inline;
+}
+
+/* заглавие за група от текстове в списъчните страници */
+.titles legend, .titles legend a {
+	color: <?php echo $legendFgColor?>;
+	background-color: inherit;
+	font-weight: bold;
+}
+
+/* картинките, появаващи се преди заглавията на текстовете */
+li.novel { list-style-image: url('<?php echo $skin->image('novel')?>'); }
+li.novella { list-style-image: url('<?php echo $skin->image('novella')?>'); }
+li.shortstory, li.novelette { list-style-image: url('<?php echo $skin->image('shortstory')?>'); }
+li.poetry, li.poem { list-style-image: url('<?php echo $skin->image('poetry')?>'); }
+li.tale { list-style-image: url('<?php echo $skin->image('tale')?>'); }
+li.othergenre, li.essay, li.article, li.play, li.screenplay,
+li.playbook, li.science, li.intro, li.travelnotes, li.other {
+	list-style-image: url('<?php echo $skin->image('othergenre')?>');
+}
+
+/* кутия за съдържание — появява се на доста страници */
+#toc {
+	font-size: .9em;
+	color: <?php echo $tocFgColor?>;
+	background-color: <?php echo $tocBgColor?>;
+	border: thin solid <?php echo $tocBordColor?>;
+	padding: 0.8em;
+	margin: 1em 1em 1em 0;
+	float: left;
+}
+/* заглавие в кутията за съдържание */
+#toc h2 {
+	color: inherit;
+	background-color: inherit;
+	font-size: 1.1em;
+	font-weight: bold;
+	margin: 0;
+	padding: 0.5em;
+	display: inline;
+	border: 0;
+}
+/* неподредени списъци в кутията за съдържание */
+#toc ul {
+	margin: 0.2em;
+	padding-left: 1.5em;
+}
+/* кутията, която обикновено е най-долу */
+#footer {
+	font-size: 90%;
+	color: <?php echo $footerFgColor?>;
+	background-color: <?php echo $footerBgColor?>;
+	text-align: center;
+	margin: 1em 0;
+	padding: .2em 0;
+	border: thin solid <?php echo $footerBordColor?>;
+	clear: both;
+}
+#footer li {
+	display: inline;
+	margin: 0 1.2em;
+}
+#propaganda, #propaganda p, #searchhelpbox, #searchhelpbox p {
+	text-indent: 0;
+	text-align: center;
+}
+#propaganda img, #searchhelpbox {
+	border: thin solid <?php echo $navTitleBgColor?>;
+}
+#searchhelpbox {
+	margin: 0.4em 0;
+	padding: 0.2em;
+}
+/* различни кутии — легенда, за авторските права, информационна */
+#legend, #copyright, .infobox, .readercomment, .tabbedpanebody {
+	color: <?php echo $mainFgColor?>;
+	background-color: <?php echo $tocBgColor?>;
+	clear: both;
+}
+#legend { margin-top: 3em; }
+/* анотация към текст */
+#annotation {
+	margin-bottom: 2em;
+	padding: 0 0 1em 1em;
+	border-left: thin solid <?php echo $fieldsetBordColor?>;
+	border-bottom: thin solid <?php echo $fieldsetBordColor?>;
+}
+
+/* неподредени списъци в кутията за авторските права */
+#copyright ul {
+	list-style-type: none;
+}
+/* съобщението в края на всеки текст — „Край“ или „Към...“ */
+#text-end-msg {
+	text-align: center;
+	font-variant: small-caps;
+	margin-top: 1em;
+}
+#txt-edit-msg {
+	font-size: 0.9em;
+	margin-top: 1em;
+}
+/* кутия, съдържаща текст за предварителен преглед — при редактиране */
+#previewbox {
+	padding: 1em;
+	margin-bottom: 1em;
+	border: thin outset <?php $codeBordColor?>;
+}
+
+/* препратка за изчистване на склада за съответната страница */
+#cache-link a {
+	color: <?php echo $mainBgColor?>;
+	background-color: <?php echo $mainBgColor?>;
+	text-decoration: none;
+}
+
+/* препратките за прочетени текстове */
+.read, .read:visited {
+	color: <?php echo $readMarkFgColor?>;
+	background-color: <?php echo $readMarkBgColor?>;
+	text-decoration: none;
+}
+/* с мишка отгоре им */
+.read:hover { text-decoration: underline; }
+
+/* препратки, направени да приличат на бутони */
+.buttonlinks { line-height: 1.8em; }
+.buttonlinks a {
+	color: <?php echo $buttonLinksFgColor?>;
+	background-color: <?php echo $buttonLinksBgColor?>;
+	background-image: url('<?php echo $skin->imageDir()?>button_bg_<?php echo $skinName?>.png');
+	background-repeat: repeat-x;
+	font-weight: bold;
+	font-size: 0.8em;
+	text-decoration: none;
+	border: thin <?php echo $buttonLinksBgColor?> outset;
+	padding: 0.15em;
+}
+/* същите бутонни препратки — активни или с мишка отгоре им */
+.buttonlinks a:hover, .buttonlinks a:active {
+	/*background-color: <?php echo $buttonLinksBgColor?>;*/
+	border-style: inset;
+}
+
+/* съобщения за грешки */
+.error { color: <?php echo $errorFgColor?>; background-color: inherit; }
+.error:before { content: url('<?php echo $skin->image('stop')?>') ' '; }
+/* допълнителна информация */
+.extra, .extra a {
+	color: <?php echo $extraInfoFgColor?>;
+	background-color: <?php echo $mainBgColor?>;
+}
+.frozen {
+	opacity: .40;
+}
+/* допълнителни препратки за дадена тема, напр. автор */
+.infolink {
+	font-size: small;
+	text-align: right;
+	margin: 0 .5em;
+}
+/* разделител на абзаци при текстовете */
+.separator {
+	font-size: 1.5em;
+	text-align: center;
+	margin-top: .5em;
+}
+table.content {
+	margin: 0 auto 1em auto;
+	border: thin solid <?php echo $headerBgColor?>;
+	border-collapse: collapse;
+}
+table.content th, table.content td {
+	padding: 0.15em 0.4em;
+}
+caption { font-weight: bold; margin: 0 auto; }
+th {
+	color: <?php echo $headerFgColor?>;
+	background-color: <?php echo $headerBgColor?>;
+}
+/* обикновено за редове на таблици */
+.odd { color: <?php echo $oddFgColor?>; background-color: <?php echo $oddBgColor?>; }
+.even { color: <?php echo $evenFgColor?>; background-color: <?php echo $evenBgColor?>; }
+
+/* неща, предвидени за текстови браузъри */
+.non-graphic { display: none; }
+
+/* различни примери, напр. за форматиране на текст в помощните страници */
+.example {
+	color: <?php echo $codeFgColor?>;
+	background-color: <?php echo $codeBgColor?>;
+	border: thin dotted <?php echo $codeBordColor?>;
+}
+pre.example, div.example {
+	padding: .5em;
+}
+
+/* за заглавията на текстовете на страницата за четене */
+.text-title { font-variant: small-caps; }
+/* за фамилии */
+.lastname { font-variant: small-caps; }
+.epigraph p { text-align: right; }
+.author { font-style: normal; text-align: right; }
+.letter, .cite { font-style: normal; }
+.subheader, .notice, .notice p {
+	font-weight: bold;
+	font-style: normal;
+	text-align: center;
+}
+.poetry h2, .poetry h3, .poetry h4, .poetry h5, .poetry h6, .poem .subheader {
+	text-align: left;
+	text-indent: 2.5em;
+}
+
+.post dt {
+	font-weight: bold;
+	background-color: <?php echo $toolbarBgColor?>;
+	padding: 0.3em 0.5em;
+	margin: 1em 1em 0 1em;
+	border: thin outset <?php echo $toolbarBgColor?>;
+}
+.post dt a { text-decoration: none; }
+.post dd { margin: 0 1em 0 3em; }
+
+
+/* текст, който е вмъкнат */
+ins {
+	color: inherit;
+	background-color: <?php echo $insBgColor?>;
+	text-decoration: none;
+}
+/* текст, който е изтрит */
+del {
+	color: inherit;
+	background-color: <?php echo $delBgColor?>;
+	text-decoration: none;
+}
+.progressbar {
+	font-weight: bold;
+	border: thin solid <?php echo $mainFgColor?>;
+}
+.progressbar .done {
+	color: <?php echo $navTitleFgColor?>;
+	background-color: <?php echo $navTitleBgColor?>;
+}
+
+div.thumb {
+	float: left;
+	margin: 0 1em 1em 0;
+	background-color: <?php echo $tocBgColor?>;
+	border: thin solid <?php echo $tocBordColor?>;
+	padding: 0.4em;
+	text-align: center;
+}
+div.thumb p {
+	text-indent: 0;
+	text-align: center;
+}
+
+div.tabbedpane { margin-top: 1em; }
+div.tab {
+	float: left;
+	margin-left: 0.5em;
+	padding: 0.2em 0.5em 0.1em 0.5em;
+	border: thin solid <?php echo $tocBordColor?>;
+	border-bottom: 0;
+}
+div.tabbedpanebody {
+	clear: both;
+	border: thin solid <?php echo $tocBordColor?>;
+	padding: 0 0.5em 0.5em 0.5em;
+}
+
+.purl {
+	margin-top: 1em;
+	float: right;
+	font-size: 0.9em;
+	border-top: thin solid <?php echo $tocBordColor?>;
+}

@@ -1,0 +1,90 @@
+; име на библиотеката
+sitename = Моята библиотека
+webroot = /mylib/index.php
+docroot = /mylib
+
+purl = http://purl.org/NET/mylib
+lang_code = bg
+; връзка към външен форум, който може да се ползва като форум за библиотеката
+forum_root = http://localhost/phpBB2/
+
+; Следните три параметъра се ползват при пращането на електронна поща
+admin = Администратор
+site_email = bib@bib.com
+admin_email = admin@bib.com
+
+; Определя дали определени страници могат да се складират (в директорията
+; cache/). Това обаче се прави само за страниците в
+; PageManager::$cachedPagesServer
+; Разрешени стойности: 0|1. По подразбиране 0.
+cache = 0
+
+[db]
+; Свързване с базата от данни
+
+; сървър (хост), потребител, парола и име на базата от данни
+server = localhost
+user = mylib-user
+pass = mylib-userpass
+name = mylib
+; Евентуална представка на таблиците, например „ml“, което значи
+; ml_author, ml_text и т.н.
+prefix =
+
+[mail]
+; Параметри, свързани с пращането на електронна поща
+
+; backend = mail|smtp
+backend = mail
+; Долните параметри са необходими, ако backend = smtp
+host =
+port =
+user =
+pass =
+; пощенски адрес
+from =
+; име на изпращача
+from_name =
+
+[rights]
+; Права на потребителските групи
+
+; anonymous users
+anon = main, dynMain, css, about, help, author, authors, translator, translators, title, titles, series, label, user, links, info, text, texts, download, history, settings, login, logout, register, sendNewPassword, sendUsername, suggestTranslator, feedback, suggestOrigTitle, work, comment, news, liternews, staticMain
+
+; normal users
+nu = markRead, editOwnPage, editTextLabels
+
+; contributors
+c0 = editText
+c = add, edit, editPerson, editAltPerson, editSeries, editComment
+
+; administrators, allmighty
+a = *
+
+[skins]
+; Облици
+
+blackwhite = Белчо
+purple = Люляк
+olive = Маслинова нощ
+neg = Негортокал
+orange = Портокал
+pink = Роза
+grey = Сивушка
+blue = Синева
+
+[navpos]
+; Позиция на навигационното меню
+
+right = Вдясно
+left = Вляво
+
+[info]
+; Wikipedia base URL
+w = "http://localhost/bgw/index.php/$1"
+w_name = Уикипедия
+
+; BG-Fantastika base URL
+f = "http://localhost/bgf/index.php/$1"
+f_name = БГ-Фантастика
