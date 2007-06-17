@@ -5,6 +5,7 @@ class CommentPage extends Page {
 	protected $wheres = array(0 => '1',
 		-1 => array('`show`' => false),
 		1 => array('`show`' => true) );
+	protected $defListLimit = 20, $maxListLimit = 100;
 
 
 	public function __construct() {
@@ -19,6 +20,7 @@ class CommentPage extends Page {
 		// 0 - all comments, -1 - only hidden, 1 - only visible
 		$this->showMode = 1;
 		$this->initDone = false;
+		$this->initPaginationFields();
 	}
 
 
@@ -38,7 +40,8 @@ class CommentPage extends Page {
 			$this->addMessage('Това е само предварителен преглед. Мнението ви все още не е съхранено.');
 			return $this->makeComment() . $this->makeForm();
 		}
-		$set = array('text' => $this->textId, 'rname' => $this->reader,
+		$set = array('text' => $this->textId,
+			'rname' => $this->reader, 'user' => $this->user->id,
 			'ctext' => $this->comment, 'ctexthash' => md5($this->comment),
 			'time' => date('Y-m-d H:i:s'));
 		$set['show'] = $this->userCanPostComments() ? 'true' : 'false';
@@ -50,7 +53,7 @@ class CommentPage extends Page {
 
 	protected function buildContent() {
 		if ( empty($this->textId) ) {
-			return $this->makeAllComments();
+			return $this->makeAllComments($this->llimit, $this->loffset);
 		}
 		$this->initData();
 		return $this->makeComments() . $this->makeForm();
@@ -162,36 +165,40 @@ EOS;
 	}
 
 
-	public function makeAllComments($limit = 0, $order = null) {
+	public function makeAllComments($limit = 0, $offset = 0, $order = null, $showPageLinks = true) {
 		if ( is_null($order) ) { $order = $this->sortOrder; }
 		$where = $this->db->makeWhereClause( $this->wheres[$this->showMode] );
-		$sql = "SELECT c.*, t.id textId, t.title textTitle,
-			GROUP_CONCAT(DISTINCT a.name) author
+		$count = $this->db->getCount($this->mainDbTable, $this->wheres[$this->showMode]);
+		$sql = "SELECT c.*, t.id textId, t.title textTitle, t.collection,
+			GROUP_CONCAT(DISTINCT a.name ORDER BY aof.pos) author
 			FROM /*p*/$this->mainDbTable c
 			LEFT JOIN /*p*/text t ON c.text = t.id
 			LEFT JOIN /*p*/author_of aof ON t.id = aof.text
 			LEFT JOIN /*p*/person a ON aof.author = a.id
 			$where GROUP BY c.id ORDER BY `time` $order";
-		if ( $limit > 0 ) $sql .= " LIMIT $limit";
+		if ( $limit > 0 ) $sql .= " LIMIT $offset, $limit";
 		$res = $this->db->query($sql);
 		if ($this->db->numRows($res) == 0) {
 			$this->addMessage('Няма читателски мнения.');
 			return '';
 		}
+		$pagelinks = $showPageLinks
+			? $this->makePageLinks($count, $this->llimit, $this->loffset) : '';
 		$c = '';
 		while ($row = $this->db->fetchAssoc($res)) {
 			extract($row);
-			$author = trim($author, ',');
+			$author = $collection == 'true' ? '' : trim($author, ',');
 			$c .= $this->makeComment($rname, $ctext, $time, $textId, $textTitle, $author, $this->showMode == -1);
 		}
-		return $c;
+		return $pagelinks . $c . $pagelinks;
 	}
 
 
 	protected function initData() {
 		if ($this->initDone) return;
 		$this->initDone = true;
-		$sql = "SELECT t.title textTitle, GROUP_CONCAT(DISTINCT a.name) author
+		$sql = "SELECT t.title textTitle, t.collection,
+				GROUP_CONCAT(DISTINCT a.name ORDER BY aof.pos) author
 			FROM /*p*/text t
 			LEFT JOIN /*p*/author_of aof ON t.id = aof.text
 			LEFT JOIN /*p*/person a ON aof.author = a.id
@@ -204,7 +211,8 @@ EOS;
 			return;
 		}
 		extract2object($data, $this);
-		$this->authorlink = $this->makeAuthorLink($this->author);
+		$this->authorlink = $this->collection == true ? ''
+			: $this->makeAuthorLink($this->author);
 		if ( !empty($this->authorlink) ) $this->authorlink = 'от '.$this->authorlink;
 		$this->titlelink = "„<a href='$this->root/text/$this->textId'>$this->textTitle</a>“
 $this->authorlink";

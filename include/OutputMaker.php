@@ -140,5 +140,31 @@ class OutputMaker {
 		$url .= implode($this->argSeparator, $q);
 		return rtrim($url, '?');
 	}
+
+
+	public function scriptInclude($script) {
+		return "<script type='text/javascript' src='{DOCROOT}/script/$script'></script>";
+	}
+
+
+	public function simpleTable($caption, $data, $extraAttr = '') {
+		$t = "<table class='content'$extraAttr><caption>$caption</caption>";
+		$curRowClass = '';
+		foreach ($data as $row) {
+			$curRowClass = $curRowClass == 'odd' ? 'even' : 'odd';
+			$t .= "\n<tr class='$curRowClass'>";
+			foreach ($row as $cell) {
+				$t .= "<td>$cell</td>";
+			}
+			$t .= "\n</tr>";
+		}
+		return $t.'</table>';
+	}
+
+
+	public function obfuscateEmail($email) {
+		return strtr($email,
+			array('@' => '&nbsp;<span title="при сървъра">(при)</span>&nbsp;'));
+	}
 }
 ?>

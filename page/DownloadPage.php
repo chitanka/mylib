@@ -36,6 +36,7 @@ class DownloadPage extends Page {
 				$mainFileData = $this->makeMainFileData($textId);
 				if (!$mainFileData) { $fileCount--; continue; }
 				list($this->filename, $this->fPrefix, $this->fSuffix) = $mainFileData;
+				$this->filename .= '.txt';
 				if ($setZipFileName) { $this->zipFileName = $this->filename; }
 				$this->addTextFileEntry($textId, $cacheFile);
 			}
@@ -45,25 +46,22 @@ class DownloadPage extends Page {
 			return '';
 		}
 		if ( !$setZipFileName && empty($this->zipFileName) ) {
-			$this->zipFileName = "Архив от Моята библиотека - $fileCount файла";
+			$this->zipFileName = "Архив от Моята библиотека - $fileCount файла_".time();
 		}
 		$this->addBinaryFileEntries($textId);
-		$zipfile = $this->zf->file();
-		header('Content-Type: application/zip');
-		header('Content-Length: '. strlen($zipfile));
-		$this->zipFileName = $this->cleanFileName(cyr2lat($this->zipFileName));
-		header('Content-Disposition: attachment; filename="'.$this->zipFileName.'.zip"');
-		header('Pragma: no-cache');
- 		echo $zipfile;
+		$this->zipFileName = cyr2lat($this->cleanFileName($this->zipFileName));
+		$fullZipFileName = $this->zipFileName .'.zip';
+		CacheManager::setDlFile($fullZipFileName, $this->zf->file());
+		header('Location: '. $this->rootd .'/'. CacheManager::getDlFile($fullZipFileName));
+		CacheManager::deleteOldDlFiles();
 		$this->outputDone = true;
 	}
 
 
 	protected function addTextFileEntry($textId, $cacheFile) {
-		$filename = "$this->filename.txt";
 		$fEntry = $this->zf->newFileEntry($this->fPrefix .
 			$this->makeContentData($textId) ."\n\n\tКРАЙ".
-			$this->fSuffix, $filename);
+			$this->fSuffix, $this->filename);
 		CacheManager::setCache($cacheFile, serialize($fEntry), false);
 		$this->zf->addFileEntry($fEntry);
 	}
@@ -106,7 +104,7 @@ class DownloadPage extends Page {
 		// authors
 		$query = "SELECT a.name FROM /*p*/author_of aof
 			LEFT JOIN /*p*/person a ON aof.author = a.id
-			WHERE aof.text = $textId";
+			WHERE aof.text = $textId ORDER BY aof.pos ASC";
 		$result = $this->db->query($query);
 		$authors = array();
 		$copyrights = '';
@@ -121,7 +119,7 @@ class DownloadPage extends Page {
 		// translators
 		$query = "SELECT t.name FROM /*p*/translator_of tof
 			LEFT JOIN /*p*/person t ON tof.translator = t.id
-			WHERE tof.text = $textId";
+			WHERE tof.text = $textId ORDER BY tof.pos ASC";
 		$result = $this->db->query($query);
 		while ( $data = $this->db->fetchAssoc($result) ) {
 			extract($data);
@@ -129,7 +127,9 @@ class DownloadPage extends Page {
 			$copyrights .= "\n\t© $name, превод";
 		}
 
-		if ( !empty($subtitle) ) { $textTitle .= " ($subtitle)"; }
+		if ( !empty($subtitle) ) {
+			$textTitle .= $subtitle{0} == '(' ? ' '.$subtitle : " ($subtitle)";
+		}
 		$prefix = "\xEF\xBB\xBF". // Byte order mark for some windows software
 			"\t[Kodirane UTF-8]\n\n|\t$authors\n|\t$textTitle\n\n\n";
 		$anno = $this->makeAnnotation($textId);
@@ -137,7 +137,7 @@ class DownloadPage extends Page {
 
 		$filename = (empty($authors) ? '' : cyr2lat($authors) .' - ').
 			(empty($sernr)?'':"$sernr. ") . cyr2lat($textTitle);
-		$filename = substr($filename, 0, 240);
+		$filename = substr($filename, 0, 200);
 		$filename = $this->cleanFileName($filename);
 		if ( isset( $this->fnameCount[$filename] ) ) {
 			$this->fnameCount[$filename]++;
@@ -146,7 +146,7 @@ class DownloadPage extends Page {
 			$this->fnameCount[$filename] = 1;
 		}
 		$suffix = "\nI>".$copyrights . $this->makeExtraInfo($textId) ."\n\n".
-			"\tСвалено от „{$this->sitename}“ ($this->purl)\nI$\n";
+			"\tСвалено от „{$this->sitename}“ [$this->purl/text/$textId]\nI$\n";
 		return array($filename, $prefix, $suffix);
 	}
 

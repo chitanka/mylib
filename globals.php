@@ -51,6 +51,7 @@ $cyrs = array(
 	'Ф', 'Х', 'Ц', 'Ч', 'Ш', 'Щ', 'Ъ', 'Ь', 'Ю', 'Я',
 );
 $types = array(
+	'fable' => 'Басни',
 	'essay' => 'Есе',
 	'playbook' => 'Книга-игра',
 	'science' => 'Научно',
@@ -64,11 +65,14 @@ $types = array(
 	'intro' => 'Предговор',
 	'tale' => 'Приказка',
 	'travelnotes' => 'Пътепис',
+	'speech' => 'Реч',
 	'article' => 'Статия',
 	'screenplay' => 'Сценарий',
+	'textbook' => 'Учебник',
 	'other' => 'Разни',
 );
 $typesPl = array(
+	'fable' => 'Басни',
 	'essay' => 'Есета',
 	'playbook' => 'Книги-игри',
 	'science' => 'Научни',
@@ -81,9 +85,11 @@ $typesPl = array(
 	'novella' => 'Повести',
 	'intro' => 'Предговори',
 	'tale' => 'Приказки',
+	'speech' => 'Речи',
 	'travelnotes' => 'Пътеписи',
 	'article' => 'Статии',
 	'screenplay' => 'Сценарии',
+	'textbook' => 'Учебници',
 	'other' => 'Разни',
 );
 
@@ -108,9 +114,10 @@ $langs = array(
 	'ru' => 'Руски',
 	'sa' => 'Санскрит',
 	'sk' => 'Словашки',
+	'sl' => 'Словенски',
 	'sr' => 'Сръбски',
 	'grc' => 'Старогръцки',
-	#'hr' => 'Хърватски',
+	'hr' => 'Хърватски',
 	'tr' => 'Турски',
 	'hu' => 'Унгарски',
 	'fi' => 'Фински',
@@ -123,6 +130,7 @@ $langs = array(
 );
 function langName($code, $asUpper = true) {
 	global $langs;
+	if ( !array_key_exists($code, $langs) ) return '';
 	$name = $langs[$code];
 	return $asUpper ? $name : mystrtolower($name);
 }
@@ -130,38 +138,48 @@ function langName($code, $asUpper = true) {
 $countries = array(
 	'au' => 'Австралия',
 	'at' => 'Австрия',
+	'al' => 'Албания',
 	'ar' => 'Аржентина',
+	'am' => 'Армения',
 	'be' => 'Белгия',
 	'br' => 'Бразилия',
 	'bg' => 'България',
 	'gb' => 'Великобритания',
 	'de' => 'Германия',
 	'gr' => 'Гърция',
+	'dk' => 'Дания',
 	'in' => 'Индия',
 	'ie' => 'Ирландия',
 	'es' => 'Испания',
 	'it' => 'Италия',
 	'ca' => 'Канада',
+	'mx' => 'Мексико',
+	'md' => 'Молдова',
 	'no' => 'Норвегия',
 	#'uk' => 'Обединено кралство',
 	'pl' => 'Полша',
-	#'pt' => 'Португалия',
+	'pt' => 'Португалия',
+	'ro' => 'Румъния',
 	'ru' => 'Русия',
 	'us' => 'САЩ',
+	'sk' => 'Словакия',
+	'si' => 'Словения',
+	'rs' => 'Сърбия',
+	'tr' => 'Турция',
 	'ua' => 'Украйна',
 	'hu' => 'Унгария',
 	'fr' => 'Франция',
-	'cz' => 'Чехия',
-	'sk' => 'Словакия',
 	'nl' => 'Холандия',
+	'hr' => 'Хърватия',
+	'cz' => 'Чехия',
 	'ch' => 'Швейцария',
 	'se' => 'Швеция',
 	'yu' => 'Югославия',
 	'jp' => 'Япония',
 );
-function countryName($code) {
+function countryName($code, $default = '') {
 	global $countries;
-	return isset($countries[$code]) ? $countries[$code] : '';
+	return isset($countries[$code]) ? $countries[$code] : $default;
 }
 
 

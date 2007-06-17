@@ -103,10 +103,12 @@ EOS;
 			$authorLink = $is_a
 				? "<a href='$this->root/author/$translatorEnc' title='Преглед на авторските произведения на $translator'>Авторски произведения</a>, "
 				: '';
+			$real_name = empty($real_name) || $translator == $real_name ? ''
+				: "Пълно име: $real_name, ";
 			$o .= <<<EOS
 
 <h2 id="$anchor">$showName $editLink</h2>
-<p class="infolink">$authorLink $infoLink</p>
+<p class="info">$real_name $authorLink $infoLink</p>
 
 EOS;
 			$series = $this->translators_titles[$translatorId];
@@ -130,11 +132,13 @@ EOS;
 					if ( !empty($orig_title) && $orig_lang != $lang ) {
 						$extras[] = "<em>$orig_title</em>";
 					}
-					if ( !empty($year) ) { $extras[] = $year; }
+					if ( !empty($year) ) {
+						$extras[] = $this->makeYearView($year, 0, $year2);
+					}
 					$textLink = $this->makeTextLink(compact('textId', 'type', 'size', 'zsize', 'title', 'date', 'reader'));
 					if ($this->order == 'time') {
 						$titleView = '<span class="extra"><tt>'.
-							$this->makeYearView($trans_year, $tr_trans_year).
+							$this->makeYearView($trans_year, $tr_trans_year, $trans_year2).
 							'</tt> — </span>'.$textLink;
 					} else {
 						$titleView = $textLink;
@@ -143,7 +147,7 @@ EOS;
 					$dlCheckbox = $this->makeDlCheckbox($textId);
 					$editLink = $userCanEdit ? $this->makeEditTextLink($textId) : '';
 					if ( $sernr > 0 ) { $title = "$sernr. $title"; }
-					$author = $this->makeAuthorLink($author);
+					$author = $collection == 'true' ? '' : $this->makeAuthorLink($author);
 					if ( !empty($author) ) { $author = 'от '.$author; }
 					$o .=<<<EOS
 
@@ -179,12 +183,13 @@ EOS;
 
 
 	protected function makeExtendedListQuery() {
-		$qSelect = "SELECT tr.id translatorId, tr.name translator, tr.country,
+		$qSelect = "SELECT tr.id translatorId, tr.name translator,
+		tr.real_name, tr.country,
 		(tr.role & 1) is_a, tr.info, tof.year tr_trans_year,
-		t.id textId, t.title, t.lang, t.orig_title,
-		t.orig_lang, t.year, t.trans_year, t.type, t.sernr, t.size, t.zsize,
-		UNIX_TIMESTAMP(t.date) date,
-		GROUP_CONCAT(a.name) author,
+		t.id textId, t.title, t.lang, t.orig_title, t.collection,
+		t.orig_lang, t.year, t.year2, t.trans_year, t.trans_year2, t.type,
+		t.sernr, t.size, t.zsize, UNIX_TIMESTAMP(t.entrydate) date,
+		GROUP_CONCAT(a.name ORDER BY aof.pos) author,
 		s.name series, s.orig_name orig_series";
 		$qFrom = " FROM /*p*/translator_of tof
 		LEFT JOIN /*p*/text t ON tof.text = t.id
@@ -223,7 +228,7 @@ EOS;
 		}
 		if ( !isset($this->translatorsData[$translatorId]) ) {
 			$this->translatorsData[$translatorId] =
-				compact('translator', 'country', 'is_a', 'info');
+				compact('translator', 'real_name', 'country', 'is_a', 'info');
 			$this->translators[] = $translatorId;
 		}
 		$this->textsData[$textId] = $dbrow;

@@ -3,6 +3,16 @@
 class SettingsPage extends Page {
 
 	protected $optKeys = array('skin', 'nav', 'mainpage');
+	protected $mpOpts = array(
+		'newtitles' => 'Добавени произведения',
+		'worktitles' => 'Подготвяни произведения',
+		'forumnews' => 'Съобщения от форума',
+		'readercomments' => 'Читателски мнения',
+		'sitenews' => 'Новини относно библиотеката',
+		'liternews' => 'Литературни новини',
+	);
+	protected $defEcnt = 10;
+
 
 	public function __construct() {
 		parent::__construct();
@@ -21,6 +31,18 @@ class SettingsPage extends Page {
 		$this->opts['mainpage'] = $this->request->value('mainpage', 's');
 		$this->news = (int) $this->request->checkbox('news');
 		$this->expire = $this->request->value('expire', '30');
+		$this->optKeys = array_merge($this->optKeys, array_keys($this->mpOpts));
+		$pos = 0;
+		foreach ($this->mpOpts as $key => $_) {
+			$pos++;
+			$sopts = (array) $this->request->value($key);
+			// show section: checkbox, by default 1
+			$this->opts[$key][0] = isset($sopts[0]) ? 1 : (empty($sopts) ? 1 : 0);
+			// section position
+			$this->opts[$key][1] = isset($sopts[1]) ? $sopts[1] : $pos;
+			// number of entries in the section
+			$this->opts[$key][2] = isset($sopts[2]) ? $sopts[2] : $this->defEcnt;
+		}
 		$this->tabindex = 1;
 	}
 
@@ -78,7 +100,6 @@ class SettingsPage extends Page {
 
 
 	protected function buildContent() {
-		$this->addAltStylesheets();
 		if ($this->isAnon) {
 			$this->initAnonUserData();
 			return $this->makeAnonUserForm();
@@ -89,6 +110,7 @@ class SettingsPage extends Page {
 
 
 	protected function makeRegUserForm() {
+		$this->addAltStylesheets();
 		$formBegin = $this->makeFormBegin();
 		$oldusername = $this->out->hiddenField('oldusername', $this->username);
 		$username = $this->out->textField('username', '', $this->username, 25, 60, $this->tabindex++);
@@ -97,7 +119,7 @@ class SettingsPage extends Page {
 		$realname = $this->out->textField('realname', '', $this->realname, 25, 60, $this->tabindex++);
 		$email = $this->out->textField('email', '', $this->email, 25, 60, $this->tabindex++);
 		$common = $this->makeCommonInput();
-		$news = $this->out->checkbox('news', '', false,
+		$news = $this->out->checkbox('news', '', $this->news,
 			'Получаване на месечно новинарско писмо', '', $this->tabindex++);
 		$formEnd = $this->makeFormEnd();
 		return <<<EOS
@@ -131,6 +153,7 @@ EOS;
 
 
 	protected function makeAnonUserForm() {
+		$this->addAltStylesheets();
 		$formBegin = $this->makeFormBegin();
 		$common = $this->makeCommonInput();
 		$expire = $this->makeExpireInput($this->tabindex++);
@@ -175,6 +198,7 @@ EOS;
 		$skin = $this->makeSkinInput($this->tabindex++);
 		$navpos = $this->makeNavPosInput($this->tabindex++);
 		$mainpage = $this->makeMainPageInput($this->tabindex++);
+		$mpExtra = $this->makeMainPageExtraInput();
 		return <<<EOS
 
 	<tr>
@@ -186,6 +210,9 @@ EOS;
 	</tr><tr>
 		<td><label for="mainpage">Начална страница:</label></td>
 		<td>$mainpage</td>
+	</tr>
+	<tr>
+		<td colspan="2" align="center">$mpExtra</td>
 	</tr>
 EOS;
 	}
@@ -218,10 +245,50 @@ EOS;
 	}
 
 
+	protected function makeMainPageExtraInput() {
+		$ta = array();
+		$rclass = '';
+		foreach ($this->mpOpts as $key => $title) {
+			$show = $this->out->checkbox($key.'[0]', '', $this->opts[$key][0] == '1');
+			$pos = $this->out->textField($key.'[1]', '', $this->opts[$key][1], 1, 2);
+			$ecnt = $this->out->textField($key.'[2]', '', $this->opts[$key][2], 2, 2);
+			$rclass = $rclass == 'odd' ? 'even' : 'odd';
+			$ta[ $this->opts[$key][1] ] = <<<EOS
+
+		<tr class="$rclass">
+			<th style="white-space: nowrap">$title</th>
+			<td>$show</td>
+			<td>$pos</td>
+			<td>$ecnt</td>
+		</tr>
+EOS;
+		}
+		ksort($ta);
+		$t = implode('', $ta);
+		return <<<EOS
+
+	<table>
+		<caption><a href="{$this->root}/dynMain">Динамична начална страница</a></caption>
+		<thead>
+		<tr>
+			<th>Раздел</th>
+			<th>Показване</th>
+			<th>Позиция</th>
+			<th>Записи</th>
+		</tr>
+		</thead>
+		<tbody>$t
+		</tbody>
+	</table>
+EOS;
+	}
+
+
 	protected function makeOptionsOutput() {
 		$o = '';
 		foreach ($this->optKeys as $key) {
-			$o .= $key .'=' . $this->opts[$key] .';';
+			$o .= $key .'=' . (is_array($this->opts[$key])
+				? implode(',', $this->opts[$key]) : $this->opts[$key]) .';';
 		}
 		return rtrim($o, ';');
 	}
@@ -236,14 +303,14 @@ EOS;
 			$this->addMessage("Не съществува потребител с номер $this->userId.", true);
 			return;
 		}
-		$this->opts = User::extractOptions($data['opts']);
+		$this->opts = array_merge($this->opts, User::extractOptions($data['opts']));
 		unset($data['opts']);
 		extract2object($data, $this);
 	}
 
 
 	protected function initAnonUserData() {
-		extract2object($this->user->options(), $this);
+		$this->opts = array_merge($this->opts, $this->user->options());
 	}
 
 

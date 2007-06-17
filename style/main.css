@@ -70,12 +70,17 @@ fieldset ul, #footer ul {
 legend { font-style: italic; }
 .readercomment legend { font-style: normal; }
 
+dt { font-weight: bold; }
 dd { margin-left: 1.5em; }
 /* абзаци */
 p {
 	text-indent: 2.5em;
 	text-align: justify;
 	margin: 0;
+}
+ul {
+	margin-top: 0;
+	margin-bottom: 0;
 }
 em em {
 	font-weight: bold;
@@ -99,6 +104,8 @@ code {
 /* картинки */
 img { border: none; vertical-align: middle; }
 p img { margin: 0.2em auto; }
+img.float-left { float: left; margin: 0 1em 1em 0; }
+img.float-right { float: right; margin: 0 0 1em 1em; }
 
 /* елементи на формуляри */
 input, textarea, select {
@@ -246,9 +253,9 @@ li.novel { list-style-image: url('<?php echo $skin->image('novel')?>'); }
 li.novella { list-style-image: url('<?php echo $skin->image('novella')?>'); }
 li.shortstory, li.novelette { list-style-image: url('<?php echo $skin->image('shortstory')?>'); }
 li.poetry, li.poem { list-style-image: url('<?php echo $skin->image('poetry')?>'); }
-li.tale { list-style-image: url('<?php echo $skin->image('tale')?>'); }
+li.tale, li.fable { list-style-image: url('<?php echo $skin->image('tale')?>'); }
 li.othergenre, li.essay, li.article, li.play, li.screenplay,
-li.playbook, li.science, li.intro, li.travelnotes, li.other {
+li.playbook, li.science, li.intro, li.travelnotes, li.other, li.textbook {
 	list-style-image: url('<?php echo $skin->image('othergenre')?>');
 }
 
@@ -305,10 +312,14 @@ li.playbook, li.science, li.intro, li.travelnotes, li.other {
 	padding: 0.2em;
 }
 /* различни кутии — легенда, за авторските права, информационна */
-#legend, #copyright, .infobox, .readercomment, .tabbedpanebody {
+#legend, #copyright, .infobox, .readercomment, .tabbedpanebody, .tooltip {
 	color: <?php echo $mainFgColor?>;
 	background-color: <?php echo $tocBgColor?>;
 	clear: both;
+}
+.tooltip {
+	padding: 0.4em 0.6em;
+	border: thin solid <?php echo $mainFgColor?>;
 }
 #legend { margin-top: 3em; }
 /* анотация към текст */
@@ -323,7 +334,7 @@ li.playbook, li.science, li.intro, li.travelnotes, li.other {
 #copyright ul {
 	list-style-type: none;
 }
-/* съобщението в края на всеки текст — „Край“ или „Към...“ */
+/* съобщението в края на всеки текст — „Край“ или „Към…“ */
 #text-end-msg {
 	text-align: center;
 	font-variant: small-caps;
@@ -366,7 +377,7 @@ li.playbook, li.science, li.intro, li.travelnotes, li.other {
 	font-weight: bold;
 	font-size: 0.8em;
 	text-decoration: none;
-	border: thin <?php echo $buttonLinksBgColor?> outset;
+	border: thin outset <?php echo $buttonLinksBgColor?>;
 	padding: 0.15em;
 }
 /* същите бутонни препратки — активни или с мишка отгоре им */
@@ -387,7 +398,7 @@ li.playbook, li.science, li.intro, li.travelnotes, li.other {
 	opacity: .40;
 }
 /* допълнителни препратки за дадена тема, напр. автор */
-.infolink {
+.info {
 	font-size: small;
 	text-align: right;
 	margin: 0 .5em;
@@ -400,13 +411,13 @@ li.playbook, li.science, li.intro, li.travelnotes, li.other {
 }
 table.content {
 	margin: 0 auto 1em auto;
-	border: thin solid <?php echo $headerBgColor?>;
 	border-collapse: collapse;
 }
 table.content th, table.content td {
 	padding: 0.15em 0.4em;
+	border: thin solid <?php echo $headerBordColor?>;
 }
-caption { font-weight: bold; margin: 0 auto; }
+table.content caption { font-weight: bold; margin: 0 auto; }
 th {
 	color: <?php echo $headerFgColor?>;
 	background-color: <?php echo $headerBgColor?>;
@@ -432,21 +443,25 @@ pre.example, div.example {
 .text-title { font-variant: small-caps; }
 /* за фамилии */
 .lastname { font-variant: small-caps; }
-.epigraph p { text-align: right; }
+.epigraph p { margin-left: 5em; }
 .author { font-style: normal; text-align: right; }
+.epigraph .author, .dedication .author {
+	margin-left: 10em; text-align: left;
+}
 .letter, .cite { font-style: normal; }
 .subheader, .notice, .notice p {
 	font-weight: bold;
 	font-style: normal;
 	text-align: center;
 }
-.poetry h2, .poetry h3, .poetry h4, .poetry h5, .poetry h6, .poem .subheader {
+.epigraph .subheader { text-align: left; }
+.poetry h2, .poetry h3, .poetry h4, .poetry h5, .poetry h6,
+.poetry .subheader, .poetry .separator, .poem .subheader, .poem .separator {
 	text-align: left;
 	text-indent: 2.5em;
 }
 
 .post dt {
-	font-weight: bold;
 	background-color: <?php echo $toolbarBgColor?>;
 	padding: 0.3em 0.5em;
 	margin: 1em 1em 0 1em;

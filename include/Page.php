@@ -6,6 +6,7 @@ class Page {
 	protected $action, $title, $head, $langCode, $outencoding, $contentType;
 	protected $request, $user, $db, $content, $messages, $jsContent, $style;
 	protected $scriptStart, $scriptEnd, $styleStart, $styleEnd;
+	protected $defListLimit = 10, $maxListLimit = 50;
 
 
 	public function __construct($action = '') {
@@ -15,9 +16,11 @@ class Page {
 		$this->skin = Setup::skin();
 		$this->out = Setup::outputMaker();
 		$this->langCode = Setup::setting('lang_code');
-		#$this->masterEncoding = Setup::$masterEncoding;
-		$this->inencoding = 'utf-8';
-		$this->outencoding = $this->request->outputEncoding;
+		$this->masterEncoding = Setup::$masterEncoding;
+		$this->inencoding = $this->masterEncoding;
+		$this->doIconv = true;
+		$this->encfilter = '';
+		$this->setOutEncoding($this->request->outputEncoding);
 		$this->root = Setup::setting('webroot');
 		$this->rootd = Setup::setting('docroot');
 		$this->sitename = Setup::setting('sitename');
@@ -80,7 +83,23 @@ class Page {
 	public function setFullContent($content) { $this->fullContent = $content; }
 	public function setMessages($messages) { $this->messages = $messages; }
 	public function setTitle($title) { $this->title = $title; }
-	public function setOutEncoding($enc) { $this->outencoding = $enc; }
+
+	public function setOutEncoding($enc) {
+		if ( empty($enc) ) return;
+		$enc = strtolower($enc);
+		$this->outencoding = $enc;
+		switch ($enc) {
+		case 'mik': // non-standard BG DOS encoding
+			$this->outencoding = 'cp866';
+			$this->encfilter = 'cp8662mik';
+			break;
+		case 'iso-8859-1': case 'cp1252': case 'windows-1252':
+			$this->doIconv = false;
+			$this->encfilter = 'cyr2lat';
+			break;
+		}
+	}
+
 	public function setContentType($contentType) { $this->contentType = $contentType; }
 
 	public function setFields($data) {
@@ -88,7 +107,6 @@ class Page {
 			$this->$field = $value;
 		}
 	}
-
 
 	public function addContent($content) { $this->content .= $content; }
 	public function addStyle($style) { $this->style .= $style; }
@@ -111,7 +129,7 @@ class Page {
 		if ( empty($this->fullContent) ) {
 			$this->makeFullContent($elapsedTime);
 		}
-		print $this->fullContent;
+		$this->encprint($this->fullContent);
 	}
 
 
@@ -184,9 +202,9 @@ $xmlPI
 	<link rel="icon" href="$this->rootd/img/favicon.png" type="image/png" />
 	<link rel="shortcut icon" href="$this->rootd/img/favicon.png" type="image/png" />
 	<script type="text/javascript" src="$this->rootd/main.js.php"></script>
+$this->head
 $this->style
 $this->jsContent
-$this->head
 </head>
 <body>
 <p id="jump-to" class="non-graphic">Направо към
@@ -210,6 +228,7 @@ $nav
 <div id="footer">
 <ul>
 	<li><a href="$this->root/about">За $this->sitename</a></li>
+	<li>{SITENAME} се задвижва от <a href="http://sourceforge.net/projects/mylib/">mylib</a>.</li>
 </ul>
 </div>
 
@@ -273,6 +292,7 @@ EOS;
 	array("$this->root/work", 'Списък на произведения, подготвящи се за добавяне', 'Сканиране'),
 	array("$this->root/liternews", 'Новини, свързани с литературата. Добавят се от потребителите.', 'Литер. новини'),
 	array("/phpBB2/", 'Форумната система на сайта', 'Форум'),
+	array("$this->root/statistics", '', 'Статистика'),
 	array("$this->root/links", 'Връзки към други полезни места в мрежата', 'Връзки'),
 	array("$this->root/feedback", 'Връзка с хората, отговарящи за библиотеката', 'Обратна връзка'),
 ),
@@ -365,12 +385,12 @@ EOS;
 	}
 
 
-	protected function encprint($s, $filter = NULL) {
-		if ($this->outencoding != $this->inencoding) {
+	protected function encprint($s) {
+		if ($this->outencoding != $this->inencoding && $this->doIconv) {
 			$s = iconv($this->inencoding, $this->outencoding.'//TRANSLIT', $s);
-			if ( !empty($filter) && function_exists($filter) ) {
-				$s = $filter($s);
-			}
+		}
+		if ( !empty($this->encfilter) && function_exists($this->encfilter) ) {
+			$s = call_user_func($this->encfilter, $s);
 		}
 		echo $s;
 	}
@@ -423,10 +443,11 @@ EOS;
 	 * @return string
 	 */
 	protected function makeDlLink($textId, $zfsize, $ltext = NULL) {
-		$zfsize = ceil($zfsize / 1024);
-		$ltext = empty($ltext) ? "$zfsize&nbsp;КБ" : htmlspecialchars($ltext);
+		$zfsize = $zfsize >> 10; // divide by 2^10 w/o rest
+		if ($zfsize == 0) $zfsize = 1;
+		$ltext = empty($ltext) ? "$zfsize&nbsp;KiB" : htmlspecialchars($ltext);
 		return <<<EOS
-	<a class="save" href="$this->root/download/$textId" title="Сваляне във формат ZIP, $zfsize КБ">$ltext</a>
+	<a class="save" href="$this->root/download/$textId" title="Сваляне във формат ZIP, $zfsize кибибайта">$ltext</a>
 EOS;
 	}
 
@@ -446,7 +467,7 @@ EOS;
 		global $types;
 		extract($data);
 		$class = empty($reader) ? 'unread' : 'read';
-		$ksize = floor($size / 1024);
+		$ksize = $size >> 10; // divide by 2^10 w/o rest
 		$titleExt = '';
 		if ( ($this->time - $date) < 2592000 ) { // 30 days limit
 			$class .= ' new';
@@ -454,8 +475,7 @@ EOS;
 			$titleExt = " — ново произведение, добавено на $fdate";
 		}
 		return <<<EOS
-	<a class="$class" href="$this->root/text/$textId"
-		title="$types[$type], {$ksize} КБ$titleExt"><em>$title</em></a>
+	<a class="$class" href="$this->root/text/$textId" title="$types[$type], {$ksize} кибибайта$titleExt"><em>$title</em></a>
 EOS;
 	}
 
@@ -481,8 +501,8 @@ EOS;
 		foreach ( explode(',', $name) as $lname ) {
 			$text = empty($sortby) ? 'Произведения'
 				: $this->formatPersonName($lname, $sortby);
-			$o .= ", $pref<a href='$this->root/author/".$this->urlencode($lname).
-				"$query'>$text</a>$suf";
+			$o .= ", $pref<a href='$this->root/author/".
+				$this->urlencode( trim($lname) ). "$query'>$text</a>$suf";
 		}
 		return substr($o, 2);
 // 		return ltrim( preg_replace('/([^,]+)/e',
@@ -496,8 +516,8 @@ EOS;
 		$o = '';
 		foreach ( explode(',', $name) as $lname ) {
 			$text = empty($sortby) ? 'Преводи' : $this->formatPersonName($lname, $sortby);
-			$o .= ", $pref<a href=\"$this->root/translator/".$this->urlencode($lname).
-				$query.'">'. $text ."</a>$suf";
+			$o .= ", $pref<a href=\"$this->root/translator/".
+				$this->urlencode( trim($lname) ). $query.'">'. $text ."</a>$suf";
 		}
 		return substr($o, 2);
 	}
@@ -599,9 +619,11 @@ EOS;
 	}
 
 
-	protected function makeYearView($year, $year2 = 0) {
-		if ( !empty($year2) ) return $year2;
-		return empty($year) ? '????' : $year;
+	protected function makeYearView($year, $yearAlt = 0, $year2 = 0) {
+		if ( !empty($yearAlt) ) $year = $yearAlt;
+		if ( empty($year) ) return '????';
+		$year2 = empty($year2) ? '' : '–'. abs($year2);
+		return $year > 0 ? $year . $year2 : abs($year) . $year2 .' пр.н.е.';
 	}
 
 
@@ -624,10 +646,39 @@ EOS;
 	}
 
 
+	protected function makePageLinks($count, $limit, $offset = 0, $urlprefix = '') {
+		if ( $count <= $limit ) { return ''; }
+		if ( empty($urlprefix) ) { $urlprefix = '{FACTION}'; }
+		$curCnt = $i = 0;
+		$o = '';
+		while ($curCnt < $count) {
+			$i++;
+			$o .= $offset == $curCnt ? "· <strong>$i</strong> ·"
+				: " <a href='$urlprefix/offset=$curCnt/limit=$limit'>$i</a> ";
+			$curCnt += $limit;
+		}
+		return '<div class="buttonlinks" style="text-align:center; margin-top:1em">Страници:'.
+			trim($o, '·').'</div>';
+	}
+
+
+	protected function initPaginationFields() {
+		$this->loffset = (int) $this->request->value('offset', 0);
+		$this->llimit = $this->normInt(
+			(int) $this->request->value('limit', $this->defListLimit),
+			$this->maxListLimit);
+	}
+
 	protected function getFreeId($dbtable) {
 		return $this->db->autoIncrementId($dbtable);
 	}
 
+
+	protected function normInt($val, $max, $min = 1) {
+		if ($val > $max) $val = $max;
+		elseif ($val < $min) $val = $min;
+		return (int) $val;
+	}
 }
 
 ?>

@@ -63,7 +63,7 @@ EOS;
 
 $this->info
 
-http://purl.org/NET/mylib/edit/$this->textId/mode=full
+$this->purl/edit/$this->textId/mode=full
 EOS;
 	}
 

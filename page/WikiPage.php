@@ -13,7 +13,7 @@ class WikiPage extends Page {
 	public function filecontent($action, $replace = true) {
 		$file = $this->filename($action);
 		if ( !file_exists($file) ) { return ''; }
-		$parser = new Sfb2XConverter($file);
+		$parser = new Sfb2HTMLConverter($file);
 		$parser->parse();
 		return explainAcronyms( $parser->text );
 	}

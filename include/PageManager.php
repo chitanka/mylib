@@ -4,10 +4,11 @@ class PageManager {
 
 	private static $pageDir = 'page/';
 	private static $defaultPage = 'main';
-	private static $cachedPagesServer = array('main', 'about', 'help', 'title',
-		'series', 'author', 'translator', 'label');
-	private static $cachedPagesClient = array('css', 'user', 'text',
-		'download', 'history', 'sendNewPassword', 'add',
+	private static $cachedPagesServer = array('main', 'about', 'links', 'help',
+		'blacklist', 'title', 'series', 'author', 'translator', 'label',
+		'statistics');
+	private static $cachedPagesClient = array('css', 'user', 'text', 'comment',
+		'download', 'history', 'sendNewPassword', 'add', 'liternews',
 		'suggestOrigTitle', 'suggestTranslator');
 
 
@@ -27,7 +28,7 @@ class PageManager {
 
 	public static function pageCanBeCachedClient($action) {
 		return in_array($action, self::$cachedPagesClient) ||
-			self::pageCanBeCachedServer($action);
+			in_array($action, self::$cachedPagesServer);
 	}
 
 

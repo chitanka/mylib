@@ -132,12 +132,21 @@ class AuthorPage extends ViewPage {
 				? "<a href='$this->root/translator/$authorEnc' title='Преглед на преводните текстове на $author'>Преводни заглавия</a>, "
 				: '';
 			$img = $this->makeCountryImage($country);
+			if ( !empty($real_name) && $author != $real_name ) {
+				$real_name = "Пълно (истинско) име: $real_name";
+				if ( !empty($oreal_name) ) {
+					$real_name .= " ($oreal_name)";
+				}
+				$real_name .= ', ';
+			} else {
+				$real_name = '';
+			}
 			$o .= <<<EOS
 
 <h2 id="$anchor">$showName $origAuthorName
 	$img $editLink
 </h2>
-<p class="infolink">$translatorLink $infoLink</p>
+<p class="info">$real_name $translatorLink $infoLink</p>
 
 EOS;
 			$series = $this->authors_titles[$authorId];
@@ -166,12 +175,11 @@ EOS;
 					}
 					if ($this->order == 'time') {
 						$titleView = '<span class="extra"><tt>'.
-							$this->makeYearView($year, $ayear).
+							$this->makeYearView($year, $ayear, $year2).
 							'</tt> — </span>'.$textLink;
 					} else {
 						$titleView = $textLink;
-						if ( !empty($ayear) ) { $extras[] = $ayear; }
-						elseif ( !empty($year) ) { $extras[] = $year; }
+						$extras[] = $this->makeYearView($year, $ayear, $year2);
 					}
 					$extras = empty($extras) ? '' : '('. implode(', ', $extras) .')';
 					$dlCheckbox = $this->makeDlCheckbox($textId);
@@ -216,10 +224,12 @@ EOS;
 
 
 	protected function makeExtendedListQuery() {
-		$qSelect = "SELECT a.name author, a.orig_name origAuthorName, a.id authorId,
+		$qSelect = "SELECT a.name author, a.orig_name origAuthorName,
+		a.id authorId, a.real_name, a.oreal_name,
 		a.country, (a.role & 2) is_t, a.info, at.year ayear,
 		t.id textId, t.title, t.lang, t.orig_title,
-		t.orig_lang, t.year, t.type, t.sernr, t.size, t.zsize, UNIX_TIMESTAMP(t.date) date,
+		t.orig_lang, t.year, t.year2, t.type, t.sernr, t.size, t.zsize,
+		UNIX_TIMESTAMP(t.entrydate) date,
 		s.name series, s.orig_name orig_series";
 		$qFrom = " FROM /*p*/author_of at
 		LEFT JOIN /*p*/text t ON at.text = t.id
@@ -258,7 +268,8 @@ EOS;
 			return; // invalid author-text relation
 		}
 		if ( !isset($this->authorsData[$authorId]) ) {
-			$this->authorsData[$authorId] = compact('author', 'origAuthorName', 'country', 'is_t', 'info');
+			$this->authorsData[$authorId] = compact('author', 'origAuthorName',
+				'real_name', 'oreal_name', 'country', 'is_t', 'info');
 		}
 		$this->textsData[$textId] = $dbrow;
 		$series = empty($series) ? $GLOBALS['typesPl'][$type] : ' '.$series;

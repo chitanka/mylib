@@ -27,10 +27,13 @@ class EditPage extends Page {
 		$this->tlang = $this->request->value('lang', 'bg');
 		$this->orig_lang = $this->request->value('orig_lang', 'bg');
 		$this->year = $this->request->value('year');
+		$this->year2 = $this->request->value('year2');
 		$this->trans_year = $this->request->value('trans_year');
+		$this->trans_year2 = $this->request->value('trans_year2');
 		$this->type = $this->request->value('type', 'shortstory');
 		$this->series = $this->request->value('series', 0);
 		$this->sernr = $this->request->value('sernr', 0);
+		$this->collection = $this->request->checkbox('collection');
 		$this->headlevel = $this->request->value('headlevel', 0);
 		$this->copy = (int) $this->request->checkbox('copy');
 		$this->tcontent = rtrim($this->request->value('content', ''));
@@ -85,14 +88,15 @@ class EditPage extends Page {
 		$set = array('title' => $this->ttitle, 'orig_title' => $this->orig_title,
 			'subtitle' => $this->subtitle, 'orig_subtitle' => $this->orig_subtitle,
 			'lang' => $this->tlang, 'orig_lang' => $this->orig_lang,
-			'trans_year' => $this->trans_year, 'year' => $this->year,
-			'type' => $this->type,
+			'year' => $this->year, 'trans_year' => $this->trans_year,
+			'year2' => $this->year2, 'trans_year2' => $this->trans_year2,
+			'type' => $this->type, 'collection' => $this->collection,
 			'series' => $this->series, 'sernr' => $this->sernr,
 			'copy' => $this->copy);
 		$key = $this->textId;
 		$qs = array();
 		if ($this->textId == 0) {
-			$set['date'] = date('Y-m-d');
+			$set['entrydate'] = date('Y-m-d');
 			$this->textId = $this->db->autoIncrementId($this->mainDbTable);
 			if ( !empty($this->scanUser) ) {
 				foreach ( explode(';', $this->scanUser) as $user_perc ) {
@@ -135,7 +139,7 @@ class EditPage extends Page {
 			$qs = $this->makeUpdateChunkQuery($file);
 			$size = filesize($file);
 			$set = array('size' => $size, 'zsize' => $size/3.5,
-				'headlevel' => $this->headlevel);
+				'headlevel' => $this->headlevel, 'lastmod' => date('Y-m-d H:i:s'));
 			$qs[] = $this->db->updateQ($this->mainDbTable, $set, array('id'=>$this->textId));
 			$set = array("size = percent/100 * $size");
 			$key = array('text' => $this->textId);
@@ -291,8 +295,13 @@ EOS;
 		$sernr = $this->out->textField('sernr', '', $this->sernr, 2);
 		$year = $this->out->textField('year', '', $this->year, 4);
 		$trans_year = $this->out->textField('trans_year', '', $this->trans_year, 4);
-		$lang = $this->out->selectBox('lang', '', $GLOBALS['langs'], $this->tlang);
-		$olang = $this->out->selectBox('orig_lang', '', $GLOBALS['langs'], $this->orig_lang);
+		$year2 = $this->out->textField('year2', '', $this->year2, 4);
+		$trans_year2 = $this->out->textField('trans_year2', '', $this->trans_year2, 4);
+		$langs = $GLOBALS['langs'];
+		$langs[''] = '(Неизвестен)';
+		$lang = $this->out->selectBox('lang', '', $langs, $this->tlang);
+		$olang = $this->out->selectBox('orig_lang', '', $langs, $this->orig_lang);
+		$collection = $this->out->checkbox('collection', '', $this->collection, 'Колективен сборник');
 		$copy = $this->out->checkbox('copy', '', $this->copy, 'Важи авторско право');
 		return <<<EOS
 	<label for="title">Заглавие:</label>
@@ -304,19 +313,20 @@ EOS;
 	<label for="orig_subtitle">Ориг. подзаглавие:</label>
 	$orig_subtitle<br />
 	<label for="series">Поредица:</label>
-	$series&nbsp;
+	$series &nbsp;
 	<label for="sernr">Пореден номер в поредицата:</label>
 	$sernr<br />
 	<label for="lang">Език:</label>
-	$lang&nbsp;
+	$lang &nbsp;
 	<label for="orig_lang">Оригинален език:</label>
 	$olang<br />
 	<label for="year">Година на написване/излизане:</label>
-	$year&nbsp;
+	{$year}–$year2 &nbsp;
 	<label for="trans_year">Година на превод:</label>
-	$trans_year<br />
+	{$trans_year}–$trans_year2<br />
 	<label for="type">Вид:</label>
-	$type<br />
+	$type &nbsp;
+	$collection<br />
 	$copy
 EOS;
 	}
@@ -450,7 +460,7 @@ EOS;
 		$js = rtrim($js, ',') . "\n}; // end of array persons['$key']\n";
 		$this->addJs($js);
 		$dbkey = array('text' => $this->textId);
-		$q = $this->db->selectQ($key.'_of', $dbkey, $key);
+		$q = $this->db->selectQ($key.'_of', $dbkey, $key, 'pos');
 		$addRowFunc = create_function('$row',
 			'return "addRow(\''.$key.'\', $row['.$key.']); ";');
 		$load = $this->db->iterateOverResult($q, $addRowFunc);
@@ -567,8 +577,8 @@ EOS;
 			$this->initChunkData();
 		}
 		$result = $this->db->query("SELECT title ttitle, orig_title, orig_lang,
-		subtitle, orig_subtitle,
-		trans_year, t.year, type, series, sernr, copy,
+		subtitle, orig_subtitle, trans_year, trans_year2, t.year, year2,
+		type, series, sernr, collection, copy,
 		GROUP_CONCAT(aof.author) author, GROUP_CONCAT(a.name) nauthor
 		FROM /*p*/$this->mainDbTable t
 		LEFT JOIN /*p*/author_of aof ON (t.id = aof.text)
@@ -579,9 +589,9 @@ EOS;
 		if ( empty($data) ) {
 			$this->copy = true;
 			$this->nauthor = '';
-		}/* else {
-			$this->copy = $this->db->s2b($this->copy);
-		}*/
+		} else {
+			$this->collection = $this->db->s2b($this->collection);
+		}
 		$this->author = explode(',', (string) $this->author);
 	}
 

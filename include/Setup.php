@@ -20,11 +20,11 @@ class Setup {
 		// Read configuration file
 		self::$config = parse_ini_file(self::$configFile, true);
 		define('ADMIN', self::$config['admin']);
-		define('ADMIN_EMAIL', header_encode(ADMIN) .' <'.
-			self::$config['admin_email'] .'>');
+		define('ADMIN_EMAIL', self::$config['admin_email']);
+		define('ADMIN_EMAIL_ENC', header_encode(ADMIN) .' <'. ADMIN_EMAIL .'>');
 		define('SITENAME', self::$config['sitename']);
-		define('SITE_EMAIL', header_encode(SITENAME) .' <'.
-			self::$config['site_email'] .'>');
+		define('SITE_EMAIL', self::$config['site_email']);
+		define('SITE_EMAIL_ENC', header_encode(SITENAME) .' <'. SITE_EMAIL .'>');
 		self::setupIni();
 		addIncludePath( PageManager::pageDir() );
 		self::setupUserRights();
@@ -48,35 +48,17 @@ class Setup {
 	}
 
 
-	public static function request() {
-		self::setupRequest();
-		return self::$request;
-	}
+	public static function request() { return self::setupRequest(); }
 
-	public static function user() {
-		self::setupUser();
-		return self::$user;
-	}
+	public static function user() { return self::setupUser(); }
 
-	public static function skin() {
-		self::setupSkin();
-		return self::$skin;
-	}
+	public static function skin() { return self::setupSkin(); }
 
-	public static function db() {
-		self::setupDB();
-		return self::$db;
-	}
+	public static function db() { return self::setupDB(); }
 
-	public static function outputMaker() {
-		self::setupOutputMaker();
-		return self::$outputMaker;
-	}
+	public static function outputMaker() { return self::setupOutputMaker(); }
 
-	public static function mailer() {
-		self::setupMailer();
-		return self::$mailer;
-	}
+	public static function mailer() { return self::setupMailer(); }
 
 
 	/**
@@ -101,55 +83,63 @@ class Setup {
 
 
 	private static function setupDB() {
-		if ( isset(self::$db) ) { return; }
-		extract(self::$config['db']);
-		self::$db = new Database($server, $user, $pass, $name);
-		if ( !empty($prefix) ) { self::$db->setPrefix($prefix.'_'); }
+		if ( !isset(self::$db) ) {
+			extract(self::$config['db']);
+			self::$db = new Database($server, $user, $pass, $name);
+			if ( !empty($prefix) ) { self::$db->setPrefix($prefix.'_'); }
+		}
+		return self::$db;
 	}
 
 
 	private static function setupRequest() {
-		if ( isset(self::$request) ) { return; }
-		self::$request = new Request();
+		if ( !isset(self::$request) ) {
+			self::$request = new Request();
+		}
+		return self::$request;
 	}
 
 
 	private static function setupUser() {
-		if ( isset(self::$user) ) { return; }
-		self::$user = User::initUser();
+		if ( !isset(self::$user) ) {
+			self::$user = User::initUser();
+		}
+		return self::$user;
 	}
 
 
 	private static function setupSkin() {
-		if ( isset(self::$skin) ) { return; }
-		self::setupUser();
-		$name = self::$user->option('skin');
-		$skinDir = $name == 'neg' ? $name .'/' : 'main/';
-		self::$skin = new Skin($skinDir);
+		if ( !isset(self::$skin) ) {
+			self::setupUser();
+			$name = self::$user->option('skin');
+			$skinDir = $name == 'neg' ? $name .'/' : 'main/';
+			self::$skin = new Skin($skinDir);
+		}
+		return self::$skin;
 	}
 
 
 	private static function setupOutputMaker() {
-		if ( isset(self::$outputMaker) ) { return; }
-		self::$outputMaker = new OutputMaker();
+		if ( !isset(self::$outputMaker) ) {
+			self::$outputMaker = new OutputMaker();
+		}
+		return self::$outputMaker;
 	}
 
 
 	private static function setupMailer() {
-		if ( isset(self::$mailer) ) { return; }
-		extract(self::$config['mail']);
-		require_once 'Mail.php';
-		$params = array(
-			'host' => $host, 'auth' => true,
-			'username' => $user, 'password' => self::decodePass($pass),
-			'persist' => true,
-		);
-		self::$mailer = Mail::factory($backend, $params);
+		if ( !isset(self::$mailer) ) {
+			extract(self::$config['mail']);
+			require_once 'Mail.php';
+			$params = array(
+				'host' => $host, 'port' => $port, 'auth' => $auth == '1',
+				'username' => $user, 'password' => $pass,
+				'persist' => $persist == '1',
+			);
+			self::$mailer = Mail::factory($backend, $params);
+		}
+		return self::$mailer;
 	}
 
-
-	private static function decodePass($encPass) {
-		return base64_decode(str_rot13(strrev($encPass)));
-	}
 }
 ?>

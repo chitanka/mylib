@@ -46,7 +46,7 @@ class UserPage extends Page {
 		if ( !file_exists($this->filename) ) {
 			return '';
 		}
-		$parser = new Sfb2XConverter($this->filename);
+		$parser = new Sfb2HTMLConverter($this->filename);
 		$parser->parse();
 		return $this->userpage = $parser->text;
 	}

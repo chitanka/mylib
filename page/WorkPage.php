@@ -10,12 +10,22 @@ class WorkPage extends Page {
 	protected $imgs = array('0', '25', '50', '75', '100');
 	protected $progressBarWidth = '20', $maxScanStatus = 2;
 	const DEF_TMPFILE = 'http://';
+	// copied from MediaWiki
+	protected $fileBlacklist = array(
+		# HTML may contain cookie-stealing JavaScript and web bugs
+		'html', 'htm', 'js', 'jsb',
+		# PHP scripts may execute arbitrary code on the server
+		'php', 'phtml', 'php3', 'php4', 'php5', 'phps',
+		# Other types that may be interpreted by some servers
+		'shtml', 'jhtml', 'pl', 'py', 'cgi');
 
 
 	public function __construct() {
 		parent::__construct();
 		$this->action = 'work';
 		$this->title = 'Подготовка на нови произведения';
+		$this->mainDbTable = 'work';
+		$this->suplDbTable = 'work_multi';
 		$this->tmpDir = 'to-do/';
 		$this->subaction = $this->request->param(1);
 		$this->entry = (int) $this->request->value('entry', 0, 2);
@@ -29,13 +39,14 @@ class WorkPage extends Page {
 		$this->delete = $this->request->checkbox('delete');
 		$this->scanuser = (int) $this->request->value('user', $this->user->id);
 		$this->comment = $this->request->value($this->FF_COMMENT);
+		$this->comment = strtr($this->comment, array("\r"=>''));
 		$this->tmpfiles = $this->request->value('tmpfiles', self::DEF_TMPFILE);
 		$this->tfsize = $this->request->value('tfsize');
 		$this->editComment = $this->request->value($this->FF_EDIT_COMMENT);
+		$this->uplfile = $this->makeUploadedFileName();
+		$this->uplfile = $this->escapeBlackListedExt($this->uplfile);
 		$this->form = $this->request->value('form');
 		$this->date = date('Y-m-d H:i:s');
-		$this->mainDbTable = 'work';
-		$this->suplDbTable = 'work_multi';
 	}
 
 
@@ -79,14 +90,16 @@ class WorkPage extends Page {
 			'date'=>$this->date, 'frozen' => $this->frozen,
 			'status'=>$this->status, 'progress' => $this->progress,
 			'tmpfiles' => $this->tmpfiles, 'tfsize' => $this->tfsize);
+		if ( $this->isSingleUser($this->workType) ) {
+			if ( $this->handleUpload() && !empty($this->uplfile) ) {
+				$set['uplfile'] = $this->uplfile;
+			}
+		}
 		$this->db->insertOrUpdate($this->mainDbTable, $set, $this->entry);
 		$msg = $this->entry == 0
 			? 'Произведението беше добавено в списъка с подготвяните.'
 			: 'Данните за произведението бяха обновени.';
 		$this->addMessage($msg);
-		if ( $this->isSingleUser($this->workType) ) {
-			$this->handleUpload();
-		}
 		return $this->makeLists();
 	}
 
@@ -111,6 +124,9 @@ class WorkPage extends Page {
 		$set = array('pid' => $this->entry, 'user' => $this->user->id,
 			'comment' => $this->editComment, 'date' => $this->date,
 			'progress' => $this->progress, 'frozen' => $this->frozen);
+		if ( $this->handleUpload() && !empty($this->uplfile) ) {
+			$set['uplfile'] = $this->uplfile;
+		}
 		if ($this->db->exists($this->suplDbTable, $key)) {
 			$this->db->update($this->suplDbTable, $set, $key);
 			$msg = 'Данните за редакцията ви бяха обновени.';
@@ -123,7 +139,6 @@ class WorkPage extends Page {
 		// update main entry
 		$set = array('date' => $this->date, 'status' => $this->isEditDone() ? 4 : 3);
 		$this->db->update($this->mainDbTable, $set, $pkey);
-		$this->handleUpload();
 		return $this->makeLists();
 	}
 
@@ -131,9 +146,7 @@ class WorkPage extends Page {
 	protected function handleUpload() {
 		$tmpfile = $_FILES['file']['tmp_name'];
 		if ( is_uploaded_file($tmpfile) ) {
-			$dest = "$this->tmpDir$this->entry-".$this->user->username.'-'.
-				str_replace(array('"', "'", '..'), '', $_FILES['file']['name']);
-			#$dest = cyr2lat($dest);
+			$dest = $this->tmpDir . $this->uplfile;
 			if ( file_exists($dest) ) { $dest .= '.1'; }
 			if ( !move_uploaded_file($tmpfile, $dest) ) {
 				$this->addMessage("Файлът не успя да бъде качен. Опитайте пак!", true);
@@ -149,6 +162,15 @@ class WorkPage extends Page {
 			$mailpage->setFields($fields);
 			$mailpage->execute();
 		}
+		return true;
+	}
+
+
+	protected function makeUploadedFileName() {
+		$filename = @$_FILES['file']['name'];
+		if ( empty($filename) ) return '';
+		return $this->entry .'-'. $this->user->username .'-'.
+			str_replace(array('"', "'"), '', $filename);
 	}
 
 
@@ -174,6 +196,7 @@ class WorkPage extends Page {
 			ORDER BY date DESC, w.id DESC";
 		if ($limit > 0) $q .= " LIMIT $limit";
 		$this->rowclass = 'even';
+		$this->tooltips = '';
 		$l = $this->db->iterateOverResult($q, 'makeWorkListItem', $this, true);
 		if ( empty($l) ) {
 			return '<p style="text-align:center"><strong>Няма подготвящи се произведения.</strong></p>';
@@ -203,6 +226,11 @@ EOS;
 		$author = strtr($author, array(', '=>','));
 		$author = $this->makeAuthorLink($author);
 		$userlink = $this->makeUserLink($username);
+		$info = '';
+		if ( !empty($comment) ) {
+			$comment = strtr($comment, array("\n"=>'', "\r"=>''));
+			$info = $this->out->image($this->skin->image('info'),  '', $comment);
+		}
 		$title = $this->userCanEditEntry($user, $type)
 			? "<a href='$this->root/$this->action/edit/$id' title='Към страницата за редактиране'><em>$title</em></a>" : "<em>$title</em>";
 		$this->rowclass = $this->rowclass == 'even' ? 'odd' : 'even';
@@ -241,7 +269,7 @@ EOS;
 	<tr class="$this->rowclass$extraclass">
 		<td title="$date">$ddate</td>
 		<td>$img</td>
-		<td>$title</td>
+		<td>$info $title</td>
 		<td>$author</td>
 		<td>$st
 			$progressbar
@@ -429,7 +457,7 @@ EOS;
 			$tmpfiles = $this->out->textField('tmpfiles', '', $this->tmpfiles, 50, 255);
 			$tmpfiles .= ' &nbsp; '.$this->out->label('Размер:', 'tfsize') .
 				$this->out->textField('tfsize', '', $this->tfsize, 2, 4) .
-				'<acronym title="Мегабайта">МБ</acronym>';
+				'<acronym title="Мегабайта">MB</acronym>';
 		} else {
 			$status = $this->statuses[$cstatus];
 			$frozen = $this->frozen ? "($frozenLabel)" : '';
@@ -528,6 +556,10 @@ EOS;
 			extract($edata);
 			$class = $class == 'odd' ? 'even' : 'odd';
 			$ulink = $this->makeUserLink($username);
+			if ( !empty($uplfile) ) {
+				$url = $this->rootd .'/'. $this->tmpDir . $uplfile;
+				$comment .= " (<a href='$url' title='Качен от $username файл'>Качен файл</a>)";
+			}
 			$progressbar = $this->makeProgressBar($progress);
 			if ($frozen) {
 				$class .= ' frozen';
@@ -633,10 +665,11 @@ EOS;
 
 	protected function makeSendFileHelp() {
 		$tmpDir = "<a href='$this->rootd/$this->tmpDir'>$this->rootd/$this->tmpDir</a>";
+		$adminMail = $this->out->obfuscateEmail(ADMIN_EMAIL);
 		return <<<EOS
 
 <p>Когато сте готови с текста, в полето „Файл“ изберете файла с произведението (като натиснете бутона до полето ще ви се отвори прозорче за избор).</p>
-<p>Има ограничение от <strong>2</strong> мегабайта за големината на файла, затова първо го компресирайте. Ако и това не помогне, опитайте да го разделите на части или пък ми го пратете по електронната поща — b.manolov(при)gmail.com.</p>
+<p>Има ограничение от <strong>2</strong> мебибайта за големината на файла, затова първо го компресирайте. Ако и това не помогне, опитайте да го разделите на части или пък ми го пратете по електронната поща — $adminMail.</p>
 <p><strong>Важно:</strong> Ако след съхранението не видите съобщението „Файлът беше качен“, значи е станал някакъв фал при качването на файла. В такъв случай опитайте да го пратите отново.</p>
 <p>Ще съм ви благодарен, ако включвате и всякаква допълнителна информация както за текста, така и за самия файл.</p>
 <p>За произведението е добре да има данни относно хартиеното издание и за преводача, ако е превод. За файла е хубаво да се знае кой го е сканирал и редактирал.</p>
@@ -653,7 +686,7 @@ EOS;
 
 
 	protected function makeContribList() {
-		$this->mb = 1 << 20;
+		$this->mb = 1 << 20; // = 2^20
 		$this->rowclass = '';
 		$q = "SELECT DISTINCT u.username, COUNT(ut.user) count, SUM(ut.size) size
 		FROM /*p*/user_text ut
@@ -673,7 +706,7 @@ EOS;
 	<thead>
 	<tr>
 		<th>Потребител</th>
-		<th title="Размер на обработените произведения в мегабайта">Размер (в <acronym title="Мегабайта">МБ</acronym>)</th>
+		<th title="Размер на обработените произведения в мебибайта">Размер (в <acronym title="Мебибайта">MiB</acronym>)</th>
 		<th title="Брой на обработените произведения">Брой</th>
 	</tr>
 	</thead>
@@ -786,6 +819,8 @@ EOS;
 		$msg = <<<EOS
 Нов потребител се присъедини към редактирането на „{$title}“ от $author.
 
+$this->purl/work/edit/$entry
+
 Моята библиотека
 EOS;
 		$fields = array('mailTo' => "$realname <$email>",
@@ -795,5 +830,16 @@ EOS;
 		return $mailpage->execute();
 	}
 
+
+	protected function escapeBlackListedExt($filename) {
+		$fext = ltrim(strrchr($this->uplfile, '.'), '.');
+		foreach ($this->fileBlacklist as $blext) {
+			if ($fext == $blext) {
+				$filename = preg_replace("/$fext$/", '$0.txt', $filename);
+				break;
+			}
+		}
+		return $filename;
+	}
 }
 ?>

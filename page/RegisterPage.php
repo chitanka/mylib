@@ -36,6 +36,12 @@ class RegisterPage extends Page {
 			$this->addMessage("Името $this->username вече е заето.", true);
 			return $this->buildContent();
 		}
+		$emailKey = array('email' => $this->email);
+		if ( $this->db->exists($this->mainDbTable, $emailKey) ) {
+			$this->addMessage("Пощенският адрес <strong>{$this->email}</strong> вече се ползва от друг потребител.", true);
+			$this->addMessage("Ако сте забравили потребителското си име, можете <a href='$this->root/sendUsername'>да поискате напомняне за него</a>.");
+			return $this->buildContent();
+		}
 		$set = array('username' => $this->username, 'realname' => $this->realname,
 			'lastname' => ltrim(strrchr($this->realname, ' ')),
 			'password' => $this->db->encodePasswordDB($this->password),

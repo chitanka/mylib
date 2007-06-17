@@ -92,8 +92,8 @@ EOS;
 
 	protected function makeExtendedListQuery() {
 		$qSelect = "SELECT l.id labelId, l.name label,
-			t.id textId, t.title, t.lang, t.orig_title, t.orig_lang,
-			t.year, t.type, t.sernr, t.size, t.zsize, UNIX_TIMESTAMP(t.date) date,
+			t.id textId, t.title, t.lang, t.orig_title, t.orig_lang, t.collection,
+			t.year, t.type, t.sernr, t.size, t.zsize, UNIX_TIMESTAMP(t.entrydate) date,
 			GROUP_CONCAT(a.name) author";
 		$qFrom = " FROM /*p*/text_label h
 			LEFT JOIN /*p*/label l ON h.label = l.id
@@ -145,7 +145,7 @@ EOS;
 		$dlLink = $this->makeDlLink($textId, $zsize);
 		$editLink = $this->userCanEdit ? $this->makeEditTextLink($textId) : '';
 		$dlCheckbox = $this->makeDlCheckbox($textId);
-		$author = $this->makeAuthorLink($author);
+		$author = $collection == 'true' ? '' : $this->makeAuthorLink($author);
 		if ( !empty($author) ) { $author = '— '.$author; }
 		$o .= <<<EOS
 

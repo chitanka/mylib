@@ -16,6 +16,9 @@ class TitlePage extends ViewPage {
 		$this->orig_lang = $this->request->value($this->FF_ORIGLANG, '');
 		$this->woTransl = $this->request->value('woTransl', 0);
 		$this->woLabel = $this->request->value('woLabel', 0);
+		if ($this->order == 'time' && empty($this->startwith)) {
+			$this->showHeaders = false;
+		}
 	}
 
 
@@ -25,7 +28,8 @@ class TitlePage extends ViewPage {
 		$items = $this->db->iterateOverResult($this->makeSimpleListQuery(),
 			'makeSimpleListItem', $this);
 		if ( empty($items) ) { return false; }
-		$o = '<ul style="display:none"><li></li>'. $items .'</ul>';
+		$listHack = $this->showHeaders ? ' style="display:none"><li></li>' : '>';
+		$o = '<ul'.$listHack. $items .'</ul>';
 		if ($this->showDlForm) {
 			$action = $this->out->hiddenField('action', 'download');
 			$submit = $this->out->submitButton('Сваляне на избраните текстове');
@@ -44,9 +48,9 @@ EOS;
 
 
 	protected function makeSimpleListQuery() {
-		$qSelect = "SELECT GROUP_CONCAT(a.name) author,
+		$qSelect = "SELECT GROUP_CONCAT(a.name ORDER BY aof.pos) author,
 			t.id textId, t.title, t.orig_title, t.year, t.type, t.size, t.zsize,
-			t.lang, t.orig_lang, UNIX_TIMESTAMP(t.date) date";
+			t.lang, t.orig_lang, t.collection, UNIX_TIMESTAMP(t.entrydate) date";
 		$qFrom = " FROM /*p*/author_of aof
 			LEFT JOIN /*p*/text t ON aof.text = t.id
 			LEFT JOIN /*p*/person a ON aof.author = a.id";
@@ -92,7 +96,7 @@ EOS;
 		extract($dbrow);
 		$o = '';
 		$lcurch = $this->firstChar($title);
-		if ($this->curch != $lcurch) {
+		if ($this->showHeaders && $this->curch != $lcurch) {
 			$this->curch = $lcurch;
 			$o .= "</ul>\n<h2>$this->curch</h2>\n<ul>";
 		}
@@ -112,7 +116,7 @@ EOS;
 		$dlLink = $this->makeDlLink($textId, $zsize);
 		$editLink = $this->userCanEdit ? $this->makeEditTextLink($textId) : '';
 		$dlCheckbox = $this->makeDlCheckbox($textId);
-		$author = $this->makeAuthorLink($author);
+		$author = $collection == 'true' ? '' : $this->makeAuthorLink($author);
 		if ( !empty($author) ) { $author = '— '.$author; }
 		$o .= <<<EOS
 

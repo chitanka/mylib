@@ -33,11 +33,14 @@ class TextPage extends Page {
 			return $this->makeRawContent();
 		}
 		if ( !is_numeric($this->chunkId) || $this->chunkId < 0 ) $this->chunkId = 1;
-		$author = $this->makeAuthorLink($this->author);
-		if ( !empty($author) ) { $author = "<small>$author</small><br />"; }
-		$this->title = "$author<span class='text-title'>$this->ttitle</span>";
-		if ( !empty($this->subtitle) ) {
-			$this->title .= "<br /><small>$this->subtitle</small>";
+		$this->title = '';
+		if ( !$this->work->collection && !empty($this->work->author_name) ) {
+			$this->title .= '<small>'.
+				$this->makeAuthorLink($this->work->author_name) .'</small><br />';
+		}
+		$this->title .= "<span class='text-title'>{$this->work->title}</span>";
+		if ( !empty($this->work->subtitle) ) {
+			$this->title .= "<br /><small>{$this->work->subtitle}</small>";
 		}
 
 		$this->initJs();
@@ -78,13 +81,7 @@ class TextPage extends Page {
 			#$this->addMessage("Няма текст с номер $this->textId.", true);
 			return '';
 		}
-		$this->outencoding = $this->request->param(3, $this->outencoding);
-		if ($this->outencoding == 'mik') {
-			$this->outencoding = 'cp866';
-			$encfilter = 'cp8662mik';
-		} else {
-			$encfilter = '';
-		}
+		$this->setOutEncoding($this->request->param(3));
 		if ( !$this->isValidEncoding($this->outencoding) ) {
 			$this->addMessage("<strong>$this->outencoding</strong> не е валидно название на кодиране. Ето малко предложения: ".$this->makeEncodingSuggestions(), true);
 			$this->outencoding = $this->inencoding;
@@ -92,18 +89,13 @@ class TextPage extends Page {
 		}
 		header("Content-Type: text/plain; charset=$this->outencoding");
 		header("Content-Language: $this->langCode");
-		$this->author = str_replace(',', ', ', $this->author);
-		$this->author = trim($this->author, ' ,');
-		if ( !empty($this->author) ) { $this->encprint("|\t$this->author\n", $encfilter); }
-		$title = $this->ttitle;
-		if ( !empty($this->subtitle) ) {
-			$title .= $this->subtitle{0} == '('
-				? " $this->subtitle" : " ($this->subtitle)";
+		if ( !empty($this->work->author_name) ) {
+			$this->encprint("|\t".$this->work->author_name."\n");
 		}
-		$this->encprint("|\t$title\n\n\n", $encfilter);
+		$this->encprint($this->work->getTitleAsSfb() ."\n\n\n");
 		$anno = $this->getAnnotation($this->textId);
 		if ( !empty($anno) ) {
-			$this->encprint("A>\n$anno\nA$\n\n", $encfilter);
+			$this->encprint("A>\n$anno\nA$\n\n");
 		}
 		if ( $this->outencoding == $this->inencoding ) {
 			readfile($file);
@@ -111,23 +103,38 @@ class TextPage extends Page {
 			$handle = fopen($file, 'r');
 			if ($handle) {
 				while ( !feof($handle) ) {
-					$this->encprint( fgets($handle), $encfilter );
+					$this->encprint( fgets($handle) );
 				}
 				fclose($handle);
 			}
 		}
 		$extra = '';
-		if ( $this->orig_lang != $this->lang ) {
-			$this->translator = trim(str_replace(',', ', ', $this->translator), ' ,');
-			$extra .= "\tПревод от ". langName($this->orig_lang, false) .': ';
-			$extra .= empty($this->translator)
+		if ( $this->work->orig_lang != $this->work->lang ) {
+			$authors = '';
+			foreach ($this->work->authors as $author) {
+				$authors .= ', '.$author['orig_name'];
+			}
+			$authors = ltrim($authors, ', ');
+			$orig_title = $this->work->orig_title;
+			if ( !empty($this->work->orig_subtitle) ) {
+				$orig_title .= " ({$this->work->orig_subtitle})";
+			}
+			$orig_title .= ', '. $this->work->getYear();
+			$orig_title = rtrim($orig_title, ', ');
+			$extra .= "\t$authors\n\t$orig_title\n\n";
+			$lang = langName($this->work->orig_lang, false);
+			if ( !empty($lang) ) $lang = ' от '.$lang;
+			$extra .= "\tПревод$lang: ";
+			$extra .= empty($this->work->translator_name)
 				? 'Няма данни за преводача'
-				: $this->translator . ( !empty($this->trans_year) ? ", $this->trans_year" : '');
+				: $this->work->translator_name .', '.
+					$this->makeYearView($this->work->getTransYear());
 			$extra .= "\n";
 		}
 		$extra .= $this->getExtraInfo($this->textId);
+		$extra .= "\n\n\tСвалено от „{$this->sitename}“ [$this->purl/text/$this->textId]";
 		if ( !empty($extra) ) {
-			$this->encprint("\nI>\n$extra\nI$\n", $encfilter);
+			$this->encprint("\nI>\n$extra\nI$\n");
 		}
 		$this->outputDone = true;
 	}
@@ -137,15 +144,15 @@ class TextPage extends Page {
 		global $contentDirs, $curImgDir;
 		$file = $contentDirs['text'].$this->textId;
 		if ( file_exists($file) ) {
-			$parser = new Sfb2XConverter($file, $this->rootd.'/content/img/'.$this->textId.'/');
+			$parser = new Sfb2HTMLConverter($file, $this->rootd.'/content/img/'.$this->textId.'/');
 			$parser->startpos = $this->fpos;
 			$parser->maxlinecnt = $this->linecnt;
-			if ($this->textType == 'playbook') {
+			if ($this->work->type == 'playbook') {
 				$parser->patterns['/#(\d+)/'] = '<a href="#h$1" title="Към част $1"><strong>$1</strong></a>';
 			}
 			$parser->parse();
 			return '<p id="textstart" style="clear:both"></p>'.
-				"\n<div class='$this->textType'>\n".$parser->text."\n</div>";
+				"\n<div class='{$this->work->type}'>\n".$parser->text."\n</div>";
 		}
 		$this->addMessage("Текстът „<a href='$this->root/text/".
 			"$this->textId/$this->chunkId'>$this->ttitle</a>“ е празен.", true);
@@ -155,42 +162,54 @@ class TextPage extends Page {
 
 	protected function makeInfo() {
 		$extra = '';
-		if ( !empty($this->series) ) {
-			if ( strpos($this->series, ' (сборник') !== false ) {
-				$start = $this->textType == 'intro' ? 'Предговор към' : 'Включено в';
+		if ($this->work->collection) {
+			$extra .= '<li>Автори: '.
+				$this->makeAuthorLink($this->work->author_name). '</li>';
+		}
+		if ( !empty($this->work->series) ) {
+			if ( strpos($this->work->series, ' (сборник') !== false ) {
+				$start = $this->work->type == 'intro' ? 'Предговор към' : 'Включено в';
 				$ser = $start .' сборника „'.
-					$this->makeSeriesLink($this->series, true) .'“';
-			} elseif ( strpos($this->series, ' (книга)') !== false ) {
+					$this->makeSeriesLink($this->work->series, true) .'“';
+				if ( !empty($this->work->sernr) )
+					$ser .= ' ('.$this->work->sernr.')';
+			} elseif ( strpos($this->work->series, ' (книга)') !== false ) {
 				$ser = 'Част от книгата „'.
-					$this->makeSeriesLink($this->series, true) .'“';
-// 			} elseif ( strpos($this->series, ' цикъл') !== false ) {
-// 				$ser = $this->makeSeriesLink($this->series);
+					$this->makeSeriesLink($this->work->series, true) .'“';
+// 			} elseif ( strpos($this->work->series, ' цикъл') !== false ) {
+// 				$ser = $this->makeSeriesLink($this->work->series);
 			} else {
-				$ser = 'Поредица: '. $this->makeSeriesLink($this->series);
-				if ( !empty($this->sernr) ) $ser .= " ($this->sernr)";
+				$ser = 'Поредица: '. $this->makeSeriesLink($this->work->series);
+				if ( !empty($this->work->sernr) )
+					$ser .= ' ('.$this->work->sernr.')';
 			}
 			$extra .= "\n<li>$ser</li>";
 		}
-		if ( $this->orig_lang != $this->lang ) {
-			if ( empty($this->orig_title) ) {
-				$this->orig_title = "[не е въведено; <a href='$this->root/suggestOrigTitle/$this->textId/$this->chunkId'>помогнете ми</a> да го добавя]";
-			} elseif ( !empty($this->orig_subtitle) ) {
-				$this->orig_title .= ' ('. trim($this->orig_subtitle, '()') .')';
+		if ( $this->work->orig_lang != $this->work->lang ) {
+			if ( empty($this->work->orig_title) ) {
+				$orig_title = "[не е въведено; <a href='$this->root/suggestOrigTitle/$this->textId/$this->chunkId'>помогнете ми</a> да го добавя]";
+			} else {
+				$orig_title = $this->work->orig_title;
+				if ( !empty($this->work->orig_subtitle) ) {
+					$orig_title .= ' ('. trim($this->work->orig_subtitle, '()') .')';
+				}
 			}
-			$extra .= "\n<li>Оригинално заглавие: <em>$this->orig_title</em>".
-				( !empty($this->year)
-					? ', <span title="Година на написване или първа публикация">'.
-					($this->year) .
-					'</span>' : '' ).
-				'</li>';
-			$extra .= "\n".'<li>Превод от '. langName($this->orig_lang, false) .': ';
-			$extra .= empty($this->translator)
+			$extra .= "\n<li>Оригинално заглавие: <em>$orig_title</em>".
+				', <span title="Година на написване или първа публикация">'.
+				$this->makeYearView($this->work->getYear()) .'</span></li>';
+			$lang = langName($this->work->orig_lang, false);
+			if ( !empty($lang) ) $lang = ' от '.$lang;
+			$extra .= "\n<li>Превод$lang: ";
+			$extra .= empty($this->work->translator_name)
 				? "[Няма данни за преводача; <a href='$this->root/suggestTranslator/$this->textId/$this->chunkId'>помогнете ми</a> да го добавя]"
-				: $this->makeTranslatorLink($this->translator, 'first') .
-					( !empty($this->trans_year) ? ", $this->trans_year" : '') .'</li>';
+				: $this->makeTranslatorLink($this->work->translator_name, 'first') .
+					', '. $this->makeYearView($this->work->getTransYear()) .'</li>';
+		} else {
+			$extra .= "\n<li><span title='Година на написване или първа публикация'>Година</span>: ".
+				$this->makeYearView($this->work->getYear()) .'</li>';
 		}
 		$extra .= "\n<li>Етикети: ". $this->makeLabelInfo() .'</li>';
-		if ($this->isRead) {
+		if ($this->work->isRead) {
 			$extra .= "\n".'<li>Това произведение е отбелязано като прочетено.</li>';
 		}
 		$commCnt = $this->getReaderCommentCount();
@@ -234,7 +253,7 @@ EOS;
 		$file = $contentDirs['text-anno'] . $this->textId;
 		if ( $this->chunkId > 1 || !file_exists($file) ) { return ''; }
 		$this->hasAnno = true;
-		$parser = new Sfb2XConverter($file, $this->getImgDir());
+		$parser = new Sfb2HTMLConverter($file, $this->getImgDir());
 		$parser->parse();
 		return "<div id='annotation'>\n$parser->text</div>";
 	}
@@ -245,7 +264,7 @@ EOS;
 		$file = $GLOBALS['contentDirs']['text-info'] . $this->textId;
 		if ( !file_exists($file) ) { return ''; }
 		$this->hasExtraInfo = true;
-		$parser = new Sfb2XConverter($file, $this->getImgDir());
+		$parser = new Sfb2HTMLConverter($file, $this->getImgDir());
 		$parser->parse();
 		$cover = $this->makeCoverImage();
 		$this->extraInfo = <<<EOS
@@ -264,7 +283,7 @@ EOS;
 	protected function makeCoverImage() {
 		$covdir = $GLOBALS['contentDirs']['cover'];
 		$bases = array($covdir . $this->textId);
-		if ( !empty($this->cover) ) $bases[] = $covdir . $this->cover;
+		if ( !empty($this->work->cover) ) $bases[] = $covdir . $this->work->cover;
 		$exts = array('.jpg', '.png');
 		$coverFiles = cartesian_product($bases, $exts);
 		$cover = '';
@@ -342,7 +361,7 @@ EOS;
 
 
 	protected function makeMarkReadLink() {
-		if ($this->isRead) return '';
+		if ($this->work->isRead) return '';
 		return "<a class='ok' href='$this->root/markRead/$this->textId'
 			title='Отбелязване като прочетено'>Прочетено</a>";
 	}
@@ -350,24 +369,23 @@ EOS;
 
 	protected function makeCopyright() {
 		$o = '';
-		if ($this->copy) {
-			$authors = explode(',', $this->author);
-			$years = explode(',', $this->ayears);
-			if ( count($authors) > 1 ) {
-				foreach ($authors as $i => $author) {
-					$year = empty($years[$i]) ? $this->year : $years[$i];
+		if ($this->work->copy) {
+			if ( count($this->work->authors) > 1 ) {
+				foreach ($this->work->authors as $author) {
+					$year = empty($author['year']) ? $this->work->getYear() : $author['year'];
 					$o .= "\n\t<li>© $year " .
-						$this->makeAuthorLink($author, 'first') . '</li>';
+						$this->makeAuthorLink($author['name'], 'first') . '</li>';
 				}
 			} else {
-				$o .= $this->makeAuthorLink($this->author, 'first',
-					"\n\t<li>© $this->year ", '</li>');
+				$o .= $this->makeAuthorLink($this->work->author_name, 'first',
+					"\n\t<li>© ". $this->work->getYear() .' ', '</li>');
 			}
 		}
-		if ( !empty($this->translator) ) {
-			$lang = langName($this->orig_lang, false);
-			$o .= $this->makeTranslatorLink($this->translator, 'first',
-				"\n\t<li>© $this->trans_year ", ", превод от $lang</li>");
+		if ( !empty($this->work->translators) ) {
+			$lang = langName($this->work->orig_lang, false);
+			if ( !empty($lang) ) $lang = ' от '.$lang;
+			$o .= $this->makeTranslatorLink($this->work->translator_name, 'first',
+				"\n\t<li>© ". $this->work->getTransYear() .' ', ", превод$lang</li>");
 		}
 		if ( empty($o) ) return '';
 		// rm comma separators
@@ -412,7 +430,7 @@ EOS;
 		$rawLinkCp1251 = $this->makeRawTextLink($this->textId, 'Суров текст (win)', 'Преглед на суровия текст в кодиране „Windows-1251“', 'cp1251');
 		$rawLinkCp866 = $this->makeRawTextLink($this->textId, 'Суров текст (dos)', 'Преглед на суровия текст в кодиране „IBM866“ — руска досовска кирилица', 'cp866');
 		$rawLinkMik = $this->makeRawTextLink($this->textId, 'Суров текст (mik)', 'Преглед на суровия текст в нестандартно кодиране „MIK“ — българска досовска кирилица', 'mik');
-		$dlLink = $this->makeDlLink($this->textId, $this->zsize, 'Суров текст (zip)');
+		$dlLink = $this->makeDlLink($this->textId, $this->work->zsize, 'Суров текст (zip)');
 		$sactions = empty($actions) ? '' : "<dt>Действия</dt>\n<dd>$actions</dd>";
 		$extraLinks = <<<EOS
 <dt><label for="fontsize">Размер на шрифта</label></dt>
@@ -432,49 +450,25 @@ EOS;
 
 
 	protected function initData() {
-		$q = "SELECT t.id textId, t.title ttitle, t.subtitle,
-			t.trans_year, t.lang, t.orig_title, t.orig_subtitle,
-			t.orig_lang, t.year, t.type textType, t.copy, t.zsize, t.sernr, t.cover,
-			s.name series, r.user isRead,
-			GROUP_CONCAT(DISTINCT a.name) author,
-			GROUP_CONCAT(aof.year) ayears,
-			GROUP_CONCAT(DISTINCT tr.name) translator
-			FROM /*p*/text t
-			LEFT JOIN /*p*/author_of aof ON t.id = aof.text
-			LEFT JOIN /*p*/person a ON aof.author = a.id
-			LEFT JOIN /*p*/translator_of tof ON t.id = tof.text
-			LEFT JOIN /*p*/person tr ON tof.translator = tr.id
-			LEFT JOIN /*p*/series s ON t.series = s.id
-			LEFT JOIN /*p*/reader_of r ON (t.id = r.text AND r.user = {$this->user->id})";
 		if ( empty($this->textId) || !is_numeric($this->textId) ) {
-			$dbTextTitle = $this->db->escape($this->ttitle);
-			$q .= " WHERE title = '$dbTextTitle'";
+			$this->work = Work::newFromTitle($this->ttitle, $this->user->id);
 			$err = "със заглавие <strong>„{$this->ttitle}“</strong>";
 		} else {
-			$q .= " WHERE t.id = '$this->textId'";
+			$this->work = Work::newFromId($this->textId, $this->user->id);
 			$err = "с номер <strong>{$this->textId}</strong>";
 		}
-		$q .= ' GROUP BY t.id LIMIT 1';
-		$data = $this->db->fetchAssoc( $this->db->query($q) );
-		if ( empty($data) ) {
+		if ( is_null($this->work) ) {
 			$this->addMessage("Не съществува текст $err.", true);
 			return false;
 		}
-		extract2object($data, $this);
-		if ( empty($this->year) ) { $this->year = ''; }
-		$this->ayears = ltrim($this->ayears, '0,');
-		if ( empty($this->year) && !empty($this->ayears) ) {
-			$this->year = strtr($this->ayears, array(','=>', '));
-		}
-		if ( empty($this->trans_year) ) { $this->trans_year = ''; }
-
+		$this->textId = $this->work->id;
 		$sel = array('fpos', 'linecnt');
 		$key = array('text' => $this->textId, 'nr' => $this->chunkId);
 		$res = $this->db->select('header', $key, $sel);
 		$data = $this->db->fetchAssoc($res);
 		if ( !empty($data) ) {
 			extract2object($data, $this);
-			$this->subtitle = str_replace('\n', '<br />', $this->subtitle);
+			#$this->subtitle = str_replace('\n', '<br />', $this->subtitle);
 		} else {
 			$this->fpos = 0;
 			$this->linecnt = 100000;

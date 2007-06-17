@@ -5,7 +5,7 @@ class ViewPage extends Page {
 	protected $FF_MODE = 'mode', $FF_ORDER = 'order', $FF_COUNTRY = 'country',
 		$FF_DLMODE = 'dlMode';
 	protected $titles = array('simple' => '', 'extended' => '');
-
+	protected $showHeaders = true;
 
 	public function __construct() {
 		parent::__construct();
@@ -209,7 +209,7 @@ EOS;
 
 	protected function makeDlCheckbox($textId) {
 		return $this->showDlForm
-			? $this->out->checkbox('textId[]', 'text'.$textId, false, '', 0, $textId)
+			? $this->out->checkbox('textId[]', 'text'.$textId, false, '', $textId)
 			: '';
 	}
 
@@ -252,7 +252,7 @@ EOS;
 	<li class="novella"><a href="#">Повест</a> — среднодълго произведение</li>
 	<li class="novel"><a href="#">Роман</a> — дълго произведение</li>
 	<li class="poetry"><a href="#">Поезия</a> — поетично произведение</li>
-	<li class="tale"><a href="#">Приказка</a></li>
+	<li class="tale"><a href="#">Приказка, басня</a></li>
 	<li class="othergenre"><a href="#">Друго</a> — друг тип произведение,
 	например <em>есе</em>, <em>пиеса</em>, <em>статия</em></li>
 </ul>

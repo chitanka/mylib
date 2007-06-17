@@ -206,19 +206,23 @@ CREATE TABLE /*prefix*/text (
   `subtitle` varchar(200) NOT NULL,
   `lang` varchar(2) NOT NULL default 'bg',
   `trans_year` smallint(4) NOT NULL COMMENT 'Year of translation',
+  `trans_year2` smallint(4) NOT NULL COMMENT 'Last year of a translation period',
   `orig_title` varchar(255) NOT NULL default '',
   `orig_subtitle` varchar(200) NOT NULL,
   `orig_lang` varchar(3) NOT NULL default 'en',
   `year` smallint(4) NOT NULL,
+  `year2` smallint(4) NOT NULL COMMENT 'Last year of a creation',
   `type` varchar(12) NOT NULL default 'shortstory',
   `cover` mediumint(8) NOT NULL COMMENT 'use this cover if no cover in COVERDIR',
   `series` smallint(5) unsigned NOT NULL default '0',
   `sernr` tinyint(2) unsigned NOT NULL default '0',
+  `collection` enum('false','true') NOT NULL default 'false',
   `headlevel` tinyint(1) unsigned NOT NULL COMMENT 'Maximal header level',
   `size` mediumint(8) unsigned NOT NULL default '0' COMMENT 'File size',
   `zsize` mediumint(8) unsigned NOT NULL default '0' COMMENT 'Zip file size',
   `copy` tinyint(1) NOT NULL default '1' COMMENT 'Copyright',
   `date` date NOT NULL default '0000-00-00' COMMENT 'Entry date',
+  `lastmod` datetime NOT NULL COMMENT 'Last modification'
   PRIMARY KEY  (`id`),
   KEY `title` (`title`),
   KEY `series` (`series`),
@@ -317,6 +321,7 @@ CREATE TABLE /*prefix*/work (
   `frozen` enum('false','true') NOT NULL default 'false',
   `tmpfiles` varchar(255) NOT NULL,
   `tfsize` smallint(5) unsigned NOT NULL COMMENT 'Големина на временните файлове',
+  `uplfile` varchar(255) NOT NULL COMMENT 'Uploaded file',
   PRIMARY KEY  (`id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
@@ -335,6 +340,7 @@ CREATE TABLE /*prefix*/work_multi (
   `progress` tinyint(3) unsigned NOT NULL,
   `frozen` enum('false','true') NOT NULL,
   `date` datetime NOT NULL,
+  `uplfile` varchar(255) NOT NULL COMMENT 'Uploaded file',
   PRIMARY KEY  (`id`),
   UNIQUE KEY `pid` (`pid`,`user`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8;

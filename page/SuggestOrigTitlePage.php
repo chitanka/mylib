@@ -46,7 +46,7 @@ class SuggestOrigTitlePage extends MailPage {
 от $author, можете да ми пратите набързо едно съобщение чрез долния формуляр,
 за да го въведа в базата от данни на библиотеката. Ще се радвам и на всякаква
 друга допълнителна информация за произведението.
-<img src="$this->root/$img" alt=";-)" title="Намигане" /></p>
+<img src="$img" alt=";-)" title="Намигане" /></p>
 <form action="{FACTION}" method="post">
 <fieldset style="margin-top:1em; width:30em">
 	$textId
@@ -66,7 +66,7 @@ EOS;
 
 $this->info
 
-http://purl.org/NET/mylib/edit/$this->textId
+$this->purl/edit/$this->textId
 EOS;
 	}
 

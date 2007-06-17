@@ -2,6 +2,7 @@
 
 class MailPage extends Page {
 
+	protected $logFile = 'log/email';
 	protected $mailSuccessMessage, $mailFailureMessage, $mailTo,
 		$mailFrom, $mailSubject = '';
 	protected $extraMailHeaders = array();
@@ -9,8 +10,8 @@ class MailPage extends Page {
 	public function __construct() {
 		parent::__construct();
 		$this->action = 'mail';
-		$this->mailTo = ADMIN_EMAIL;
-		$this->mailFrom = SITE_EMAIL;
+		$this->mailTo = ADMIN_EMAIL_ENC;
+		$this->mailFrom = SITE_EMAIL_ENC;
 		$this->mailSubject = 'Тема на писмото';
 		$this->mailSuccessMessage = 'Съобщението беше изпратено.';
 		$this->mailFailureMessage = 'Изглежда е станал някакъв фал при
@@ -20,9 +21,11 @@ class MailPage extends Page {
 
 
 	protected function processSubmission() {
-		error_reporting(E_ALL);
 		$mailer = Setup::mailer();
-		$res = $mailer->send($this->mailTo, $this->makeMailHeaders(), $this->makeMailMessage());
+		$message = $this->makeMailMessage();
+		$headers = $this->makeMailHeaders();
+		$res = @$mailer->send($this->mailTo, $headers, $message);
+		$this->logEmail($message, $headers);
 		if ( $res !== true ) {
 			$this->addMessage($this->mailFailureMessage .
 				'<br />Съобщението за грешка, между другото, гласи: <code>'.
@@ -55,5 +58,25 @@ class MailPage extends Page {
 
 	protected function makeMailMessage() { return $this->mailMessage; }
 
+
+	protected function logEmail($message, $headers) {
+		$sheaders = '';
+		foreach ($headers as $header => $value) {
+			$sheaders .= "$header: $value\n";
+		}
+		$date = date('Y-m-d H:i:s');
+		$logString = <<<EOS
++++ EMAIL +++
+[$date]
+$sheaders
+Subject: $this->mailSubject
+To: $this->mailTo
+Message:
+$message
+--- EMAIL ---
+
+EOS;
+		file_put_contents($this->logFile, $logString, FILE_APPEND);
+	}
 }
 ?>

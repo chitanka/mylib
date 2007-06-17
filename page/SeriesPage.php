@@ -177,8 +177,8 @@ EOS;
 	protected function makeExtendedListQuery() {
 		$qSelect = "SELECT s.id seriesId, s.name series, s.orig_name orig_series,
 			t.id textId, t.title, t.lang, t.orig_title, t.orig_lang,
-			t.year, t.type, t.sernr, t.size, t.zsize, UNIX_TIMESTAMP(t.date) date,
-			GROUP_CONCAT(a.name) author";
+			t.year, t.type, t.sernr, t.size, t.zsize, UNIX_TIMESTAMP(t.entrydate) date,
+			GROUP_CONCAT(a.name ORDER BY aof.pos) author";
 		$qFrom = " FROM /*p*/series s
 			LEFT JOIN /*p*/text t ON s.id = t.series
 			LEFT JOIN /*p*/author_of aof ON t.id = aof.text

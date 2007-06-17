@@ -1,6 +1,8 @@
 <?php
 class LiterNewsPage extends Page {
 
+	protected $defListLimit = 10, $maxListLimit = 25;
+
 	public function __construct() {
 		parent::__construct();
 		$this->action = 'liternews';
@@ -11,18 +13,16 @@ class LiterNewsPage extends Page {
 		$this->newstext = $this->request->value('newstext');
 		$this->newssrc = $this->request->value('newssrc', 'http://');
 		$this->newsId = $this->request->value('newsId', 0, 1);
-		$this->noffset = $this->request->value('offset', 0);
-		$this->nlimit = $this->request->value('limit', 10);
-		$this->maxnlimit = 25;
-		if ($this->nlimit > $this->maxnlimit) $this->nlimit = $this->maxnlimit;
+		$this->initPaginationFields();
 	}
 
 
-	public function makeNews($limit = 0, $offset = 0) {
-		if (empty($limit)) $limit = $this->nlimit;
-		if (empty($offset)) $offset = $this->noffset;
-		$res = $this->db->select($this->mainDbTable, array('`show`' => 'true'),
-			'*', '`time` DESC', $offset, $limit);
+	public function makeNews($limit = 0, $offset = 0, $showPageLinks = true) {
+		if (empty($limit)) $limit = $this->llimit;
+		if (empty($offset)) $offset = $this->loffset;
+		$keys = array('`show`' => 'true');
+		$count = $this->db->getCount($this->mainDbTable, $keys);
+		$res = $this->db->select($this->mainDbTable, $keys, '*', '`time` DESC', $offset, $limit);
 		if ($this->db->numRows($res) == 0) {
 			$this->addMessage('Няма новини.');
 			return '';
@@ -31,7 +31,9 @@ class LiterNewsPage extends Page {
 		while ($row = $this->db->fetchAssoc($res)) {
 			$c .= $this->makeNewsEntry($row);
 		}
-		return $c;
+		$pagelinks = $showPageLinks
+			? $this->makePageLinks($count, $this->llimit, $this->loffset) : '';
+		return $pagelinks . $c . $pagelinks;
 	}
 
 
@@ -45,6 +47,7 @@ class LiterNewsPage extends Page {
 			return $this->buildContent();
 		}
 		require_once 'include/replace.php';
+		$this->newstitle = my_replace($this->newstitle);
 		$this->newstext = my_replace($this->newstext);
 		if ( $this->request->value('preview') != NULL ) {
 			$this->addMessage('Това е само предварителен преглед. Новината все още не е съхранена.');
@@ -71,6 +74,7 @@ class LiterNewsPage extends Page {
 		if ( empty($username) ) $username = $this->newsuser;
 		if ( empty($title) ) $title = $this->newstitle;
 		if ( empty($text) ) $text = $this->newstext;
+		if ( empty($src) ) $src = $this->newssrc;
 		if ( empty($id) ) $id = $this->newsId;
 		$format = 'd.m.Y H:i:s';
 		$time = empty($time) ? date($format) : date($format, strtotime($time));
@@ -78,12 +82,16 @@ class LiterNewsPage extends Page {
 		$text = wiki2html($text);
 		$editLink = $this->userCanEditNews() ? $this->makeEditLiternewsLink($id) : '';
 		$text .= empty($src) ? '' : " (<a href='$src' title='$src — източник на новината'>Източник</a>)";
+		$vuser = empty($user) ? $username : $this->makeUserLink($username);
 		return <<<EOS
 
 	<dl class="post" style="clear:both">
 		<dt><strong>$title</strong> $editLink</dt>
-		<dd><p class="extra" style="text-align:right"><small>(пратена от $username на $time)</small></p>
-		$text</dd>
+		<dd><p class="extra" style="text-align:right;margin-bottom:0.5em"><small>(пратена от $vuser на $time)</small></p>
+		<div>
+		$text
+		</div>
+		</dd>
 	</dl>
 EOS;
 	}
@@ -108,7 +116,7 @@ EOS;
 		$newsId = $this->out->hiddenField('newsId', $id);
 		$newsuser = $this->out->textField('newsuser', '', $this->newsuser, 30, 160, 1);
 		$newstitle = $this->out->textField('newstitle', '', $this->newstitle, 60, 160, 2);
-		$newstext = $this->out->textarea('newstext', '', $this->newstext, 10, 76, 3);
+		$newstext = $this->out->textarea('newstext', '', $this->newstext, 20, 76, 3);
 		$newssrc = $this->out->textField('newssrc', '', $this->newssrc, 60, 255, 4);
 		$boxes = $showEditBoxes ? '<br />'.$this->makeEditBoxes($id) : '';
 		$submit1 = $this->out->submitButton('Предварителен преглед', '', 5, 'preview');

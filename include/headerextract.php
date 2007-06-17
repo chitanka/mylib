@@ -53,13 +53,13 @@ class SfbParserSimple {
 
 
 	protected function nextLine() {
-		if ( feof($this->handle) && !$this->hasNextLine ) {
-			$this->lcmd = $this->ltext = NULL;
-			return false;
-		}
 		if ($this->hasNextLine) {
 			$this->hasNextLine = false;
 			return $this->line;
+		}
+		if ( (feof($this->handle) ) /*&& !$this->hasNextLine*/ ) {
+			$this->lcmd = $this->ltext = null;
+			return false;
 		}
 		$this->fpos = ftell($this->handle);
 		$this->lcnt++;
@@ -93,12 +93,12 @@ class SfbParserSimple {
 			$header = $this->curUnknownHead[$level]++;
 		} else {
 			$header = $this->ltext;
-			if ( !preg_match('/[.,;?!]$/', $this->ltext) ) { $header .= '.'; }
+			if ( !preg_match('/[.,;:?!]$/', $this->ltext) ) { $header .= '.'; }
 		}
 		$this->nextLine();
 		while ( $this->lcmd == $this->titMarks[$level] ) {
 			$header .= ' '.$this->ltext;
-			if ( !preg_match('/[.,;?!]$/', $this->ltext) ) { $header .= '.'; }
+			if ( !preg_match('/[.,;:?!]$/', $this->ltext) ) { $header .= '.'; }
 			$this->nextLine();
 		}
 		if ( !preg_match('/ г\.$/', $header) ) {

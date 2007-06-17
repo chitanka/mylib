@@ -17,6 +17,7 @@ class EditLiterNewsPage extends LiternewsPage {
 			return $this->buildContent();
 		}
 		require_once 'include/replace.php';
+		$this->newstitle = my_replace($this->newstitle);
 		$this->newstext = my_replace($this->newstext);
 		if ( $this->request->value('preview') != NULL ) {
 			$this->addMessage('Това е само предварителен преглед. Новината все още не е съхранена.');
@@ -29,12 +30,12 @@ class EditLiterNewsPage extends LiternewsPage {
 			return parent::buildContent();
 		}
 		$set = array('username' => $this->newsuser,
-			'user' => $this->user->id,
 			'title' => $this->newstitle, 'text' => $this->newstext,
 			'texthash' => md5($this->newstext), 'src' => $this->newssrc,
 			'show' => $this->shownews);
 		$this->db->update($this->mainDbTable, $set, $key);
 		$this->addMessage('Новината беше съхранена.');
+		$this->newsId = 0;
 		return $this->buildContent();
 	}
 

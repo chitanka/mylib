@@ -198,7 +198,7 @@ class User {
 		foreach ($rawopts as $rawopt) {
 			if ( empty($rawopt) ) continue;
 			list($name, $val) = explode('=', $rawopt);
-			$opts[$name] = $val;
+			$opts[$name] = strpos($val, ',') === false ? $val : explode(',', $val);
 		}
 		return $opts;
 	}

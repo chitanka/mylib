@@ -41,27 +41,28 @@ class Request {
 		}
 
 		// not needed $_GET (but not $_REQUEST) vars
-		unset( $_GET['requestEncoding'] );
 		unset( $_GET[SESSION_NAME] );
 		unset( $_GET['cache'] );
 
 		$this->unescapeGlobals();
 
-		/*$encodingCookie = $this->value(ENC_COOKIE, Setup::$masterEncoding);
-		$this->encoding = $this->value('requestEncoding', $encodingCookie);
-		$this->outputEncoding = $this->value('encoding', $encodingCookie);
-		if ( $this->outputEncoding != $encodingCookie ) {
-			setcookie(ENC_COOKIE, $this->outputEncoding, COOKIE_EXP);
+		$encodingCookie = $this->value(ENC_COOKIE, Setup::$masterEncoding);
+		$this->outputEncoding = $this->value('enc', $encodingCookie);
+		if ( empty($this->outputEncoding) ) {
+			$this->outputEncoding = Setup::$masterEncoding;
 		}
-		$this->normalizeGlobalsEncoding();*/
-		$this->outputEncoding = 'utf-8';
+// 		$this->encoding = $this->value('enc', $encodingCookie);
+// 		if ( $this->outputEncoding != $encodingCookie ) {
+// 			setcookie(ENC_COOKIE, $this->outputEncoding, COOKIE_EXP);
+// 		}
+// 		$this->normalizeGlobalsEncoding();
 
 		// put encoding in hash in order to generate/retrieve the right cache
-		#$_GET['encoding'] = $this->outputEncoding;
+		#$_GET['enc'] = $this->outputEncoding;
 		ksort($_GET);
 		$this->hash = $this->action . md5( serialize($_GET) );
 		$this->cookiePath = Setup::setting('path');
-		#unset( $_GET['encoding'] );
+		#unset( $_GET['enc'] );
 	}
 
 

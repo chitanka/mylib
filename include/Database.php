@@ -71,19 +71,20 @@ class Database {
 
 
 	public function select($table, $keys = array(), $fields = array(),
-			$orderby = '', $offset = 0, $limit = 0) {
+			$orderby = '', $offset = 0, $limit = 0, $groupby = '') {
 		$q = $this->selectQ($table, $keys, $fields, $orderby, $offset, $limit);
 		return $this->query($q);
 	}
 
 	public function selectQ($table, $keys = array(), $fields = array(),
-			$orderby = '', $offset = 0, $limit = 0) {
+			$orderby = '', $offset = 0, $limit = 0, $groupby = '') {
 		settype($fields, 'array');
 		$sel = empty($fields) ? '*' : implode(', ', $fields);
 		$sorder = empty($orderby) ? '' : ' ORDER BY '.$orderby;
+		$sgroup = empty($groupby) ? '' : ' GROUP BY '.$groupby;
 		$slimit = $limit > 0 ? " LIMIT $offset, $limit" : '';
 		return "SELECT $sel FROM /*p*/$table".$this->makeWhereClause($keys).
-			$sorder . $slimit;
+			$sgroup . $sorder . $slimit;
 	}
 
 	public function insert($table, $data, $ignore = false) {
