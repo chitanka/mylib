@@ -29,7 +29,7 @@ class CommentPage extends Page {
 			$this->addMessage('Попълнете всички полета!', true);
 			return $this->buildContent();
 		}
-		if ( isSpam($this->comment) ) {
+		if ( $this->user->isAnon() && isSpam($this->comment) ) {
 			$this->addMessage('Коментарът ви е определен като спам. Вероятно съдържа прекалено много уеб адреси.', true);
 			return $this->buildContent();
 		}

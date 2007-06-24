@@ -20,8 +20,8 @@ class LinksPage extends MailPage {
 			$this->addMessage('Не сте въвели описание на сайта!', true);
 			return $this->buildContent();
 		}
-		if ( strpos($this->elem['desc'], 'http://') !== false ) {
-			$this->addMessage('Не се приемат хипервръзки в описанието на сайта!', true);
+		if ( $this->user->isAnon() && isSpam($this->elem['desc'], 1) ) {
+			$this->addMessage('Описанието е определено като спам. Вероятно съдържа уеб адреси.', true);
 			return $this->buildContent();
 		}
 		$this->mailSubject = "$this->sitename: Нова връзка";

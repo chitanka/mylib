@@ -4,7 +4,7 @@ class User {
 
 	const MAIN_DB_TABLE = 'user';
 	public static $userRights;
-	public $id, $username, $realname, $group;
+	public $id, $username, $realname, $email, $group;
 	private $rights = array();
 	private $options = array();
 
@@ -16,10 +16,11 @@ class User {
 	 * @param string $group
 	 */
 	private function __construct($id = 0, $username = '', $realname = '',
-			$group = 'anon', $options = array()) {
+			$email = '', $group = 'anon', $options = array()) {
 		$this->id = $id;
 		$this->username = $username;
 		$this->realname = $realname;
+		$this->email = $email;
 		$this->group = $group;
 		foreach (self::$userRights as $group => $grights) {
 			$this->rights = array_merge($this->rights, $grights);
@@ -65,7 +66,7 @@ class User {
 	 * @return mixed true if the user name is ok, or the invalid character
 	 */
 	public static function isValidUsername($username) {
-		$forbidden = '/+#{}[]';
+		$forbidden = '/+#"{}[]';
 		$len = strlen($forbidden);
 		for ($i=0; $i < $len; $i++) {
 			if ( strpos($username, $forbidden{$i}) !== false ) {
@@ -92,10 +93,17 @@ class User {
 	}
 
 
-	public static function getData($userId) {
+	public static function getDataByName($username) {
+		return self::getData( array('username' => $username) );
+	}
+
+	public static function getDataById($userId) {
+		return self::getData( array('id' => $userId) );
+	}
+
+	public static function getData($dbkey) {
 		$db = Setup::db();
-		$key = array('id' => $userId);
-		$res = $db->select(self::MAIN_DB_TABLE, $key);
+		$res = $db->select(self::MAIN_DB_TABLE, $dbkey);
 		if ( $db->numRows($res) ==  0) return array();
 		return $db->fetchAssoc($res);
 	}
@@ -239,7 +247,8 @@ class User {
 			if ( $db->encodePasswordCookie($password) === $_COOKIE[TOKEN_COOKIE] ) {
 				$opts = self::extractOptions($opts);
 				$opts['news'] = $news;
-				$user = new User($uid, $username, $realname, $group, $opts);
+				$opts['allowemail'] = $allowemail;
+				$user = new User($uid, $username, $realname, $email, $group, $opts);
 				return $_SESSION[U_SESSION] = $user;
 			}
 		}

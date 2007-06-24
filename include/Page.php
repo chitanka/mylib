@@ -2,7 +2,7 @@
 
 class Page {
 
-	protected $FF_QUERY = 'q';
+	protected $FF_QUERY = 'q', $FF_LIMIT = 'limit', $FF_OFFSET = 'offset';
 	protected $action, $title, $head, $langCode, $outencoding, $contentType;
 	protected $request, $user, $db, $content, $messages, $jsContent, $style;
 	protected $scriptStart, $scriptEnd, $styleStart, $styleEnd;
@@ -23,6 +23,7 @@ class Page {
 		$this->setOutEncoding($this->request->outputEncoding);
 		$this->root = Setup::setting('webroot');
 		$this->rootd = Setup::setting('docroot');
+		$this->forum_root = Setup::setting('forum_root');
 		$this->sitename = Setup::setting('sitename');
 		$this->purl = Setup::setting('purl');
 		$this->infoSrcs = Setup::setting('info');
@@ -291,7 +292,7 @@ EOS;
 	array("$this->root/history", 'Списък на произведенията по месец на добавяне', 'История'),
 	array("$this->root/work", 'Списък на произведения, подготвящи се за добавяне', 'Сканиране'),
 	array("$this->root/liternews", 'Новини, свързани с литературата. Добавят се от потребителите.', 'Литер. новини'),
-	array("/phpBB2/", 'Форумната система на сайта', 'Форум'),
+	array($this->forum_root, 'Форумната система на сайта', 'Форум'),
 	array("$this->root/statistics", '', 'Статистика'),
 	array("$this->root/links", 'Връзки към други полезни места в мрежата', 'Връзки'),
 	array("$this->root/feedback", 'Връзка с хората, отговарящи за библиотеката', 'Обратна връзка'),
@@ -313,7 +314,8 @@ EOS;
 		$mode = $this->out->hiddenField('mode', 'simple');
 		$q = $this->out->textField('q', '', $startwith, 14, 40, 0,
 			'Клавиш за достъп — Т', 'style="width:9em" accesskey="т"');
-		$submit = $this->out->submitButton('Показване', 'Показване на резултатите от търсенето');
+		$submit = $this->out->submitButton('Показване',
+			'Показване на резултатите от търсенето', 0, false);
 		return <<<EOS
 <div id="navigation"><a name="navigation"> </a>
 <div id="logo"><a href="$this->root" title="Към началната страница">$this->sitename</a></div>
@@ -493,7 +495,7 @@ EOS;
 	}
 
 
-	protected function makeAuthorLink($name, $sortby='first', $pref='', $suf='', $query='') {
+	public function makeAuthorLink($name, $sortby='first', $pref='', $suf='', $query='') {
 		$name = rtrim($name, ',');
 		if ( empty($name) ) { return ''; }
 		if ( !empty($query) ) { $query = '/'.$query; }
@@ -511,7 +513,7 @@ EOS;
 	}
 
 
-	protected function makeTranslatorLink($name, $sortby='first', $pref='', $suf='', $query='') {
+	public function makeTranslatorLink($name, $sortby='first', $pref='', $suf='', $query='') {
 		if ( !empty($query) ) { $query = '/'.$query; }
 		$o = '';
 		foreach ( explode(',', $name) as $lname ) {
@@ -552,6 +554,17 @@ EOS;
 	protected function makeUserLink($name) {
 		$enc = $this->urlencode($name);
 		return "<a href='$this->root/user/$enc'>$name</a>";
+	}
+
+	protected function makeUserLinkWithEmail($username, $email, $allowemail) {
+		$mlink = '';
+		if ( !empty($email) && $allowemail == 'true' ) {
+			$title = 'Пращане на писмо на '. htmlspecialchars($username);
+			$img = $this->out->image($this->skin->image('mail'), 'е-поща', $title);
+			$mlink = '&nbsp;'. $this->out->link($img, 'emailUser',
+				array('username' => $username), $title);
+		}
+		return $this->makeUserLink($username) . $mlink;
 	}
 
 
@@ -654,18 +667,40 @@ EOS;
 		while ($curCnt < $count) {
 			$i++;
 			$o .= $offset == $curCnt ? "· <strong>$i</strong> ·"
-				: " <a href='$urlprefix/offset=$curCnt/limit=$limit'>$i</a> ";
+				: " <a href='$urlprefix/$this->FF_OFFSET=$curCnt/$this->FF_LIMIT=$limit'>$i</a> ";
 			$curCnt += $limit;
 		}
-		return '<div class="buttonlinks" style="text-align:center; margin-top:1em">Страници:'.
+		return '<div class="buttonlinks pagelinks">Страници:'.
 			trim($o, '·').'</div>';
 	}
 
+	protected function makePrevNextPageLinks($maxlimit, $minlimit = 0,
+			$qfields = array()) {
+		$prev = $this->makePrevPageLink($minlimit, $qfields);
+		$next = $this->makeNextPageLink($maxlimit, $qfields);
+		return '<div class="pagelinks">'. trim($prev .' | '. $next, '| ') .'</div>';
+	}
+
+	protected function makePrevPageLink($minlimit = 0, $qfields = array()) {
+		if ( $this->loffset <= $minlimit ) return '';
+		$newoffset = normInt($this->loffset - $this->llimit, $this->loffset, $minlimit);
+		$curfields = array($this->FF_OFFSET => $newoffset, $this->FF_LIMIT => $this->llimit);
+		$qfields = array_merge($curfields, $qfields);
+		return '&larr;&nbsp;'. $this->out->link('Предишна страница', $this->action, $qfields);
+	}
+
+	protected function makeNextPageLink($maxlimit, $qfields = array()) {
+		$newoffset = normInt($this->loffset + $this->llimit, $maxlimit, $this->loffset);
+		if ( $newoffset >= $maxlimit ) return '';
+		$curfields = array($this->FF_OFFSET => $newoffset, $this->FF_LIMIT => $this->llimit);
+		$qfields = array_merge($curfields, $qfields);
+		return $this->out->link('Следваща страница', $this->action, $qfields) .'&nbsp;&rarr;';
+	}
 
 	protected function initPaginationFields() {
-		$this->loffset = (int) $this->request->value('offset', 0);
-		$this->llimit = $this->normInt(
-			(int) $this->request->value('limit', $this->defListLimit),
+		$this->loffset = (int) $this->request->value($this->FF_OFFSET, 0);
+		$this->llimit = normInt(
+			(int) $this->request->value($this->FF_LIMIT, $this->defListLimit),
 			$this->maxListLimit);
 	}
 
@@ -673,12 +708,6 @@ EOS;
 		return $this->db->autoIncrementId($dbtable);
 	}
 
-
-	protected function normInt($val, $max, $min = 1) {
-		if ($val > $max) $val = $max;
-		elseif ($val < $min) $val = $min;
-		return (int) $val;
-	}
 }
 
 ?>

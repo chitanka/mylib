@@ -23,7 +23,7 @@ class LoginPage extends RegisterPage {
 		$result = $this->db->select($this->mainDbTable, $key, $sel);
 		$count = $this->db->numRows($result);
 		if ( $count <= 0 ) {
-			$this->addMessage("Не съществува потребител с име $this->username.", true );
+			$this->addMessage("Не съществува потребител с име <strong>$this->username</strong>.", true );
 			return $this->buildContent();
 		}
 		$udata = $this->db->fetchAssoc($result);
@@ -79,13 +79,13 @@ class LoginPage extends RegisterPage {
 	<legend>Влизане</legend>
 	<table>
 	<tr>
-		<td style="text-align:right"><label for="username">Потребителско име:</label></td>
+		<td class="fieldname-left"><label for="username">Потребителско име:</label></td>
 		<td>$username <a href="$this->root/sendUsername">Забравено име</a></td>
 	</tr><tr>
-		<td style="text-align:right"><label for="password">Парола:</label></td>
+		<td class="fieldname-left"><label for="password">Парола:</label></td>
 		<td>$password <a href="$this->root/sendNewPassword">Забравена парола</a></td>
 	</tr><tr>
-		<td style="text-align:right">$remember</td>
+		<td class="fieldname-left">$remember</td>
 		<td><label for="remember">Запомняне на паролата</label></td>
 	</tr><tr>
 		<td colspan="2" style="text-align:center">$submit</td>

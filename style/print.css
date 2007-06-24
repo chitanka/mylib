@@ -10,6 +10,6 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 #logo, #toc, .infobox, #toolbar, #footer, #copyright, #cache-link,
-#txt-edit-msg, .ok {
+#fulltext-link, #txt-edit-msg, .ok {
 	display: none;
 }

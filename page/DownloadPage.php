@@ -93,50 +93,15 @@ class DownloadPage extends Page {
 
 
 	protected function makeMainFileData($textId) {
-		// text data
-		$sel = array('title textTitle', 'subtitle', 'orig_title', 'orig_subtitle',
-			'sernr', 'copy');
-		$res = $this->db->select('text', array('id' => $textId), $sel);
-		$data = $this->db->fetchAssoc($res);
-		if ( empty($data) ) { return false; }
-		extract($data);
-
-		// authors
-		$query = "SELECT a.name FROM /*p*/author_of aof
-			LEFT JOIN /*p*/person a ON aof.author = a.id
-			WHERE aof.text = $textId ORDER BY aof.pos ASC";
-		$result = $this->db->query($query);
-		$authors = array();
-		$copyrights = '';
-		while ( $data = $this->db->fetchAssoc($result) ) {
-			extract($data);
-			if ( empty($name) ) continue;
-			$authors[] = $name;
-			if ($copy) $copyrights .= "\n\t© ". $name;
-		}
-		$authors = implode(', ', $authors);
-
-		// translators
-		$query = "SELECT t.name FROM /*p*/translator_of tof
-			LEFT JOIN /*p*/person t ON tof.translator = t.id
-			WHERE tof.text = $textId ORDER BY tof.pos ASC";
-		$result = $this->db->query($query);
-		while ( $data = $this->db->fetchAssoc($result) ) {
-			extract($data);
-			if ( empty($name) ) continue;
-			$copyrights .= "\n\t© $name, превод";
-		}
-
-		if ( !empty($subtitle) ) {
-			$textTitle .= $subtitle{0} == '(' ? ' '.$subtitle : " ($subtitle)";
-		}
+		$work = Work::newFromId($textId);
 		$prefix = "\xEF\xBB\xBF". // Byte order mark for some windows software
-			"\t[Kodirane UTF-8]\n\n|\t$authors\n|\t$textTitle\n\n\n";
+			"\t[Kodirane UTF-8]\n\n|\t$work->author_name\n".
+			$work->getTitleAsSfb() ."\n\n\n";
 		$anno = $this->makeAnnotation($textId);
 		if ( !empty($anno) ) { $prefix .= "A>\n$anno\nA$\n\n\n"; }
 
-		$filename = (empty($authors) ? '' : cyr2lat($authors) .' - ').
-			(empty($sernr)?'':"$sernr. ") . cyr2lat($textTitle);
+		$filename = (empty($work->author_name) ? '' : cyr2lat($work->author_name) .' - ').
+			(empty($sernr)?'':"$sernr. ") . cyr2lat($work->title);
 		$filename = substr($filename, 0, 200);
 		$filename = $this->cleanFileName($filename);
 		if ( isset( $this->fnameCount[$filename] ) ) {
@@ -145,8 +110,11 @@ class DownloadPage extends Page {
 		} else {
 			$this->fnameCount[$filename] = 1;
 		}
-		$suffix = "\nI>".$copyrights . $this->makeExtraInfo($textId) ."\n\n".
-			"\tСвалено от „{$this->sitename}“ [$this->purl/text/$textId]\nI$\n";
+		$suffix = "\nI>".$work->getCopyright() ."\n\n".
+			$work->getOrigTitleAsSfb() .
+			$this->makeExtraInfo($textId) .
+			"\n\n\tСвалено от „{$this->sitename}“ [$this->purl/text/$textId]\nI$\n";
+		$suffix = preg_replace('/\n\n+/', "\n\n", $suffix);
 		return array($filename, $prefix, $suffix);
 	}
 

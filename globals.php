@@ -354,6 +354,22 @@ function cartesian_product($arr1, $arr2) {
 	return $prod;
 }
 
+function normInt($val, $max, $min = 1) {
+	if ($val > $max) $val = $max;
+	elseif ($val < $min) $val = $min;
+	return (int) $val;
+}
+
+/**
+ * @param $key Key
+ * @param $data Associative array
+ * @param $defKey Default key
+ * @return $key if it exists as key in $data, otherwise $defKey
+ */
+function normKey($key, $data, $defKey) {
+	return array_key_exists($key, $data) ? $key : $defKey;
+}
+
 function isArchive($file) {
 	$exts = array('zip', 'tgz', 'tar.gz');
 	foreach ($exts as $ext) {
@@ -362,6 +378,25 @@ function isArchive($file) {
 		}
 	}
 	return false;
+}
+
+/**
+ * Validates an e-mail address
+ * Regexps are taken from http://www.iki.fi/markus.sipila/pub/emailvalidator.php
+ * (author: Markus Sipilä, version: 1.0, 2006-08-02)
+ * @param string $input E-mail address to be validated
+ * @return int 1 if valid, 0 if not valid, -1 if valid but strange
+ */
+function validateEmailAddress($input) {
+	if ( empty($input) ) { return 1; }
+	$ct = '[a-zA-Z0-9-]';
+	$cn = '[a-zA-Z0-9_+-]';
+	$cr = '[a-zA-Z0-9,!#$%&\'\*+\/=?^_`{|}~-]';
+	$normal = "/^$cn+(\.$cn+)*@$ct+(\.$ct+)*\.([a-z]{2,4})$/";
+	$rare   = "/^$cr+(\.$cr+)*@$ct+(\.$ct+)*\.([a-z]{2,})$/";
+	if ( preg_match($normal, $input) ) { return 1; }
+	if ( preg_match($rare, $input) ) { return -1; }
+	return 0;
 }
 
 function dpr($arr) { echo '<pre>'.print_r($arr, true).'</pre>'; }

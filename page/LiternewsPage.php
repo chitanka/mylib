@@ -42,7 +42,7 @@ class LiterNewsPage extends Page {
 			$this->addMessage('Попълнете всички полета!');
 			return $this->buildContent();
 		}
-		if ( isSpam($this->newstext, 3) ) {
+		if ( $this->user->isAnon() && isSpam($this->newstext, 3) ) {
 			$this->addMessage('Новината ви е определена като спам. Вероятно съдържа прекалено много уеб адреси.', true);
 			return $this->buildContent();
 		}

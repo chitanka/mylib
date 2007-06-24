@@ -157,8 +157,7 @@ class WorkPage extends Page {
 			file_put_contents('log/todo', $log, FILE_APPEND);
 			$mailpage = PageManager::buildPage('mail');
 			$fields = array('mailSubject'=>'Ново произведение за Моята библиотека',
-				'mailMessage'=>$log."\n\nhttp://borislav.free.fr$this->rootd/".
-				strtr(urlencode($dest), array('%2F' => '/')));
+				'mailMessage' => "$log\n$dest");
 			$mailpage->setFields($fields);
 			$mailpage->execute();
 		}
@@ -190,7 +189,7 @@ class WorkPage extends Page {
 
 
 	public function makeWorkList($limit = 0) {
-		$q = "SELECT w.*, DATE(date) ddate, u.username
+		$q = "SELECT w.*, DATE(date) ddate, u.username, u.email, u.allowemail
 			FROM /*p*/$this->mainDbTable w
 			LEFT JOIN /*p*/". User::MAIN_DB_TABLE ." u ON (w.user = u.id)
 			ORDER BY date DESC, w.id DESC";
@@ -225,7 +224,7 @@ EOS;
 		extract($dbrow);
 		$author = strtr($author, array(', '=>','));
 		$author = $this->makeAuthorLink($author);
-		$userlink = $this->makeUserLink($username);
+		$userlink = $this->makeUserLinkWithEmail($username, $email, $allowemail);
 		$info = '';
 		if ( !empty($comment) ) {
 			$comment = strtr($comment, array("\n"=>'', "\r"=>''));
@@ -233,7 +232,7 @@ EOS;
 		}
 		$title = $this->userCanEditEntry($user, $type)
 			? "<a href='$this->root/$this->action/edit/$id' title='Към страницата за редактиране'><em>$title</em></a>" : "<em>$title</em>";
-		$this->rowclass = $this->rowclass == 'even' ? 'odd' : 'even';
+		$this->rowclass = $this->out->nextRowClass($this->rowclass);
 		if ($progress > 0) {
 			$progressbar = $this->makeProgressBar($progress);
 			$st = '';
@@ -254,7 +253,8 @@ EOS;
 			$mdata = $this->getMultiEditData($id);
 			foreach ($mdata as $muser => $data) {
 				if ($muser == $user) continue;
-				$ulink = $this->makeUserLink($data['username']);
+				$ulink = $this->makeUserLinkWithEmail($data['username'],
+					$data['email'], $data['allowemail']);
 				if ($data['frozen']) {
 					$ulink = "<span class='frozen'>$ulink</span>";
 				}
@@ -282,8 +282,8 @@ EOS;
 
 
 	protected function makeTabImg($type) {
-		return '<img src="{IMGDIR}'.$this->tabImgs[$type].'.png" title="'.
-			$this->tabs[$type].'" alt="'.$this->tabImgAlts[$type].'" />';
+		return $this->out->image('{IMGDIR}'.$this->tabImgs[$type].'.png',
+			$this->tabImgAlts[$type], $this->tabs[$type]);
 	}
 
 
@@ -463,7 +463,7 @@ EOS;
 			$frozen = $this->frozen ? "($frozenLabel)" : '';
 			$tmpfiles = '';
 		}
-		$udata = User::getData($this->scanuser);
+		$udata = User::getDataById($this->scanuser);
 		$ulink = $this->makeUserLink($udata['username']);
 		$flink = $this->tmpfiles == self::DEF_TMPFILE ? ''
 			: "<a href='$this->tmpfiles'>$this->tmpfiles</a>" .
@@ -554,7 +554,7 @@ EOS;
 		$l = $class = '';
 		foreach ($this->multidata as $edata) {
 			extract($edata);
-			$class = $class == 'odd' ? 'even' : 'odd';
+			$class = $this->out->nextRowClass($class);
 			$ulink = $this->makeUserLink($username);
 			if ( !empty($uplfile) ) {
 				$url = $this->rootd .'/'. $this->tmpDir . $uplfile;
@@ -719,7 +719,7 @@ EOS;
 
 	public function makeContribListItem($dbrow) {
 		extract($dbrow);
-		$this->rowclass = $this->rowclass == 'odd' ? 'even' : 'odd';
+		$this->rowclass = $this->out->nextRowClass($this->rowclass);
 		$ulink = $this->makeUserLink($username);
 		$s = formatNumber($size / $this->mb);
 		return "\n\t<tr class='$this->rowclass'><td>$ulink</td><td>$s</td><td>$count</td></tr>";
@@ -748,7 +748,7 @@ EOS;
 
 
 	protected function getMultiEditData($mainId) {
-		$q = "SELECT m.*, DATE(m.date) date, u.username
+		$q = "SELECT m.*, DATE(m.date) date, u.username, u.email, u.allowemail
 		FROM /*p*/$this->suplDbTable m
 		LEFT JOIN /*p*/". User::MAIN_DB_TABLE ." u ON m.user = u.id
 		WHERE pid = $mainId ORDER BY m.date DESC";

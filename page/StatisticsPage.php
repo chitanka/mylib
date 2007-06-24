@@ -20,6 +20,7 @@ class StatisticsPage extends Page {
 			array($this->out->link('Етикети', 'label'), $this->getLabelCount()),
 			array($this->out->link('Читателски мнения', 'comment'), $this->getCommentCount()),
 			array($this->out->link('Литературни новини', 'liternews'), $this->getLiternewsCount()),
+			array($this->out->link('Потребители', 'user'), $this->getUserCount()),
 		);
 		$o = '<div style="float:left; width:33%">'. $this->out->simpleTable('Основни данни', $tdata) .'</div>';
 		$o .= '<div style="float:left; width:33%">'.$this->makePersonCountryStats(1) .'</div>';
@@ -39,7 +40,7 @@ class StatisticsPage extends Page {
 			extract($tc);
 			$qvars = array('type' => $type);
 			if ($count < $this->maxCountToList) $qvars['mode'] = 'simple';
-			$curRowClass = $curRowClass == 'odd' ? 'even' : 'odd';
+			$curRowClass = $this->out->nextRowClass($curRowClass);
 			$link = $this->out->link($name, 'title', $qvars);
 			$l .= "<tr class='$curRowClass'><td>$link</td><td>$count</td></tr>";
 		}
@@ -97,6 +98,10 @@ class StatisticsPage extends Page {
 
 	protected function getLiternewsCount() {
 		return $this->db->getCount('liternews', array('`show`' => true));
+	}
+
+	protected function getUserCount() {
+		return $this->db->getCount('user');
 	}
 
 }

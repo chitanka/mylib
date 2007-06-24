@@ -88,7 +88,7 @@ EOS;
 				if ( $lang != $orig_lang ) {
 					$stranslator = (!empty($sauthor) ? ', ' : '').'превод: ';
 					$stranslator .= empty($translator)
-						? "<a href='$this->root/suggestTranslator/$textId'>неизвестен</a>"
+						? "<a href='$this->root/suggestData/translator/$textId'>неизвестен</a>"
 						: $this->makeTranslatorLink($translator, 'first', '', '', '');
 				} else { $stranslator = ''; }
 				$vdate = $textData[$this->getby];
@@ -151,7 +151,7 @@ EOS;
 					if ( $lang != $orig_lang ) {
 						$stranslator = ', превод: ';
 						$stranslator .= empty($translator)
-							? "<a href='$this->root/suggestTranslator/$textId'>неизвестен</a>"
+							? "<a href='$this->root/suggestData/translator/$textId'>неизвестен</a>"
 							: $this->makeTranslatorLink($translator, 'first', '', '', '');
 					} else { $stranslator = ''; }
 					$readClass = empty($reader) ? 'unread' : 'read';

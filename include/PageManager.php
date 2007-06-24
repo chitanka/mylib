@@ -9,7 +9,7 @@ class PageManager {
 		'statistics');
 	private static $cachedPagesClient = array('css', 'user', 'text', 'comment',
 		'download', 'history', 'sendNewPassword', 'add', 'liternews',
-		'suggestOrigTitle', 'suggestTranslator');
+		'suggestData');
 
 
 	/**

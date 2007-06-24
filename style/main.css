@@ -357,6 +357,7 @@ li.playbook, li.science, li.intro, li.travelnotes, li.other, li.textbook {
 	background-color: <?php echo $mainBgColor?>;
 	text-decoration: none;
 }
+#fulltext-link { float: right; }
 
 /* препратките за прочетени текстове */
 .read, .read:visited {
@@ -385,7 +386,11 @@ li.playbook, li.science, li.intro, li.travelnotes, li.other, li.textbook {
 	/*background-color: <?php echo $buttonLinksBgColor?>;*/
 	border-style: inset;
 }
-
+/* препратки за разлистване на подстраници — предишна, следваща */
+.pagelinks {
+	text-align: center;
+	margin: 1em auto;
+}
 /* съобщения за грешки */
 .error { color: <?php echo $errorFgColor?>; background-color: inherit; }
 .error:before { content: url('<?php echo $skin->image('stop')?>') ' '; }
@@ -525,3 +530,5 @@ div.tabbedpanebody {
 	font-size: 0.9em;
 	border-top: thin solid <?php echo $tocBordColor?>;
 }
+/* за таблици */
+.fieldname-left { text-align: right; }

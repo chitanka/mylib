@@ -65,7 +65,7 @@ class SendNewsletterPage extends Page {
 
 	protected function initData() {
 		$sel = array('username', 'realname', 'email');
-		$key = array('news' => 1, 'email' => array('LIKE', '%@%'));
+		$key = array('news' => true, 'email' => array('LIKE', '%@%'));
 		$res = $this->db->select(User::MAIN_DB_TABLE, $key, $sel);
 		while ( $data = $this->db->fetchAssoc($res)) {
 			extract($data);

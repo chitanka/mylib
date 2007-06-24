@@ -11,7 +11,7 @@ class LogoutPage extends Page {
 
 	protected function buildContent() {
 		if ( $this->user->isAnon() ) {
-			$this->addMessage('Не сте влезли, а искате да излезете! ;)');
+			$this->addMessage('Не сте влезли, а искате да излезете! ;-)');
 		} else {
 			$this->user->logout();
 			$this->addMessage("Излязохте от $this->sitename.");

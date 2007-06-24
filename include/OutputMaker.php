@@ -55,13 +55,17 @@ class OutputMaker {
 	}
 
 
-	public function submitButton($value, $title = '', $tabindex = 0, $name = '',
+	public function submitButton($value, $title = '', $tabindex = 0, $putname = true,
 			$extraAttr = '') {
 		$value = htmlspecialchars($value);
 		$title = htmlspecialchars($title);
 		$tab = $this->tabindex($tabindex);
-		if ( empty($name) ) $name = 'submitButton';
-		return "<input type='submit' name='$name' value=\"$value\" title='$title'$tab $extraAttr />";
+		if ( is_string($putname) ) {
+			$name = " name='$putname'";
+		} else {
+			$name = $putname ? ' name="submitButton"' : '';
+		}
+		return "<input type='submit'$name value=\"$value\" title='$title'$tab $extraAttr />";
 	}
 
 	public function selectBox($name, $id = '', $opts = array(), $selId = 0,
@@ -151,7 +155,7 @@ class OutputMaker {
 		$t = "<table class='content'$extraAttr><caption>$caption</caption>";
 		$curRowClass = '';
 		foreach ($data as $row) {
-			$curRowClass = $curRowClass == 'odd' ? 'even' : 'odd';
+			$curRowClass = $this->nextRowClass($curRowClass);
 			$t .= "\n<tr class='$curRowClass'>";
 			foreach ($row as $cell) {
 				$t .= "<td>$cell</td>";
@@ -159,6 +163,40 @@ class OutputMaker {
 			$t .= "\n</tr>";
 		}
 		return $t.'</table>';
+	}
+
+
+	public function multicolTable($data, $colcount = 3, $width = '100%', $class = '') {
+		$t = '';
+		$curRowClass = '';
+		$count = count($data);
+		for ($i = 0; $i < $count; $i += $colcount) { // rows
+			$curRowClass = $this->nextRowClass($curRowClass);
+			$t .= "\n<tr class='$curRowClass'>";
+			for ($j = 0; $j < $colcount; $j++) { // cols
+				$c = isset($data[$i+$j]) ? $data[$i+$j] : '';
+				$t .= "\n\t<td>$c</td>";
+			}
+			$t .= "\n</tr>";
+		}
+		$colwidth = floor(100 / $colcount);
+		$cols = '';
+		for ($i = 0; $i < $colcount; $i++) {
+			$cols .= "<col width='{$colwidth}%' />";
+		}
+		return <<<EOS
+<table class="$class" border="0" style="width:$width">
+	<colgroup>
+		$cols
+	</colgroup>
+$t
+</table>
+EOS;
+	}
+
+
+	public function nextRowClass($curRowClass = '') {
+		return $curRowClass == 'odd' ? 'even' : 'odd';
 	}
 
 

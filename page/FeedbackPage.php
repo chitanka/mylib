@@ -19,13 +19,11 @@ class FeedbackPage extends MailPage {
 				Без коментар не се приема! ;-)', true);
 			return $this->buildContent();
 		}
-		if ( isSpam($this->comment) ) {
+		if ( $this->user->isAnon() && isSpam($this->comment) ) {
 			$this->addMessage('Коментарът ви е определен като спам. Вероятно съдържа прекалено много уеб адреси.', true);
 			return $this->buildContent();
 		}
-		if ( empty($this->name) ) $this->name = 'Анонимен';
-		if ( empty($this->email) ) $this->email = 'anonymous@anonymous.net';
-		$this->mailFrom = header_encode($this->name) ." <$this->email>";
+		$this->mailFrom = $this->makeFullAddress($this->name, $this->email);
 		$this->mailSubject = "Обратна връзка от $this->sitename";
 		$this->mailSuccessMessage = 'Съобщението ви беше изпратено. Благодаря ви!';
 		$this->mailFailureMessage = 'Изглежда е станал някакъв фал при
@@ -35,10 +33,10 @@ class FeedbackPage extends MailPage {
 
 
 	protected function makeSubmissionReturn() {
-		if ( !empty($this->referer) ) {
-			return "<p>Обратно към <a href='$this->referer'>предишната страница</a></p>";
+		if ( empty($this->referer) ) {
+			return '';
 		}
-		return '';
+		return "<p>Обратно към <a href='$this->referer'>предишната страница</a></p>";
 	}
 
 
@@ -57,10 +55,10 @@ class FeedbackPage extends MailPage {
 	<legend>Формулярче</legend>
 	$referer
 	<table summary="table for the layout"><tr>
-		<td><label for="name">Име:</label></td>
+		<td class="fieldname-left"><label for="name">Име:</label></td>
 		<td>$name</td>
 	</tr><tr>
-		<td><label for="email">Е-поща:</label></td>
+		<td class="fieldname-left"><label for="email">Е-поща:</label></td>
 		<td>$email</td>
 	</tr></table>
 	<label for="comment">Коментар:</label>

@@ -60,7 +60,8 @@ class Database {
 	}
 
 
-	public function iterateOverResult($query, $func, $obj = null, $buffered = false) {
+	public function iterateOverResult($query, $func, $obj = null,
+			$buffered = false) {
 		$result = $this->query($query, $buffered);
 		$out = '';
 		while ( $row = mysql_fetch_assoc($result) ) {

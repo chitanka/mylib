@@ -30,7 +30,6 @@ class DynMainPage extends Page {
 		parent::__construct();
 		$this->action = 'dynMain';
 		$this->title = 'Начална страница';
-		$this->forum_root = Setup::setting('forum_root');
 		$this->urls = array(
 			'liternews' => "$this->root/liternews",
 			'newtitles' => "$this->root/history",

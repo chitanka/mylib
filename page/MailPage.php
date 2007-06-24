@@ -47,7 +47,7 @@ class MailPage extends Page {
 			'Content-type' => 'text/plain; charset=utf-8',
 			'From' => $this->mailFrom,
 			'Subject' => header_encode($this->mailSubject),
-			'X-Mailer' => 'MyLib mailer',
+			'X-Mailer' => 'Mylib',
 		);
 		return array_merge($headers, $this->extraMailHeaders);
 	}
@@ -58,6 +58,12 @@ class MailPage extends Page {
 
 	protected function makeMailMessage() { return $this->mailMessage; }
 
+
+	protected function makeFullAddress($user, $email) {
+		if ( empty($user) ) $user = 'Анонимен';
+		if ( empty($email) ) $email = 'anonymous@anonymous.net';
+		return header_encode($user) ." <$email>";
+	}
 
 	protected function logEmail($message, $headers) {
 		$sheaders = '';

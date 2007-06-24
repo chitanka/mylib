@@ -1,6 +1,6 @@
 <?php
 
-class SettingsPage extends Page {
+class SettingsPage extends RegisterPage {
 
 	protected $optKeys = array('skin', 'nav', 'mainpage');
 	protected $mpOpts = array(
@@ -12,6 +12,7 @@ class SettingsPage extends Page {
 		'liternews' => 'Литературни новини',
 	);
 	protected $defEcnt = 10;
+	protected $nonEmptyFields = array();
 
 
 	public function __construct() {
@@ -20,16 +21,10 @@ class SettingsPage extends Page {
 		$this->title = 'Настройки';
 		$this->isAnon = $this->user->isAnon();
 		$this->userId = $this->user->id;
-		$this->username = $this->request->value('username');
-		$this->oldusername = $this->request->value('oldusername');
-		$this->realname = $this->request->value('realname');
-		$this->password = $this->request->value('password');
-		$this->passwordRe = $this->request->value('passwordRe');
-		$this->email = $this->request->value('email', '');
+		$this->allowemail = $this->request->checkbox('allowemail');
 		$this->opts['skin'] = $this->request->value('skin', 'orange');
 		$this->opts['nav'] = $this->request->value('navpos', 'right');
 		$this->opts['mainpage'] = $this->request->value('mainpage', 's');
-		$this->news = (int) $this->request->checkbox('news');
 		$this->expire = $this->request->value('expire', '30');
 		$this->optKeys = array_merge($this->optKeys, array_keys($this->mpOpts));
 		$pos = 0;
@@ -54,36 +49,38 @@ class SettingsPage extends Page {
 
 
 	protected function processRegUserRequest() {
+		$err = $this->validateInput();
+		$this->attempt++;
+		if ( !empty($err) ) {
+			$this->addMessage($err, true);
+			return $this->makeRegUserForm();
+		}
 		$set = array('realname' => $this->realname,
 			'lastname' => ltrim(strrchr($this->realname, ' ')),
-			'email' => $this->email, 'news' => $this->news,
-			'opts' => $this->makeOptionsOutput());
-		if ( $this->oldusername != $this->username ) {
-			$key = array('username' => $this->username);
-			if ( $this->db->exists(User::MAIN_DB_TABLE, $key) ) {
-				$this->addMessage("За съжаление името „{$this->username}“ вече е заето.", true);
-				return $this->buildContent();
+			'email' => $this->email, 'allowemail' => $this->allowemail,
+			'news' => $this->news, 'opts' => $this->makeOptionsOutput());
+		if ( !empty($this->username) && $this->user->username != $this->username ) {
+			if ( $this->userExists() ) {
+				return $this->makeRegUserForm();
 			}
 			$set['username'] = $this->username;
 		}
-		if ( !empty($this->password) && !empty($this->passwordRe) ) {
-			// change password
-			if ( strcmp($this->password, $this->passwordRe) !== 0 ) {
-				$this->addMessage('Двете въведени пароли се различават.', true);
-				return $this->buildContent();
-			}
+		if ( $this->emailExists($this->user->username) ) {
+			return $this->makeRegUserForm();
+		}
+		if ( !empty($this->password) ) { // change password
 			$set['password']= $this->db->encodePasswordDB($this->password);
 		}
 		$key = array('id' => $this->userId);
-		if ( $this->db->update(User::MAIN_DB_TABLE, $set, $key) !== false ) {
+		if ( $this->db->update(User::MAIN_DB_TABLE, $set, $key) === false ) {
+			$this->addMessage('Имаше някакъв проблем при промяната на данните.', true);
+		} else {
 			$this->addMessage("Данните ви бяха променени.");
 			if ( isset($set['username']) ) {
+				$this->addMessage("<strong>Обърнете внимание, че отсега нататък потребителското ви име е „{$set['username']}“. Старото ви име „{$this->user->username}“ е вече невалидно.</strong>");
 				$this->user->username = $set['username'];
-				$this->addMessage("Обърнете внимание, че отсега нататък потребителското ви име е „{$set['username']}“. Старото ви име „{$this->oldusername}“ е вече невалидно.");
 			}
 			$this->setNewUserOptions();
-		} else {
-			$this->addMessage('Имаше някакъв проблем при промяната на данните.', true);
 		}
 		return $this->makeRegUserForm();
 	}
@@ -112,12 +109,14 @@ class SettingsPage extends Page {
 	protected function makeRegUserForm() {
 		$this->addAltStylesheets();
 		$formBegin = $this->makeFormBegin();
-		$oldusername = $this->out->hiddenField('oldusername', $this->username);
+		$attempt = $this->out->hiddenField('attempt', $this->attempt);
 		$username = $this->out->textField('username', '', $this->username, 25, 60, $this->tabindex++);
 		$password = $this->out->passField('password', '', '', 25, 40, $this->tabindex++);
 		$passwordRe = $this->out->passField('passwordRe', '', '', 25, 40, $this->tabindex++);
 		$realname = $this->out->textField('realname', '', $this->realname, 25, 60, $this->tabindex++);
 		$email = $this->out->textField('email', '', $this->email, 25, 60, $this->tabindex++);
+		$allowemail = $this->out->checkbox('allowemail', '', $this->allowemail,
+			'Разрешаване на писма от другите потребители', '', $this->tabindex++);
 		$common = $this->makeCommonInput();
 		$news = $this->out->checkbox('news', '', $this->news,
 			'Получаване на месечно новинарско писмо', '', $this->tabindex++);
@@ -125,23 +124,27 @@ class SettingsPage extends Page {
 		return <<<EOS
 
 $formBegin
+	$attempt
 	<legend>Данни и настройки</legend>
 	<table>
 	<tr>
-		<td><label for="username">Потребителско име:</label></td>
-		<td>$oldusername $username</td>
+		<td class="fieldname-left"><label for="username">Потребителско име:</label></td>
+		<td>$username</td>
 	</tr><tr>
-		<td><label for="password">Нова парола<a id="nb1" href="#n1">*</a>:</label></td>
+		<td class="fieldname-left"><label for="password">Нова парола<a id="nb1" href="#n1">*</a>:</label></td>
 		<td>$password</td>
 	</tr><tr>
-		<td><label for="passwordRe">Новата парола още веднъж:</label></td>
+		<td class="fieldname-left"><label for="passwordRe">Новата парола още веднъж:</label></td>
 		<td>$passwordRe</td>
 	</tr><tr>
-		<td><label for="realname">Истинско име:</label></td>
+		<td class="fieldname-left"><label for="realname">Истинско име:</label></td>
 		<td>$realname</td>
 	</tr><tr>
-		<td><label for="email">Е-поща:</label></td>
+		<td class="fieldname-left"><label for="email">Е-поща:</label></td>
 		<td>$email</td>
+	</tr>
+	<tr>
+		<td colspan="2">$allowemail</td>
 	</tr>$common
 	<tr>
 		<td colspan="2">$news</td>
@@ -202,13 +205,13 @@ EOS;
 		return <<<EOS
 
 	<tr>
-		<td><label for="skin">Облик:</label></td>
+		<td class="fieldname-left"><label for="skin">Облик:</label></td>
 		<td>$skin</td>
 	</tr><tr>
-		<td><label for="navpos">Навигация:</label></td>
+		<td class="fieldname-left"><label for="navpos">Навигация:</label></td>
 		<td>$navpos</td>
 	</tr><tr>
-		<td><label for="mainpage">Начална страница:</label></td>
+		<td class="fieldname-left"><label for="mainpage">Начална страница:</label></td>
 		<td>$mainpage</td>
 	</tr>
 	<tr>
@@ -252,7 +255,7 @@ EOS;
 			$show = $this->out->checkbox($key.'[0]', '', $this->opts[$key][0] == '1');
 			$pos = $this->out->textField($key.'[1]', '', $this->opts[$key][1], 1, 2);
 			$ecnt = $this->out->textField($key.'[2]', '', $this->opts[$key][2], 2, 2);
-			$rclass = $rclass == 'odd' ? 'even' : 'odd';
+			$rclass = $this->out->nextRowClass($rclass);
 			$ta[ $this->opts[$key][1] ] = <<<EOS
 
 		<tr class="$rclass">
@@ -295,7 +298,7 @@ EOS;
 
 
 	protected function initRegUserData() {
-		$sel = array('username', 'realname', 'email', 'news', 'opts');
+		$sel = array('username', 'realname', 'email', 'allowemail', 'news', 'opts');
 		$key = array('id' => $this->userId);
 		$res = $this->db->select(User::MAIN_DB_TABLE, $key, $sel);
 		$data = $this->db->fetchAssoc($res);
@@ -306,6 +309,8 @@ EOS;
 		$this->opts = array_merge($this->opts, User::extractOptions($data['opts']));
 		unset($data['opts']);
 		extract2object($data, $this);
+		$this->allowemail = $this->db->s2b($this->allowemail);
+		$this->news = $this->db->s2b($this->news);
 	}
 
 

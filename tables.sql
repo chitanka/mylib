@@ -85,6 +85,34 @@ CREATE TABLE /*prefix*/label_log (
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `ml_license`
+--
+
+DROP TABLE IF EXISTS /*prefix*/license;
+CREATE TABLE /*prefix*/license (
+  `id` smallint(5) unsigned NOT NULL auto_increment,
+  `code` varchar(20) NOT NULL,
+  `name` varchar(255) NOT NULL,
+  `free` enum('false','true') NOT NULL COMMENT 'Free license?',
+  `copyright` enum('false','true') NOT NULL default 'true' COMMENT 'Contains any copyright?',
+  PRIMARY KEY  (`id`),
+  UNIQUE KEY `code` (`code`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 AUTO_INCREMENT=10 ;
+
+
+INSERT INTO /*prefix*/license VALUES (1, 'pd', 'Обществено достояние', 'true', 'false'),
+(2, 'fc', 'Пълни авторски права', 'false', 'true'),
+(3, 'gfdl', 'Лиценз за свободна документация на ГНУ', 'true', 'true'),
+(4, 'cc-by', 'Криейтив Комънс — Признание', 'true', 'true'),
+(5, 'cc-by-sa', 'Криейтив Комънс — Признание — Споделяне на споделеното', 'true', 'true'),
+(6, 'cc-by-nc', 'Криейтив Комънс — Признание — Некомерсиално', 'false', 'true'),
+(7, 'cc-by-nc-sa', 'Криейтив Комънс — Признание — Некомерсиално — Споделяне на споделеното', 'false', 'true'),
+(8, 'cc-by-nd', 'Криейтив Комънс — Признание — Без производни', 'false', 'true'),
+(9, 'cc-by-nc-nd', 'Криейтив Комънс — Признание — Некомерсиално — Без производни', 'false', 'true');
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table /*prefix*/liternews
 --
 
@@ -212,6 +240,8 @@ CREATE TABLE /*prefix*/text (
   `orig_lang` varchar(3) NOT NULL default 'en',
   `year` smallint(4) NOT NULL,
   `year2` smallint(4) NOT NULL COMMENT 'Last year of a creation',
+  `license_orig` smallint(5) unsigned NOT NULL COMMENT 'License of the original work',
+  `license_trans` smallint(5) unsigned NOT NULL COMMENT 'License of the translated work',
   `type` varchar(12) NOT NULL default 'shortstory',
   `cover` mediumint(8) NOT NULL COMMENT 'use this cover if no cover in COVERDIR',
   `series` smallint(5) unsigned NOT NULL default '0',
@@ -274,8 +304,9 @@ CREATE TABLE /*prefix*/user (
   `password` varchar(100) character set latin1 NOT NULL,
   `newpassword` varchar(100) character set latin1 NOT NULL default '',
   `email` varchar(100) character set latin1 NOT NULL default '',
+  `allowemail` enum('false', 'true') NOT NULL default 'false' COMMENT 'Allow email from other users?',
   `group` enum('nu','c0','c','a','mod') NOT NULL default 'nu',
-  `news` tinyint(1) NOT NULL default '0',
+  `news` enum('false', 'true') NOT NULL default 'false' COMMENT 'Receive a monthly newsletter?',
   `opts` varchar(255) NOT NULL,
   `login_tries` tinyint(3) unsigned NOT NULL,
   `registration` datetime NOT NULL COMMENT 'Registration date',

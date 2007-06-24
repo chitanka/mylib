@@ -1,11 +1,14 @@
 <?php
 class EditPage extends Page {
 
+	protected $defLicense = 'fc'; // full (fucking) copyright
+
 	public function __construct() {
 		parent::__construct();
 		$this->action = 'edit';
 		$this->title = 'Редактиране';
 		$this->mainDbTable = 'text';
+		$this->licenseDbTable = 'license';
 		$this->textId = (int) $this->request->value('textId', 0, 1);
 		$this->obj = $this->request->value('obj', '', 2);
 		$this->withText = true;
@@ -35,7 +38,8 @@ class EditPage extends Page {
 		$this->sernr = $this->request->value('sernr', 0);
 		$this->collection = $this->request->checkbox('collection');
 		$this->headlevel = $this->request->value('headlevel', 0);
-		$this->copy = (int) $this->request->checkbox('copy');
+		$this->license_orig = (int) $this->request->value('license_orig', $this->defLicense);
+		$this->license_trans = (int) $this->request->value('license_trans', $this->defLicense);
 		$this->tcontent = rtrim($this->request->value('content', ''));
 		// Format: USER(,PERCENT)?(;USER(,PERCENT)?)*
 		$this->scanUser = $this->request->value('user');
@@ -50,9 +54,9 @@ class EditPage extends Page {
 		}
 		switch ($this->obj) {
 		#case 'text' : $qs = (array)$this->makeUpdateChunkQuery(); break;
-		case 'info' : $qs = $this->makeUpdateInfoQueries(); break;
-		case 'anno' : $qs = $this->makeUpdateAnnoQueries(); break;
-		case 'textonly' : $qs = $this->makeUpdateTextContentQueries(); break;
+		case 'info': $qs = $this->makeUpdateInfoQueries(); break;
+		case 'anno': $qs = $this->makeUpdateAnnoQueries(); break;
+		case 'textonly': $qs = $this->makeUpdateTextContentQueries(); break;
 		default:      $qs = $this->makeUpdateTextQueries();
 		}
 		$this->db->transaction($qs);
@@ -74,10 +78,10 @@ class EditPage extends Page {
 	protected function buildContent() {
 		$this->replace = true;
 		switch ($this->obj) {
-		case 'text' : return $this->makeEditChunkForm();
-		case 'info' : return $this->makeEditInfoForm();
-		case 'anno' : return $this->makeEditAnnoForm();
-		default:      return $this->makeEditTextForm();
+		case 'text': return $this->makeEditChunkForm();
+		case 'info': return $this->makeEditInfoForm();
+		case 'anno': return $this->makeEditAnnoForm();
+		default:     return $this->makeEditTextForm();
 		}
 	}
 
@@ -92,7 +96,9 @@ class EditPage extends Page {
 			'year2' => $this->year2, 'trans_year2' => $this->trans_year2,
 			'type' => $this->type, 'collection' => $this->collection,
 			'series' => $this->series, 'sernr' => $this->sernr,
-			'copy' => $this->copy);
+			'license_orig' => $this->license_orig,
+			'license_trans' => $this->license_trans,
+		);
 		$key = $this->textId;
 		$qs = array();
 		if ($this->textId == 0) {
@@ -302,7 +308,10 @@ EOS;
 		$lang = $this->out->selectBox('lang', '', $langs, $this->tlang);
 		$olang = $this->out->selectBox('orig_lang', '', $langs, $this->orig_lang);
 		$collection = $this->out->checkbox('collection', '', $this->collection, 'Колективен сборник');
-		$copy = $this->out->checkbox('copy', '', $this->copy, 'Важи авторско право');
+		$lopts = $this->db->getObjects('license');
+		$lopts[0] = 'Неизвестен';
+		$license_orig = $this->out->selectBox('license_orig', '', $lopts, $this->license_orig);
+		$license_trans = $this->out->selectBox('license_trans', '', $lopts, $this->license_trans);
 		return <<<EOS
 	<label for="title">Заглавие:</label>
 	$title<br />
@@ -327,7 +336,10 @@ EOS;
 	<label for="type">Вид:</label>
 	$type &nbsp;
 	$collection<br />
-	$copy
+	<label for="license_orig">Лиценз на оригиналното произведение:</label><br />
+	$license_orig<br />
+	<label for="license_trans">Лиценз на превода:</label><br />
+	$license_trans
 EOS;
 	}
 
@@ -578,7 +590,7 @@ EOS;
 		}
 		$result = $this->db->query("SELECT title ttitle, orig_title, orig_lang,
 		subtitle, orig_subtitle, trans_year, trans_year2, t.year, year2,
-		type, series, sernr, collection, copy,
+		license_orig, license_trans, type, series, sernr, collection,
 		GROUP_CONCAT(aof.author) author, GROUP_CONCAT(a.name) nauthor
 		FROM /*p*/$this->mainDbTable t
 		LEFT JOIN /*p*/author_of aof ON (t.id = aof.text)
@@ -587,7 +599,6 @@ EOS;
 		$data = $this->db->fetchAssoc($result);
 		extract2object($data, $this);
 		if ( empty($data) ) {
-			$this->copy = true;
 			$this->nauthor = '';
 		} else {
 			$this->collection = $this->db->s2b($this->collection);
