@@ -90,4 +90,3 @@ class LsPage extends Page {
 EOS;
 	}
 }
-?>

@@ -42,6 +42,10 @@ class Setup {
 		return self::$config['cache'] == '1';
 	}
 
+	public static function hasPathInfo() {
+		return self::$config['has_path_info'] == '1';
+	}
+
 	public static function setting($settingName) {
 		return isset(self::$config[$settingName])
 			? self::$config[$settingName] : '';
@@ -70,6 +74,7 @@ class Setup {
 		ini_set('session.use_trans_sid', 0);
 		ini_set('session.use_only_cookies', 1);
 		ini_set('arg_separator.output', '&amp;');
+		ini_set('date.timezone', self::$config['default_timezone']);
 	}
 
 
@@ -122,6 +127,7 @@ class Setup {
 	private static function setupOutputMaker() {
 		if ( !isset(self::$outputMaker) ) {
 			self::$outputMaker = new OutputMaker();
+			self::$outputMaker->setHasPathInfo(self::hasPathInfo());
 		}
 		return self::$outputMaker;
 	}
@@ -142,4 +148,3 @@ class Setup {
 	}
 
 }
-?>

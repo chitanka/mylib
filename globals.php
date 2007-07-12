@@ -192,6 +192,13 @@ function monthName($m, $asUpper = true) {
 	return $asUpper ? $name : mystrtolower($name);
 }
 
+$serSuffices = array('series' => '',
+	'collection' => ' (сборник)',
+	'book' => ' (книга)');
+function seriesSuffix($seriesType) {
+	return isset($GLOBALS['serSuffices'][$seriesType]) ? $GLOBALS['serSuffices'][$seriesType] : '';
+}
+
 
 $cyrUppers = 'А Б В Г Д Е Ж З И Й К Л М Н О П Р С Т У Ф Х Ц Ч Ш Щ Ъ Ю Я';
 $cyrLowers = 'а б в г д е ж з и й к л м н о п р с т у ф х ц ч ш щ ъ ю я';
@@ -370,6 +377,16 @@ function normKey($key, $data, $defKey) {
 	return array_key_exists($key, $data) ? $key : $defKey;
 }
 
+/**
+ * @param $val Value
+ * @param $data Associative array
+ * @param $defVal Default value
+ * @return $val if it exists in $data, otherwise $defVal
+ */
+function normVal($val, $data, $defVal) {
+	return in_array($val, $data) ? $val : $defVal;
+}
+
 function isArchive($file) {
 	$exts = array('zip', 'tgz', 'tar.gz');
 	foreach ($exts as $ext) {
@@ -402,4 +419,3 @@ function validateEmailAddress($input) {
 function dpr($arr) { echo '<pre>'.print_r($arr, true).'</pre>'; }
 function dprbt() { echo '<pre>'; debug_print_backtrace(); echo '</pre>'; }
 
-?>

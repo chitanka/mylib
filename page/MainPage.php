@@ -18,4 +18,3 @@ class MainPage extends WikiPage {
 	}
 
 }
-?>

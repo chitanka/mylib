@@ -13,6 +13,10 @@ admin = Администратор
 site_email = bib@bib.com
 admin_email = admin@bib.com
 
+; This must be a valid timezone constant
+; See “List of Supported Timezones” [http://php.net/manual/en/timezones.php]
+default_timezone = "Europe/Sofia"
+
 ; Определя дали определени страници могат да се складират (в директорията
 ; cache/). Това обаче се прави само за страниците в
 ; PageManager::$cachedPagesServer
@@ -45,7 +49,7 @@ pass =
 auth = 1
 ; 0|1, по подразбиране 1
 persist = 1
-; пощенски адрес
+; е-пощенски адрес
 from =
 ; име на изпращача
 from_name =
@@ -54,7 +58,7 @@ from_name =
 ; Права на потребителските групи
 
 ; anonymous users
-anon = main, dynMain, css, about, help, author, authors, translator, translators, title, titles, series, label, user, links, info, text, texts, download, history, settings, login, logout, register, sendNewPassword, sendUsername, suggestTranslator, feedback, suggestOrigTitle, work, comment, news, liternews, staticMain
+anon = main, dynMain, css, about, help, author, authors, translator, translators, title, titles, series, label, user, links, info, text, texts, download, history, settings, login, logout, register, sendNewPassword, sendUsername, suggestData, feedback, work, comment, news, liternews, staticMain, statistics, blacklist, whitelist, emailUser
 
 ; normal users
 nu = markRead, editOwnPage, editTextLabels

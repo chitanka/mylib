@@ -105,4 +105,3 @@ class StatisticsPage extends Page {
 	}
 
 }
-?>

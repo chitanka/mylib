@@ -300,6 +300,27 @@ li.playbook, li.science, li.intro, li.travelnotes, li.other, li.textbook {
 	display: inline;
 	margin: 0 1.2em;
 }
+/* формуляра за търсене */
+dl#search {
+	color: <?php echo $mainFgColor?>;
+	background-color: <?php echo $mainBgColor?>;
+	position: absolute;
+	top: 0;
+	left: <?php echo $navPos == 'right' ? '1em' : '12em'?>;
+	border: 0;
+	padding: 0.2em;
+}
+#search form, #search div { display: inline; }
+#search dt, #search dd {
+	color: <?php echo $mainFgColor?>;
+	background-color: <?php echo $mainBgColor?>;
+	display: inline;
+}
+/* полето за търсене */
+#search-q { width: 20em; }
+/* бутона за активиране на търсенето */
+#search-go { display: none; /* скриване */ }
+
 #propaganda, #propaganda p, #searchhelpbox, #searchhelpbox p {
 	text-indent: 0;
 	text-align: center;
@@ -322,13 +343,6 @@ li.playbook, li.science, li.intro, li.travelnotes, li.other, li.textbook {
 	border: thin solid <?php echo $mainFgColor?>;
 }
 #legend { margin-top: 3em; }
-/* анотация към текст */
-#annotation {
-	margin-bottom: 2em;
-	padding: 0 0 1em 1em;
-	border-left: thin solid <?php echo $fieldsetBordColor?>;
-	border-bottom: thin solid <?php echo $fieldsetBordColor?>;
-}
 
 /* неподредени списъци в кутията за авторските права */
 #copyright ul {
@@ -341,7 +355,7 @@ li.playbook, li.science, li.intro, li.travelnotes, li.other, li.textbook {
 	margin-top: 1em;
 }
 #txt-edit-msg {
-	font-size: 0.9em;
+	font-size: .9em;
 	margin-top: 1em;
 }
 /* кутия, съдържаща текст за предварителен преглед — при редактиране */
@@ -376,7 +390,7 @@ li.playbook, li.science, li.intro, li.travelnotes, li.other, li.textbook {
 	background-image: url('<?php echo $skin->imageDir()?>button_bg_<?php echo $skinName?>.png');
 	background-repeat: repeat-x;
 	font-weight: bold;
-	font-size: 0.8em;
+	font-size: .9em;
 	text-decoration: none;
 	border: thin outset <?php echo $buttonLinksBgColor?>;
 	padding: 0.15em;
@@ -527,7 +541,7 @@ div.tabbedpanebody {
 .purl {
 	margin-top: 1em;
 	float: right;
-	font-size: 0.9em;
+	font-size: .9em;
 	border-top: thin solid <?php echo $tocBordColor?>;
 }
 /* за таблици */

@@ -61,4 +61,3 @@ class CacheManager {
 		closedir($dh);
 	}
 }
-?>

@@ -1,5 +1,5 @@
 <?php
-class LiterNewsPage extends Page {
+class LiternewsPage extends Page {
 
 	protected $defListLimit = 10, $maxListLimit = 25;
 
@@ -12,17 +12,14 @@ class LiterNewsPage extends Page {
 		$this->newstitle = $this->request->value('newstitle');
 		$this->newstext = $this->request->value('newstext');
 		$this->newssrc = $this->request->value('newssrc', 'http://');
-		$this->newsId = $this->request->value('newsId', 0, 1);
+		$this->objId = $this->request->value('objId', 0, 1);
 		$this->initPaginationFields();
+		$this->dbkey = array('`show`' => 'true');
 	}
 
 
 	public function makeNews($limit = 0, $offset = 0, $showPageLinks = true) {
-		if (empty($limit)) $limit = $this->llimit;
-		if (empty($offset)) $offset = $this->loffset;
-		$keys = array('`show`' => 'true');
-		$count = $this->db->getCount($this->mainDbTable, $keys);
-		$res = $this->db->select($this->mainDbTable, $keys, '*', '`time` DESC', $offset, $limit);
+		$res = $this->db->query($this->makeSqlQuery($limit, $offset));
 		if ($this->db->numRows($res) == 0) {
 			$this->addMessage('Няма новини.');
 			return '';
@@ -31,9 +28,22 @@ class LiterNewsPage extends Page {
 		while ($row = $this->db->fetchAssoc($res)) {
 			$c .= $this->makeNewsEntry($row);
 		}
+		$count = $this->db->getCount($this->mainDbTable, $this->dbkey);
 		$pagelinks = $showPageLinks
 			? $this->makePageLinks($count, $this->llimit, $this->loffset) : '';
 		return $pagelinks . $c . $pagelinks;
+	}
+
+
+	public function makeSqlQuery($limit = 0, $offset = 0, $order = null) {
+		if (empty($limit)) $limit = $this->llimit;
+		if (empty($offset)) $offset = $this->loffset;
+		if ( is_null($order) ) $order = 'DESC';
+		if ( !empty($this->objId) && is_numeric($this->objId) ) {
+			$this->dbkey = array('id' => $this->objId);
+		}
+		return $this->db->selectQ($this->mainDbTable, $this->dbkey, '*',
+			"`time` $order", $offset, $limit);
 	}
 
 
@@ -53,7 +63,7 @@ class LiterNewsPage extends Page {
 			$this->addMessage('Това е само предварителен преглед. Новината все още не е съхранена.');
 			return $this->makeNewsEntry() . $this->makeForm();
 		}
-		$set = array('id' => $this->newsId, 'username' => $this->newsuser,
+		$set = array('id' => $this->objId, 'username' => $this->newsuser,
 			'user' => $this->user->id,
 			'title' => $this->newstitle, 'text' => $this->newstext,
 			'texthash' => md5($this->newstext), 'src' => $this->newssrc,
@@ -65,29 +75,39 @@ class LiterNewsPage extends Page {
 
 
 	protected function buildContent() {
+		$this->addRssLink();
 		return $this->makeNews() . $this->makeForm();
 	}
 
 
-	protected function makeNewsEntry($fields = array()) {
+	public function makeNewsEntry($fields = array()) {
 		extract($fields);
 		if ( empty($username) ) $username = $this->newsuser;
-		if ( empty($title) ) $title = $this->newstitle;
 		if ( empty($text) ) $text = $this->newstext;
 		if ( empty($src) ) $src = $this->newssrc;
-		if ( empty($id) ) $id = $this->newsId;
-		$format = 'd.m.Y H:i:s';
-		$time = empty($time) ? date($format) : date($format, strtotime($time));
+		if ( empty($id) ) $id = $this->objId;
+		$titlev = $timev = '';
+		if ( !isset($showtitle) || $showtitle ) { // show per default
+			if ( empty($title) ) $title = $this->newstitle;
+			$titlev = "<strong>$title</strong>";
+			if ($this->userCanEditNews()) {
+				$titlev .=  ' '. $this->makeEditLiternewsLink($id);
+			}
+		}
+		if ( !isset($showtime) || $showtime ) { // show per default
+			$format = 'd.m.Y H:i:s';
+			$time = empty($time) ? date($format) : date($format, strtotime($time));
+			$timev = ' на '.$time;
+		}
 		$text = str_replace("\n", "<br/>\n", $text);
 		$text = wiki2html($text);
-		$editLink = $this->userCanEditNews() ? $this->makeEditLiternewsLink($id) : '';
 		$text .= empty($src) ? '' : " (<a href='$src' title='$src — източник на новината'>Източник</a>)";
 		$vuser = empty($user) ? $username : $this->makeUserLink($username);
 		return <<<EOS
 
-	<dl class="post" style="clear:both">
-		<dt><strong>$title</strong> $editLink</dt>
-		<dd><p class="extra" style="text-align:right;margin-bottom:0.5em"><small>(пратена от $vuser на $time)</small></p>
+	<dl class="post" style="clear:both" id="e$id">
+		<dt>$titlev</dt>
+		<dd><p class="extra" style="text-align:right;margin-bottom:0.5em"><small>(пратена от $vuser$timev)</small></p>
 		<div>
 		$text
 		</div>
@@ -112,8 +132,8 @@ EOS;
 
 
 	protected function makeEditForm($showEditBoxes = false, $id = 0) {
-		if ( empty($id) ) $id = $this->newsId;
-		$newsId = $this->out->hiddenField('newsId', $id);
+		if ( empty($id) ) $id = $this->objId;
+		$objId = $this->out->hiddenField('objId', $id);
 		$newsuser = $this->out->textField('newsuser', '', $this->newsuser, 30, 160, 1);
 		$newstitle = $this->out->textField('newstitle', '', $this->newstitle, 60, 160, 2);
 		$newstext = $this->out->textarea('newstext', '', $this->newstext, 20, 76, 3);
@@ -126,7 +146,7 @@ EOS;
 <form action="{FACTION}" method="post">
 <fieldset style="width:46em; clear:both">
 	<legend>Новина</legend>
-	$newsId
+	$objId
 	<label for="newsuser">Потребител:</label>
 	$newsuser
 	<script src="/cyr5ko/cyr5ko6.source.js" type="text/javascript" language="javascript1.2"></script>
@@ -165,4 +185,3 @@ EOS;
 		return $this->user->canExecute('editLiternews');
 	}
 }
-?>

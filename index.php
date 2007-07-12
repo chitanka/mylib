@@ -1,7 +1,15 @@
 <?php
+/** @file
+ * The main entry point of the application
+ */
+
+/** @mainpage
+ * Software for an on-line digital library.
+ */
+
 /**
  * Load a class file
- * @param string $class
+ * @param $class Class name
  */
 function __autoload($class) { require_once $class .'.php'; }
 
@@ -20,10 +28,9 @@ $request = Setup::request();
 $action = $request->action();
 Setup::startSession($action);
 $user = Setup::user(); // session must be already started
-if ( !$user->canExecute($action) ) { $action = 'main'; }
+if ( !$user->canExecute($action) ) { $action = PageManager::defaultPage(); }
 
 $useCache = (bool) $request->value('cache', 1);
 $page = PageManager::executePage($action, $useCache, $request->hash());
 $elapsedTime = number_format( microtime(true) - $startTime, 4, ',', '' );
 $page->output($elapsedTime); // Output all page content
-?>

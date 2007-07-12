@@ -153,10 +153,12 @@ EOS;
 			ksort($series);
 			foreach ($series as $serName => $titles) {
 				$isTrueSeries = $serName{0} == ' '; // false by novels, etc.
-				$orig = $ser[$serName];
+				list($orig, $seriesType) = $ser[$serName];
 				$serName = trim($serName);
 				$orig = !empty($orig) && $orig != $serName ? "($orig)" : '';
-				$serLink = $isTrueSeries ? $this->makeSeriesLink($serName) : $serName;
+				$serLink = $isTrueSeries
+					? $this->makeSeriesLink($serName) . seriesSuffix($seriesType)
+					: $serName;
 				$o .= <<<EOS
 <fieldset class="titles">
 	<legend>$serLink $orig</legend>
@@ -212,10 +214,10 @@ EOS;
 			$action = $this->out->hiddenField('action', 'download');
 			$o = <<<EOS
 
-<form action="$this->root" method="post">
+<form action="$this->root" method="post"><div>
 	$action
 $o
-</form>
+</div></form>
 EOS;
 		}
 		$o .= $this->makeColorLegend();
@@ -230,7 +232,7 @@ EOS;
 		t.id textId, t.title, t.lang, t.orig_title,
 		t.orig_lang, t.year, t.year2, t.type, t.sernr, t.size, t.zsize,
 		UNIX_TIMESTAMP(t.entrydate) date,
-		s.name series, s.orig_name orig_series";
+		s.name series, s.orig_name orig_series, s.type seriesType";
 		$qFrom = " FROM /*p*/author_of at
 		LEFT JOIN /*p*/text t ON at.text = t.id
 		LEFT JOIN /*p*/$this->mainDbTable a ON at.author = a.id
@@ -273,7 +275,7 @@ EOS;
 		}
 		$this->textsData[$textId] = $dbrow;
 		$series = empty($series) ? $GLOBALS['typesPl'][$type] : ' '.$series;
-		$this->authorsData[$authorId]['ser'][$series] = $orig_series;
+		$this->authorsData[$authorId]['ser'][$series] = array($orig_series, $seriesType);
 		$key = '';
 		if ($this->order == 'time') {
 			$key .= empty($ayear) ? $year : $ayear;
@@ -338,4 +340,3 @@ EOS;
 		$this->addMessage('Няма намерени автори.', true);
 	}
 }
-?>

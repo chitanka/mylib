@@ -8,4 +8,3 @@ class StaticMainPage extends MainPage {
 	}
 
 }
-?>

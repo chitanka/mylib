@@ -19,4 +19,3 @@ class LogoutPage extends Page {
 		return '';
 	}
 }
-?>

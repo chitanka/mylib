@@ -115,17 +115,24 @@ class OutputMaker {
 		return "<label for='$for' title='$title' $extraAttr>$text</label>";
 	}
 
+
+	public function internLink($text, $params, $ignorePos = 0) {
+		$url = $this->internUrl($params, $ignorePos);
+		return "<a href='$url'>$text</a>";
+	}
+
 	/**
+	Generates an intern URL.
 	@param $params array Associative array (param => value)
 	@param $ignorePos int Field names can be ignored up to this position
 	@return string
 
 	Usage:
 	$params = array('action' => 'text', 'textId' => 2, 'chunkId' => 3);
-	OutputMaker::link($params, 0) returns ROOT?action=text&textId=2&chunkId=3
-	OutputMaker::link($params, 1) returns ROOT/text?textId=2&chunkId=3
-	OutputMaker::link($params, 2) returns ROOT/text/2?chunkId=3
-	OutputMaker::link($params, 3) returns ROOT/text/2/3
+	OutputMaker::internUrl($params, 0) returns ROOT?action=text&textId=2&chunkId=3
+	OutputMaker::internUrl($params, 1) returns ROOT/text?textId=2&chunkId=3
+	OutputMaker::internUrl($params, 2) returns ROOT/text/2?chunkId=3
+	OutputMaker::internUrl($params, 3) returns ROOT/text/2/3
 
 	If OutputMaker::$hasPathInfo is false, $ignorePos is set to 0
 	*/
@@ -204,5 +211,9 @@ EOS;
 		return strtr($email,
 			array('@' => '&nbsp;<span title="при сървъра">(при)</span>&nbsp;'));
 	}
+
+
+	public function setHasPathInfo($hasPathInfo) {
+		$this->hasPathInfo = $hasPathInfo;
+	}
 }
-?>

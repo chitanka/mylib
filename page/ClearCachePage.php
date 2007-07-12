@@ -58,4 +58,3 @@ class ClearCachePage extends Page {
 EOS;
 	}
 }
-?>

@@ -33,6 +33,7 @@ class TextPage extends Page {
 			return '';
 		}
 		if ( !$this->initData() ) { return ''; }
+		$this->user->markTextAsRead($this->textId);
 		if ( $this->chunkId == 'raw' ) {
 			return $this->makeRawContent();
 		}
@@ -149,17 +150,15 @@ class TextPage extends Page {
 				$this->makeAuthorLink($this->work->author_name). '</li>';
 		}
 		if ( !empty($this->work->series) ) {
-			if ( strpos($this->work->series, ' (сборник') !== false ) {
+			if ($this->work->seriesType == 'collection') {
 				$start = $this->work->type == 'intro' ? 'Предговор към' : 'Включено в';
 				$ser = $start .' сборника „'.
 					$this->makeSeriesLink($this->work->series, true) .'“';
 				if ( !empty($this->work->sernr) )
 					$ser .= ' ('.$this->work->sernr.')';
-			} elseif ( strpos($this->work->series, ' (книга)') !== false ) {
+			} elseif ($this->work->seriesType == 'book') {
 				$ser = 'Част от книгата „'.
 					$this->makeSeriesLink($this->work->series, true) .'“';
-// 			} elseif ( strpos($this->work->series, ' цикъл') !== false ) {
-// 				$ser = $this->makeSeriesLink($this->work->series);
 			} else {
 				$ser = 'Поредица: '. $this->makeSeriesLink($this->work->series);
 				if ( !empty($this->work->sernr) )
@@ -237,14 +236,20 @@ EOS;
 			if ($this->work->size < $this->minTextSizeForAnno) {
 				return '';
 			}
-			$anno = "<p style='text-align:center'><a href='$this->root/suggestData/annotation/$this->textId'><strong>Предложете анотация на произведението!</strong></a></p>";
+			$anno = "<p style='text-align:center; margin-top:1em'><a href='$this->root/suggestData/annotation/$this->textId'>Предложете анотация на произведението!</a></p>";
 		} else {
 			$this->hasAnno = true;
 			$parser = new Sfb2HTMLConverter($file, $this->getImgDir());
 			$parser->parse();
 			$anno = $parser->text;
 		}
-		return "<div id='annotation'>\n$anno</div>";
+		return <<<EOS
+
+<fieldset id="annotation">
+<legend>Анотация</legend>
+$anno
+</fieldset>
+EOS;
 	}
 
 
@@ -270,29 +275,13 @@ EOS;
 
 
 	protected function makeCoverImage() {
-		$covdir = $GLOBALS['contentDirs']['cover'];
-		$bases = array($covdir . $this->textId);
-		if ( !empty($this->work->cover) ) $bases[] = $covdir . $this->work->cover;
-		$exts = array('.jpg', '.png');
-		$coverFiles = cartesian_product($bases, $exts);
+		$cnt = 0;
 		$cover = '';
-		foreach ($coverFiles as $file) {
-			if ( file_exists( $file ) ) {
-				$img = $this->makeCoverImageView($file);
-				// search for more images of the form "TEXTID-DIGIT.EXT"
-				for ($i = 2; /* infinite */; $i++) {
-					$efile = strtr($file, array('.'=>"-$i."));
-					if ( file_exists( $efile ) ) {
-						$img .= ' '.$this->makeCoverImageView($efile);
-					} else {
-						break;
-					}
-				}
-				$cover = "<span style='float:right; margin:0 0 1em 1em'>$img</span>";
-				break;
-			}
+		foreach (Work::getCovers($this->textId, $this->work->cover) as $file) {
+			$delim = $cnt++ % 2 == 0 ? '<br />' : ' ';
+			$cover .= $delim . $this->makeCoverImageView($file);
 		}
-		return $cover;
+		return "<span style='float:right; margin:0 0 1em 1em'>$cover</span>";
 	}
 
 	protected function makeCoverImageView($file) {
@@ -518,4 +507,3 @@ EOS;
 
 }
 
-?>

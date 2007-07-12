@@ -21,16 +21,34 @@ CREATE TABLE /*prefix*/author_of (
 DROP TABLE IF EXISTS /*prefix*/comment;
 CREATE TABLE /*prefix*/comment (
   `id` int(11) unsigned NOT NULL auto_increment,
-  `text` mediumint(8) unsigned NOT NULL,
-  `rname` varchar(160) NOT NULL,
-  `user` mediumint(8) unsigned NOT NULL,
-  `ctext` text NOT NULL,
-  `ctexthash` varchar(32) character set latin1 NOT NULL,
-  `time` datetime NOT NULL,
-  `show` enum('false','true') character set latin1 collate latin1_general_ci NOT NULL,
+  `text` mediumint(8) unsigned NOT NULL COMMENT 'Text ID',
+  `rname` varchar(160) NOT NULL COMMENT 'Reader (or user) name',
+  `user` mediumint(8) unsigned NOT NULL COMMENT 'User ID',
+  `ctext` text NOT NULL COMMENT 'Text of the comment',
+  `ctexthash` varchar(32) character set latin1 NOT NULL COMMENT 'MD5 hash of the comment',
+  `time` datetime NOT NULL COMMENT 'Entry ime of the comment',
+  `show` enum('false','true') character set latin1 NOT NULL COMMENT 'Show this comment?',
   PRIMARY KEY  (`id`),
   UNIQUE KEY `title` (`text`,`rname`,`ctexthash`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8 COMMENT='Reader comments';
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table /*prefix*/edit_history
+--
+
+DROP TABLE IF EXISTS /*prefix*/edit_history;
+CREATE TABLE /*prefix*/edit_history (
+  `id` int(10) unsigned NOT NULL auto_increment,
+  `text` mediumint(8) unsigned NOT NULL,
+  `user` mediumint(8) unsigned NOT NULL,
+  `comment` varchar(255) character set utf8 NOT NULL,
+  `date` datetime NOT NULL,
+  PRIMARY KEY  (`id`),
+  KEY `date` (`date`),
+  KEY `text` (`text`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COMMENT='Edit history of texts';
 
 -- --------------------------------------------------------
 
@@ -47,7 +65,7 @@ CREATE TABLE /*prefix*/header (
   `fpos` int(10) unsigned NOT NULL COMMENT 'File position in bytes',
   `linecnt` smallint(6) unsigned NOT NULL COMMENT 'Lines count',
   PRIMARY KEY  (`text`,`nr`,`level`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 PACK_KEYS=0;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 -- --------------------------------------------------------
 
@@ -129,7 +147,22 @@ CREATE TABLE /*prefix*/liternews (
   `show` enum('false','true') NOT NULL,
   PRIMARY KEY  (`id`),
   UNIQUE KEY `title` (`title`,`texthash`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 COMMENT='Литературни новини';
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COMMENT='Literature news';
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table /*prefix*/news
+--
+
+CREATE TABLE /*prefix*/news (
+  `id` mediumint(8) unsigned NOT NULL auto_increment,
+  `user` mediumint(8) unsigned NOT NULL,
+  `text` mediumtext NOT NULL,
+  `time` datetime NOT NULL,
+  PRIMARY KEY  (`id`),
+  KEY `time` (`time`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COMMENT='News about the site';
 
 -- --------------------------------------------------------
 
@@ -154,7 +187,7 @@ CREATE TABLE /*prefix*/person (
   KEY `country` (`country`),
   KEY `orig_name` (`orig_name`),
   KEY `role` (`role`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 PACK_KEYS=1;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 -- --------------------------------------------------------
 
@@ -174,7 +207,7 @@ CREATE TABLE /*prefix*/person_alt (
   UNIQUE KEY `person` (`person`,`name`),
   KEY `last_name` (`last_name`),
   KEY `name` (`name`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 PACK_KEYS=1;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 -- --------------------------------------------------------
 
@@ -217,9 +250,10 @@ CREATE TABLE /*prefix*/series (
   `id` smallint(5) unsigned NOT NULL auto_increment,
   `name` varchar(255) NOT NULL default '',
   `orig_name` varchar(255) NOT NULL default '',
+  `type` enum('series','collection','book') NOT NULL default 'series',
   PRIMARY KEY  (`id`),
   KEY `name` (`name`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 PACK_KEYS=1;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 -- --------------------------------------------------------
 
@@ -238,8 +272,8 @@ CREATE TABLE /*prefix*/text (
   `orig_title` varchar(255) NOT NULL default '',
   `orig_subtitle` varchar(200) NOT NULL,
   `orig_lang` varchar(3) NOT NULL default 'en',
-  `year` smallint(4) NOT NULL,
-  `year2` smallint(4) NOT NULL COMMENT 'Last year of a creation',
+  `year` smallint(4) NOT NULL COMMENT 'Year of publication or creation',
+  `year2` smallint(4) NOT NULL COMMENT 'Last year of creation period',
   `license_orig` smallint(5) unsigned NOT NULL COMMENT 'License of the original work',
   `license_trans` smallint(5) unsigned NOT NULL COMMENT 'License of the translated work',
   `type` varchar(12) NOT NULL default 'shortstory',
@@ -250,14 +284,19 @@ CREATE TABLE /*prefix*/text (
   `headlevel` tinyint(1) unsigned NOT NULL COMMENT 'Maximal header level',
   `size` mediumint(8) unsigned NOT NULL default '0' COMMENT 'File size',
   `zsize` mediumint(8) unsigned NOT NULL default '0' COMMENT 'Zip file size',
-  `copy` tinyint(1) NOT NULL default '1' COMMENT 'Copyright',
-  `date` date NOT NULL default '0000-00-00' COMMENT 'Entry date',
-  `lastmod` datetime NOT NULL COMMENT 'Last modification'
+  `entrydate` date NOT NULL default '0000-00-00',
+  `lastedit` int(10) unsigned NOT NULL COMMENT 'Last edit comment ID',
+  `dl_count` bigint(20) unsigned NOT NULL default '0' COMMENT 'Number of downloads',
+  `read_count` bigint(20) unsigned NOT NULL default '0' COMMENT 'Number of readings',
+  `comment_count` smallint(5) unsigned NOT NULL COMMENT 'Number of comments for this text',
+  `rating` float(3,1) NOT NULL COMMENT 'Average rating of the text',
+  `has_anno` enum('false','true') NOT NULL default 'false' COMMENT 'Does the text has annotation?',
   PRIMARY KEY  (`id`),
   KEY `title` (`title`),
   KEY `series` (`series`),
-  KEY `date` (`date`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 PACK_KEYS=1;
+  KEY `lastedit` (`lastedit`),
+  KEY `entrydate` (`entrydate`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 -- --------------------------------------------------------
 
@@ -310,11 +349,12 @@ CREATE TABLE /*prefix*/user (
   `opts` varchar(255) NOT NULL,
   `login_tries` tinyint(3) unsigned NOT NULL,
   `registration` datetime NOT NULL COMMENT 'Registration date',
+  `touched` datetime NOT NULL COMMENT 'Last user visit',
   PRIMARY KEY  (`id`),
   UNIQUE KEY `username` (`username`),
   KEY `realname` (`realname`),
   KEY `lastname` (`lastname`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 PACK_KEYS=0;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 -- --------------------------------------------------------
 
@@ -351,7 +391,7 @@ CREATE TABLE /*prefix*/work (
   `progress` tinyint(3) unsigned NOT NULL,
   `frozen` enum('false','true') NOT NULL default 'false',
   `tmpfiles` varchar(255) NOT NULL,
-  `tfsize` smallint(5) unsigned NOT NULL COMMENT 'Големина на временните файлове',
+  `tfsize` smallint(5) unsigned NOT NULL COMMENT 'Size of the temporary files',
   `uplfile` varchar(255) NOT NULL COMMENT 'Uploaded file',
   PRIMARY KEY  (`id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8;

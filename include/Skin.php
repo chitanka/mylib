@@ -18,5 +18,8 @@ class Skin {
 	}
 
 	public function imageDir() { return $this->imgDir; }
+
+	public function useAbsolutePath() {
+		$this->imgDir = 'http://'.$_SERVER['SERVER_NAME'] . $this->imgDir;
+	}
 }
-?>

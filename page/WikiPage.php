@@ -29,4 +29,3 @@ class WikiPage extends Page {
 		return $GLOBALS['contentDirs']['wiki'] . $action;
 	}
 }
-?>

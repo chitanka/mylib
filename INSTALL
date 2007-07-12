@@ -36,10 +36,19 @@ Apache 1.3 ще върши работа.
 повече информация.
 
 Сега е нужно да разрешите на софтуера (сървъра) да пише в следните директории:
-cache/, log/, to-do/ и всички поддиректории на content/
+cache/, log/, to-do/ и всички поддиректории на content/. (Нека сървъра върви
+под името SRVUSER от групата SRVGROUP.)
 
 Това става най-лесно през командния ред:
-  cd /PATH/TO/MYLIB-DIR ; chmod a+w cache log to-do content/*
+  cd /PATH/TO/MYLIB-DIR
+  chown -R SRVUSER:SRVGROUP cache log to-do content/*
+
+Ако нямате представа като кой потребител върви сървъра, разгледайте
+конфигурационния файл на Апаче (httpd.conf). Потърсете редовете, започващи
+съответно с „User“ и „Group“. В краен случай ползвайте следната команда, която
+ще даде достъп за писане в съответните директории на всички потребители:
+
+  chmod -R a+w cache log to-do content/*
 
 След това копирайте файла conf/main.ini.example като conf/main.ini:
   cp conf/main.ini.example conf/main.ini

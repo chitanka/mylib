@@ -24,31 +24,29 @@ class DownloadPage extends Page {
 			if ( !$textId || !is_numeric($textId) ) {
 				$fileCount--; continue; // invalid text ID
 			}
+			$this->user->markTextAsDl($textId);
 			$cacheFile = CacheManager::SFBZIP_FILE .$textId;
 			if ( CacheManager::cacheExists($cacheFile) ) {
 				$fEntry = CacheManager::getCache($cacheFile, false);
 				$fEntry = unserialize($fEntry);
 				$this->zf->addFileEntry($fEntry);
-				if ($setZipFileName) {
-					$this->zipFileName = $fEntry['name'];
-				}
+				$this->filename = $this->rmFEntrySuffix($fEntry['name']);
 			} else {
 				$mainFileData = $this->makeMainFileData($textId);
 				if (!$mainFileData) { $fileCount--; continue; }
 				list($this->filename, $this->fPrefix, $this->fSuffix) = $mainFileData;
-				$this->filename .= '.txt';
-				if ($setZipFileName) { $this->zipFileName = $this->filename; }
 				$this->addTextFileEntry($textId, $cacheFile);
 			}
+			if ($setZipFileName) { $this->zipFileName = $this->filename; }
+			$this->addBinaryFileEntries($textId, $this->filename);
 		}
 		if ( $fileCount < 1 ) {
 			$this->addMessage('Не е посочен валиден номер на текст за сваляне!', true);
 			return '';
 		}
 		if ( !$setZipFileName && empty($this->zipFileName) ) {
-			$this->zipFileName = "Архив от Моята библиотека - $fileCount файла_".time();
+			$this->zipFileName = "Архив от $this->sitename - $fileCount файла_".time();
 		}
-		$this->addBinaryFileEntries($textId);
 		$this->zipFileName = cyr2lat($this->cleanFileName($this->zipFileName));
 		$fullZipFileName = $this->zipFileName .'.zip';
 		CacheManager::setDlFile($fullZipFileName, $this->zf->file());
@@ -61,13 +59,22 @@ class DownloadPage extends Page {
 	protected function addTextFileEntry($textId, $cacheFile) {
 		$fEntry = $this->zf->newFileEntry($this->fPrefix .
 			$this->makeContentData($textId) ."\n\n\tКРАЙ".
-			$this->fSuffix, $this->filename);
+			$this->fSuffix, $this->filename .'.txt');
 		CacheManager::setCache($cacheFile, serialize($fEntry), false);
 		$this->zf->addFileEntry($fEntry);
 	}
 
 
-	protected function addBinaryFileEntries($textId) {
+	protected function addBinaryFileEntries($textId, $filename) {
+		// add covers
+		if ( $this->user->option('dlcover') ) {
+			foreach (Work::getCovers($textId) as $file) {
+				$ename = Work::renameCover(basename($file), $filename);
+				$fEntry = $this->zf->newFileEntry(file_get_contents($file), $ename);
+				$this->zf->addFileEntry($fEntry);
+			}
+		}
+		// add images
 		$dir = $this->binaryDir . $textId;
 		if ( !is_dir($dir) ) { return; }
 		if ($dh = opendir($dir)) {
@@ -101,7 +108,7 @@ class DownloadPage extends Page {
 		if ( !empty($anno) ) { $prefix .= "A>\n$anno\nA$\n\n\n"; }
 
 		$filename = (empty($work->author_name) ? '' : cyr2lat($work->author_name) .' - ').
-			(empty($sernr)?'':"$sernr. ") . cyr2lat($work->title);
+			(empty($work->sernr)?'':"$work->sernr. ") . cyr2lat($work->title);
 		$filename = substr($filename, 0, 200);
 		$filename = $this->cleanFileName($filename);
 		if ( isset( $this->fnameCount[$filename] ) ) {
@@ -139,5 +146,9 @@ class DownloadPage extends Page {
 		$repl = array('"'=>'', '\''=>'', ':'=>' -', '\\'=>'', '/'=>'');
 		return strtr($fname, $repl);
 	}
+
+
+	protected function rmFEntrySuffix($fEntryName) {
+		return strtr($fEntryName, array('.txt'=>''));
+	}
 }
-?>

@@ -3,33 +3,33 @@
 class ViewPage extends Page {
 
 	protected $FF_MODE = 'mode', $FF_ORDER = 'order', $FF_COUNTRY = 'country',
-		$FF_DLMODE = 'dlMode';
-	protected $titles = array('simple' => '', 'extended' => '');
-	protected $showHeaders = true;
+		$FF_DLMODE = 'dlMode',
+		$titles = array('simple' => '', 'extended' => ''),
+		$showHeaders = true,
+		$defOrder = 'alpha', $defDlMode = 'one', $defMode = 'simple-toc';
 
 	public function __construct() {
 		parent::__construct();
 		$this->action = 'view';
 
-		$defMode = 'simple-toc';
 		$this->startwith = $this->request->value('startwith',
 			$this->request->value($this->FF_QUERY, ''));
 		$this->param1 = $this->request->param(1);
 		if ( !empty($this->param1) && strpos($this->param1, '=') === false ) {
 			$this->startwith = $this->param1;
-			$defMode = 'extended';
+			$this->defMode = 'extended';
 		}
 		$this->startwith = str_replace('\'', '’', $this->startwith);
 		$this->prefix = $this->request->value('prefix', '');
 		if ($this->prefix == '%') { $this->expandSearchString(); }
 		else { $this->startwith = $this->prefix . $this->startwith; }
 
-		$this->order = $this->request->value($this->FF_ORDER);
+		$this->order = $this->request->value($this->FF_ORDER, $this->defOrder);
 		$this->country = $this->request->value($this->FF_COUNTRY);
-		$this->dlMode = $this->request->value($this->FF_DLMODE, 'one');
+		$this->dlMode = $this->request->value($this->FF_DLMODE, $this->defDlMode);
 		$this->showDlForm = $this->dlMode == 'both';
 
-		$this->mode = $this->request->value($this->FF_MODE, $defMode);
+		$this->mode = $this->request->value($this->FF_MODE, $this->defMode);
 		$modes = explode('-', $this->mode);
 		$this->mode1 = isset($this->titles[ $modes[0] ]) ? $modes[0] : '';
 		$this->mode2 = isset( $modes[1] ) ? $modes[1] : '';
@@ -207,6 +207,41 @@ EOS;
 	}
 
 
+	protected function makeListItemForTitle($fields) {
+		extract($fields);
+		$extras = array();
+		if ( !empty($orig_title) && $orig_lang != $lang ) {
+			$extras[] = "<em>$orig_title</em>";
+		}
+		$textLink = $this->makeTextLink(compact('textId', 'type', 'size', 'zsize', 'title', 'date', 'reader'));
+		if ($this->order == 'time') {
+			$titleView = '<span class="extra"><tt>'.$this->makeYearView($year).
+				'</tt> — </span>'.$textLink;
+		} else {
+			$titleView = $textLink;
+			if ( !empty($year) ) { $extras[] = $year; }
+		}
+		$seriesLink = empty($series) ? ''
+			: '<span class="extra">'.$this->makeSeriesLink($series, true) .':</span> ';
+		$extras = empty($extras) ? '' : '('. implode(', ', $extras) .')';
+		$dlLink = $this->makeDlLink($textId, $zsize);
+		$editLink = $this->userCanEdit ? $this->makeEditTextLink($textId) : '';
+		$dlCheckbox = $this->makeDlCheckbox($textId);
+		$author = $collection == 'true' ? '' : $this->makeAuthorLink($author);
+		if ( !empty($author) ) { $author = '— '.$author; }
+		return <<<EOS
+
+<li class="$type" title="{$GLOBALS['types'][$type]}">
+	$dlCheckbox
+	$seriesLink
+	$titleView
+	<span class="extra">$extras — $dlLink$editLink</span>
+	$author
+</li>
+EOS;
+	}
+
+
 	protected function makeDlCheckbox($textId) {
 		return $this->showDlForm
 			? $this->out->checkbox('textId[]', 'text'.$textId, false, '', $textId)
@@ -232,12 +267,12 @@ EOS;
 		$submit = $this->out->submitButton('Сваляне на '.$button);
 		return <<<EOS
 
-<form action="$this->root" method="post">
+<form action="$this->root" method="post"><div>
 	$action
 	$filename
 	$inp
 	$submit
-</form>
+</div></form>
 EOS;
 	}
 
@@ -266,4 +301,3 @@ EOS;
 	}
 
 }
-?>

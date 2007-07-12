@@ -9,4 +9,3 @@ class AboutPage extends WikiPage {
 	}
 
 }
-?>

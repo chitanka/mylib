@@ -2,7 +2,9 @@
 
 class SettingsPage extends RegisterPage {
 
+	protected $canChangeUsername = false;
 	protected $optKeys = array('skin', 'nav', 'mainpage');
+	protected $optKeysCh = array('dlcover');
 	protected $mpOpts = array(
 		'newtitles' => 'Добавени произведения',
 		'worktitles' => 'Подготвяни произведения',
@@ -22,9 +24,12 @@ class SettingsPage extends RegisterPage {
 		$this->isAnon = $this->user->isAnon();
 		$this->userId = $this->user->id;
 		$this->allowemail = $this->request->checkbox('allowemail');
-		$this->opts['skin'] = $this->request->value('skin', 'orange');
-		$this->opts['nav'] = $this->request->value('navpos', 'right');
-		$this->opts['mainpage'] = $this->request->value('mainpage', 's');
+		foreach ($this->optKeys as $key) {
+			$this->opts[$key] = $this->request->value($key, User::$defOptions[$key]);
+		}
+		foreach ($this->optKeysCh as $key) {
+			$this->opts[$key] = $this->request->checkbox($key);
+		}
 		$this->expire = $this->request->value('expire', '30');
 		$this->optKeys = array_merge($this->optKeys, array_keys($this->mpOpts));
 		$pos = 0;
@@ -48,6 +53,17 @@ class SettingsPage extends RegisterPage {
 	}
 
 
+	protected function isValidPassword() {
+		// sometimes browsers automaticaly fill the first password field
+		// so the user does NOT want to change it
+		$samepass = $this->db->encodePasswordDB($this->password) == $this->user->password;
+		if ($samepass) {
+			return true;
+		}
+		return parent::isValidPassword();
+	}
+
+
 	protected function processRegUserRequest() {
 		$err = $this->validateInput();
 		$this->attempt++;
@@ -59,7 +75,8 @@ class SettingsPage extends RegisterPage {
 			'lastname' => ltrim(strrchr($this->realname, ' ')),
 			'email' => $this->email, 'allowemail' => $this->allowemail,
 			'news' => $this->news, 'opts' => $this->makeOptionsOutput());
-		if ( !empty($this->username) && $this->user->username != $this->username ) {
+		if ( $this->canChangeUsername && !empty($this->username) &&
+				$this->user->username != $this->username ) {
 			if ( $this->userExists() ) {
 				return $this->makeRegUserForm();
 			}
@@ -68,8 +85,8 @@ class SettingsPage extends RegisterPage {
 		if ( $this->emailExists($this->user->username) ) {
 			return $this->makeRegUserForm();
 		}
-		if ( !empty($this->password) ) { // change password
-			$set['password']= $this->db->encodePasswordDB($this->password);
+		if ( !empty($this->password) && !empty($this->passwordRe) ) { // change password
+			$set['password'] = $this->db->encodePasswordDB($this->password);
 		}
 		$key = array('id' => $this->userId);
 		if ( $this->db->update(User::MAIN_DB_TABLE, $set, $key) === false ) {
@@ -110,7 +127,9 @@ class SettingsPage extends RegisterPage {
 		$this->addAltStylesheets();
 		$formBegin = $this->makeFormBegin();
 		$attempt = $this->out->hiddenField('attempt', $this->attempt);
-		$username = $this->out->textField('username', '', $this->username, 25, 60, $this->tabindex++);
+		$username = $this->canChangeUsername
+			? $this->out->textField('username', '', $this->username, 25, 60, $this->tabindex++)
+			: "<span id='username'>{$this->user->username}</span>";
 		$password = $this->out->passField('password', '', '', 25, 40, $this->tabindex++);
 		$passwordRe = $this->out->passField('passwordRe', '', '', 25, 40, $this->tabindex++);
 		$realname = $this->out->textField('realname', '', $this->realname, 25, 60, $this->tabindex++);
@@ -137,20 +156,20 @@ $formBegin
 		<td class="fieldname-left"><label for="passwordRe">Новата парола още веднъж:</label></td>
 		<td>$passwordRe</td>
 	</tr><tr>
+		<td colspan="2"><a id="n1" href="#nb1">*</a> <em>Нова парола</em> — въведете нова парола само ако искате да смените сегашната си.</td>
+	</tr><tr>
 		<td class="fieldname-left"><label for="realname">Истинско име:</label></td>
 		<td>$realname</td>
 	</tr><tr>
 		<td class="fieldname-left"><label for="email">Е-поща:</label></td>
 		<td>$email</td>
-	</tr>
-	<tr>
+	</tr><tr>
 		<td colspan="2">$allowemail</td>
 	</tr>$common
 	<tr>
 		<td colspan="2">$news</td>
 	</tr>
 $formEnd
-<p><a id="n1" href="#nb1">*</a> <em>Нова парола</em> — въведете нова парола само ако искате да смените сегашната си.</p>
 EOS;
 	}
 
@@ -199,8 +218,10 @@ EOS;
 
 	protected function makeCommonInput() {
 		$skin = $this->makeSkinInput($this->tabindex++);
-		$navpos = $this->makeNavPosInput($this->tabindex++);
+		$nav = $this->makeNavPosInput($this->tabindex++);
 		$mainpage = $this->makeMainPageInput($this->tabindex++);
+		$dlcover = $this->out->checkbox('dlcover', '', $this->opts['dlcover'],
+			'Включване на корицата при сваляне на текст', '', $this->tabindex++);
 		$mpExtra = $this->makeMainPageExtraInput();
 		return <<<EOS
 
@@ -208,14 +229,15 @@ EOS;
 		<td class="fieldname-left"><label for="skin">Облик:</label></td>
 		<td>$skin</td>
 	</tr><tr>
-		<td class="fieldname-left"><label for="navpos">Навигация:</label></td>
-		<td>$navpos</td>
+		<td class="fieldname-left"><label for="nav">Навигация:</label></td>
+		<td>$nav</td>
 	</tr><tr>
 		<td class="fieldname-left"><label for="mainpage">Начална страница:</label></td>
 		<td>$mainpage</td>
-	</tr>
-	<tr>
+	</tr><tr>
 		<td colspan="2" align="center">$mpExtra</td>
+	</tr><tr>
+		<td colspan="2">$dlcover</td>
 	</tr>
 EOS;
 	}
@@ -228,7 +250,7 @@ EOS;
 
 
 	protected function makeNavPosInput($tabindex) {
-		return $this->out->selectBox('navpos', '', Setup::setting('navpos'),
+		return $this->out->selectBox('nav', '', Setup::setting('navpos'),
 			$this->opts['nav'], $tabindex, 'onchange="nav=this.value; changeStyleSheet()"');
 	}
 
@@ -293,24 +315,24 @@ EOS;
 			$o .= $key .'=' . (is_array($this->opts[$key])
 				? implode(',', $this->opts[$key]) : $this->opts[$key]) .';';
 		}
+		foreach ($this->optKeysCh as $key) {
+			$o .= $key .'=' . $this->opts[$key] .';';
+		}
 		return rtrim($o, ';');
 	}
 
 
 	protected function initRegUserData() {
-		$sel = array('username', 'realname', 'email', 'allowemail', 'news', 'opts');
-		$key = array('id' => $this->userId);
-		$res = $this->db->select(User::MAIN_DB_TABLE, $key, $sel);
-		$data = $this->db->fetchAssoc($res);
-		if ( empty($data) ) {
-			$this->addMessage("Не съществува потребител с номер $this->userId.", true);
-			return;
+		foreach ($this->mainFields as $field) {
+			if ( isset($this->user->$field) ) {
+				$this->$field = $this->user->$field;
+			}
 		}
-		$this->opts = array_merge($this->opts, User::extractOptions($data['opts']));
-		unset($data['opts']);
-		extract2object($data, $this);
-		$this->allowemail = $this->db->s2b($this->allowemail);
-		$this->news = $this->db->s2b($this->news);
+		$this->opts = array_merge($this->opts, $this->user->options());
+		foreach ( array('allowemail', 'news') as $key ) {
+			$this->$key = $this->opts[$key];
+			unset($this->opts[$key]);
+		}
 	}
 
 
@@ -323,6 +345,21 @@ EOS;
 		foreach ($this->optKeys as $key) {
 			$this->user->setOption($key, $this->opts[$key]);
 		}
+		foreach ($this->optKeysCh as $key) {
+			$this->user->setOption($key, (bool) $this->opts[$key]);
+		}
+		// TODO rm
+		foreach ( array('allowemail', 'news') as $key ) {
+			$this->user->setOption($key, (bool) $this->$key);
+		}
+		foreach ($this->mainFields as $field) {
+			if ( !$this->canChangeUsername && $field == 'username' ) {
+				continue; // don’t change user name
+			}
+			$this->user->set($field,  $this->$field);
+		}
+		// change back the password form plain text to its hash value
+		$this->user->password = $this->db->encodePasswordDB($this->user->password);
 		$this->user->updateSession();
 	}
 
@@ -346,4 +383,3 @@ EOS;
 	}
 
 }
-?>

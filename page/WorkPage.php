@@ -8,7 +8,7 @@ class WorkPage extends Page {
 	protected $statuses = array('Планира се сканиране', 'Сканира се',
 		'Сканирано е', 'Редактира се', 'Готово е за добавяне');
 	protected $imgs = array('0', '25', '50', '75', '100');
-	protected $progressBarWidth = '20', $maxScanStatus = 2;
+	public $progressBarWidth = '20', $maxScanStatus = 2;
 	const DEF_TMPFILE = 'http://';
 	// copied from MediaWiki
 	protected $fileBlacklist = array(
@@ -47,6 +47,8 @@ class WorkPage extends Page {
 		$this->uplfile = $this->escapeBlackListedExt($this->uplfile);
 		$this->form = $this->request->value('form');
 		$this->date = date('Y-m-d H:i:s');
+		$this->rowclass = 'even';
+		$this->showProgressbar = true;
 	}
 
 
@@ -178,6 +180,7 @@ class WorkPage extends Page {
 			$this->initData();
 			return $this->makeForm();
 		}
+		$this->addRssLink();
 		return $this->makeLists();
 	}
 
@@ -189,20 +192,15 @@ class WorkPage extends Page {
 
 
 	public function makeWorkList($limit = 0) {
-		$q = "SELECT w.*, DATE(date) ddate, u.username, u.email, u.allowemail
-			FROM /*p*/$this->mainDbTable w
-			LEFT JOIN /*p*/". User::MAIN_DB_TABLE ." u ON (w.user = u.id)
-			ORDER BY date DESC, w.id DESC";
-		if ($limit > 0) $q .= " LIMIT $limit";
-		$this->rowclass = 'even';
 		$this->tooltips = '';
+		$q = $this->makeSqlQuery($limit);
 		$l = $this->db->iterateOverResult($q, 'makeWorkListItem', $this, true);
 		if ( empty($l) ) {
 			return '<p style="text-align:center"><strong>Няма подготвящи се произведения.</strong></p>';
 		}
 		return <<<EOS
 
-<table class="content" cellpadding="0" cellspacing="0" rules="all">
+<table class="content" cellpadding="0" cellspacing="0">
 <thead>
 	<tr>
 		<th>Дата</th>
@@ -220,7 +218,17 @@ EOS;
 	}
 
 
-	public function makeWorkListItem($dbrow) {
+	public function makeSqlQuery($limit = 0, $offset = 0, $order = null) {
+		$q = "SELECT w.*, DATE(date) ddate, u.username, u.email, u.allowemail
+			FROM /*p*/$this->mainDbTable w
+			LEFT JOIN /*p*/". User::MAIN_DB_TABLE ." u ON (w.user = u.id)
+			ORDER BY date DESC, w.id DESC";
+		if ($limit > 0) $q .= " LIMIT $limit";
+		return $q;
+	}
+
+
+	public function makeWorkListItem($dbrow, $astable = true) {
 		extract($dbrow);
 		$author = strtr($author, array(', '=>','));
 		$author = $this->makeAuthorLink($author);
@@ -228,20 +236,16 @@ EOS;
 		$info = '';
 		if ( !empty($comment) ) {
 			$comment = strtr($comment, array("\n"=>'', "\r"=>''));
-			$info = $this->out->image($this->skin->image('info'),  '', $comment);
+			$info = isset($expandinfo) && $expandinfo
+				? $comment
+				: $this->out->image($this->skin->image('info'),  '', $comment);
 		}
 		$title = $this->userCanEditEntry($user, $type)
 			? "<a href='$this->root/$this->action/edit/$id' title='Към страницата за редактиране'><em>$title</em></a>" : "<em>$title</em>";
 		$this->rowclass = $this->out->nextRowClass($this->rowclass);
-		if ($progress > 0) {
-			$progressbar = $this->makeProgressBar($progress);
-			$st = '';
-		} else {
-			$img = $this->skin->image('b'.$this->imgs[$status].'p');
-			$st = "<img src='$img' alt='{$this->imgs[$status]}%' />" .
-				$this->statuses[$status];
-			$progressbar = '';
-		}
+		$st = $progress > 0
+			? $this->makeProgressBar($progress)
+			: $this->makeStatus($status);
 		if ( $this->db->s2b($frozen) ) {
 			$sfrozen = '<span title="Подготовката е замразена">(замразена)</span>';
 			$extraclass = ' frozen';
@@ -260,42 +264,69 @@ EOS;
 				}
 				$userlink .= ', '. $ulink;
 			}
-			if ( $status == $this->maxScanStatus && empty($mdata) ) {
-				$userlink .= ' (<strong>очакват се редактори</strong>)';
+			if ( $status >= $this->maxScanStatus ) {
+				if ( empty($mdata) ) {
+					$userlink .= ' (<strong>очакват се редактори</strong>)';
+				} elseif ( isset($showeditors) && $showeditors ) {
+					$userlink .= $this->makeEditorList($mdata);
+				}
 			}
 		}
-		return <<<EOS
+		if ($astable) {
+			return <<<EOS
 
-	<tr class="$this->rowclass$extraclass">
+	<tr class="$this->rowclass$extraclass" id="e$id">
 		<td title="$date">$ddate</td>
 		<td>$img</td>
 		<td>$info $title</td>
 		<td>$author</td>
-		<td>$st
-			$progressbar
-			$sfrozen
-		</td>
+		<td>$st $sfrozen</td>
 		<td>$userlink</td>
 	</tr>
+EOS;
+		}
+		$time = !isset($showtime) || $showtime ? "Дата: $date<br />" : '';
+		$titlev = !isset($showtitle) || $showtitle ? $title : '';
+		return <<<EOS
+
+		<p>$time
+		$img $info $titlev<br/>
+		<strong>Автор:</strong> $author<br/>
+		<strong>Етап:</strong> $st $sfrozen<br/>
+		Подготвя се от $userlink
+		</p>
 EOS;
 	}
 
 
-	protected function makeTabImg($type) {
+	public function makeStatus($stCode) {
+		return $this->makeStatusImage($stCode) . $this->statuses[$stCode];
+	}
+
+
+	public function makeStatusImage($stCode, $urlonly = false) {
+		$url = $this->skin->image('b'.$this->imgs[$stCode].'p');
+		if ($urlonly) return $url;
+		return "<img src='$url' alt='{$this->imgs[$stCode]}%' />";
+	}
+
+
+	public function makeTabImg($type) {
 		return $this->out->image('{IMGDIR}'.$this->tabImgs[$type].'.png',
 			$this->tabImgAlts[$type], $this->tabs[$type]);
 	}
 
 
-	protected function makeProgressBar($progressInPerc) {
-		$bar = str_repeat(' ', $this->progressBarWidth);
+	public function makeProgressBar($progressInPerc) {
 		$perc = $progressInPerc .'%';
+		if ( !$this->showProgressbar ) return $perc;
+		$bar = str_repeat(' ', $this->progressBarWidth);
 		$bar = substr_replace($bar, $perc, $this->progressBarWidth/2-1, strlen($perc));
 		$curProgressWidth = ceil($this->progressBarWidth * $progressInPerc / 100);
 		// done bar end
 		$bar = substr_replace($bar, '</span>', $curProgressWidth, 0);
 		$bar = strtr($bar, array(' '=>'&nbsp;'));
-		return "<pre><span class='progressbar'><span class='done'>$bar</span></pre>";
+		return "<pre style='display:inline'><span class='progressbar'><span class='done'>$bar</span></pre>";
 	}
 
 
@@ -335,7 +366,7 @@ EOS;
 			$comment = $this->out->textarea($this->FF_COMMENT, '', $this->comment, 3, 60);
 			$delete = empty($this->entry) ? ''
 				: '<div class="error" style="margin-bottom:1em">'.
-				$this->out->checkbox('delete', '', '', false, 0, 'Изтриване на записа') .
+				$this->out->checkbox('delete', '', false, 'Изтриване на записа') .
 				' (напр., ако произведението вече е добавено в библиотеката)</div>';
 			$button = $this->makeSubmitButton();
 		} else {
@@ -399,7 +430,7 @@ EOS;
 		$status = '';
 		foreach ($this->statuses as $code => $text) {
 			$sel = $this->status == $code ? ' selected="selected"' : '';
-			$img = $this->skin->image('b'.$this->imgs[$code].'p');
+			$img = $this->makeStatusImage($code, true);
 			$status .= "\n\t<option value='$code'$sel style='background:url($img) no-repeat left; padding-left:18px;'>$text</option>";
 		}
 		$progress = $this->out->textField('progress', '', $this->progress, 2, 3);
@@ -448,7 +479,7 @@ EOS;
 				foreach ($this->statuses as $code => $text) {
 					if ($code > $this->maxScanStatus) break;
 					$sel = $cstatus == $code ? ' selected="selected"' : '';
-					$img = $this->skin->image('b'.$this->imgs[$code].'p');
+					$img = $this->makeStatusImage($code, true);
 					$status .= "\n\t<option value='$code'$sel style='background:url($img) no-repeat left; padding-left:18px;'>$text</option>";
 				}
 				$status = "<select name='status' id='status'>$status</select>";
@@ -464,7 +495,8 @@ EOS;
 			$tmpfiles = '';
 		}
 		$udata = User::getDataById($this->scanuser);
-		$ulink = $this->makeUserLink($udata['username']);
+		$ulink = $this->makeUserLinkWithEmail($udata['username'],
+			$udata['email'], $udata['allowemail']);
 		$flink = $this->tmpfiles == self::DEF_TMPFILE ? ''
 			: "<a href='$this->tmpfiles'>$this->tmpfiles</a>" .
 			($this->tfsize > 0 ? " ($this->tfsize&nbsp;мегабайта)" : '');
@@ -547,15 +579,16 @@ EOS;
 	}
 
 
-	protected function makeEditorList() {
-		if ( empty($this->multidata) ) {
+	protected function makeEditorList($mdata = null) {
+		if ( empty($mdata) ) $mdata = $this->multidata;
+		if ( empty($mdata) ) {
 			return '<p>Все още никой не се е включил в редакцията на сканирания текст.</p>';
 		}
 		$l = $class = '';
-		foreach ($this->multidata as $edata) {
+		foreach ($mdata as $edata) {
 			extract($edata);
 			$class = $this->out->nextRowClass($class);
-			$ulink = $this->makeUserLink($username);
+			$ulink = $this->makeUserLinkWithEmail($username, $email, $allowemail);
 			if ( !empty($uplfile) ) {
 				$url = $this->rootd .'/'. $this->tmpDir . $uplfile;
 				$comment .= " (<a href='$url' title='Качен от $username файл'>Качен файл</a>)";
@@ -747,7 +780,7 @@ EOS;
 	}
 
 
-	protected function getMultiEditData($mainId) {
+	public function getMultiEditData($mainId) {
 		$q = "SELECT m.*, DATE(m.date) date, u.username, u.email, u.allowemail
 		FROM /*p*/$this->suplDbTable m
 		LEFT JOIN /*p*/". User::MAIN_DB_TABLE ." u ON m.user = u.id
@@ -775,33 +808,33 @@ EOS;
 	}
 
 
-	protected function isSingleUser($type) { return $type == 0; }
-	protected function isMultiUser($type) { return $type == 1; }
+	public function isSingleUser($type) { return $type == 0; }
+	public function isMultiUser($type) { return $type == 1; }
 
-	protected function thisUserCanEditEntry($entry, $type) {
+	public function thisUserCanEditEntry($entry, $type) {
 		if ($this->user->isSuperUser() || $type == 1) return true;
 		$key = array('id' => $entry, 'user' => $this->user->id);
 		return $this->db->exists($this->mainDbTable, $key);
 	}
 
-	protected function userCanEditEntry($user, $type = 0) {
+	public function userCanEditEntry($user, $type = 0) {
 		return $this->user->isSuperUser() || $user == $this->user->id
 			|| ($type == 1 && $this->userCanAddEntry());
 	}
 
-	protected function thisUserCanDeleteEntry() {
+	public function thisUserCanDeleteEntry() {
 		if ($this->user->isSuperUser() || empty($this->entry)) return true;
 		if ( isset($this->_tucde) ) return $this->_tucde;
 		$key = array('id' => $this->entry, 'user' => $this->user->id);
 		return $this->_tucde = $this->db->exists($this->mainDbTable, $key);
 	}
 
-	protected function userCanDeleteEntry($user) {
+	public function userCanDeleteEntry($user) {
 		return $this->user->isSuperUser() || $user == $this->scanuser;
 	}
 
 
-	protected function userCanAddEntry() {
+	public function userCanAddEntry() {
 		return !$this->user->isAnon();
 	}
 
@@ -842,4 +875,3 @@ EOS;
 		return $filename;
 	}
 }
-?>

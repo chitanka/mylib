@@ -4,6 +4,7 @@ class RegisterPage extends Page {
 
 	private $invalidReferers = array('login', 'logout', 'register', 'sendNewPassword');
 	protected $nonEmptyFields = array('username', 'password', 'passwordRe');
+	protected $mainFields = array('username', 'password', 'passwordRe', 'realname', 'email');
 
 
 	public function __construct() {
@@ -12,11 +13,10 @@ class RegisterPage extends Page {
 		$this->title = 'Регистрация';
 		$this->mainDbTable = User::MAIN_DB_TABLE;
 		$this->attempt = (int) $this->request->value('attempt', 1);
-		$this->username = trim($this->request->value('username'));
-		$this->realname = trim($this->request->value('realname'));
-		$this->password = trim($this->request->value('password'));
-		$this->passwordRe = trim($this->request->value('passwordRe'));
-		$this->email = trim($this->request->value('email', ''));
+		$this->mainFields = $this->nonEmptyFields + $this->mainFields;
+		foreach ($this->mainFields as $field) {
+			$this->$field = trim($this->request->value($field, ''));
+		}
 		$this->news = $this->request->checkbox('news');
 		$this->returnto = $this->request->value('returnto', $this->request->referer());
 		foreach ($this->invalidReferers as $invalidReferer) {
@@ -37,11 +37,12 @@ class RegisterPage extends Page {
 		if ($this->userExists() || $this->emailExists()) {
 			return $this->buildContent();
 		}
+		$now = date('Y-m-d H:i:s');
 		$set = array('username' => $this->username, 'realname' => $this->realname,
 			'lastname' => ltrim(strrchr($this->realname, ' ')),
 			'password' => $this->db->encodePasswordDB($this->password),
 			'email' => $this->email, 'allowemail' => true,
-			'news' => $this->news, 'registration' => date('Y-m-d H:i:s'));
+			'news' => $this->news, 'touched' => $now, 'registration' => $now);
 		if ( $this->db->insert($this->mainDbTable, $set) !== false ) {
 			$this->addMessage("Регистрирахте се в <em>$this->sitename</em> като $this->username.");
 			return $this->redirect('login');
@@ -57,7 +58,7 @@ class RegisterPage extends Page {
 				return 'Не сте попълнили всички полета.';
 			}
 		}
-		if ( strcmp($this->password, $this->passwordRe) !== 0 ) {
+		if ( !$this->isValidPassword() ) {
 			return 'Двете въведени пароли се различават.';
 		}
 		$isValid = User::isValidUsername($this->username);
@@ -71,6 +72,12 @@ class RegisterPage extends Page {
 		if ($res == -1 && $this->attempt == 1) {
 			return 'Въведеният адрес за електронна поща е валиден, но е леко странен. Проверете дали не сте допуснали грешка.';
 		}
+		return '';
+	}
+
+
+	protected function isValidPassword() {
+		return strcmp($this->password, $this->passwordRe) === 0;
 	}
 
 
@@ -167,4 +174,3 @@ class RegisterPage extends Page {
 EOS;
 	}
 }
-?>

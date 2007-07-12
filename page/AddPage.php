@@ -2,6 +2,8 @@
 
 class AddPage extends EditPage {
 
+	protected $defEditComment = 'Добавяне';
+
 	public function __construct() {
 		parent::__construct();
 		$this->action = 'add';
@@ -15,4 +17,3 @@ class AddPage extends EditPage {
 	}
 
 }
-?>

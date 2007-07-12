@@ -116,9 +116,11 @@ EOS;
 			foreach ($series as $serName => $titles) {
 				$isTrueSeries = $serName{0} == ' '; // false by novels, etc.
 				$orig = $ser[$serName];
-				$serName = trim($serName);
+				list($orig, $seriesType) = $ser[$serName];
 				$orig = !empty($orig) && $orig != $serName ? "($orig)" : '';
-				$serLink = $isTrueSeries ? $this->makeSeriesLink($serName) : $serName;
+				$serLink = $isTrueSeries
+					? $this->makeSeriesLink($serName) . seriesSuffix($seriesType)
+					: $serName;
 				$o .= <<<EOS
 <fieldset class="titles">
 	<legend>$serLink $orig</legend>
@@ -190,7 +192,7 @@ EOS;
 		t.orig_lang, t.year, t.year2, t.trans_year, t.trans_year2, t.type,
 		t.sernr, t.size, t.zsize, UNIX_TIMESTAMP(t.entrydate) date,
 		GROUP_CONCAT(a.name ORDER BY aof.pos) author,
-		s.name series, s.orig_name orig_series";
+		s.name series, s.orig_name orig_series, s.type seriesType";
 		$qFrom = " FROM /*p*/translator_of tof
 		LEFT JOIN /*p*/text t ON tof.text = t.id
 		LEFT JOIN /*p*/$this->mainDbTable tr ON tof.translator = tr.id
@@ -233,7 +235,7 @@ EOS;
 		}
 		$this->textsData[$textId] = $dbrow;
 		$series = empty($series) ? $GLOBALS['typesPl'][$type] : ' '.$series;
-		$this->translatorsData[$translatorId]['ser'][$series] = $orig_series;
+		$this->translatorsData[$translatorId]['ser'][$series] = array($orig_series, $seriesType);
 		$key = '';
 		if ($this->order == 'time') {
 			$key .= empty($tr_trans_year) ? $trans_year : $tr_trans_year;
@@ -298,4 +300,3 @@ EOS;
 		$this->addMessage('Няма намерени преводачи.', true);
 	}
 }
-?>

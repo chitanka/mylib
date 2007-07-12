@@ -115,20 +115,32 @@ class Page {
 	public function addExtraLinks($extra) { $this->extra .= $extra; }
 	public function addHeadContent($content) { $this->head .= $content; }
 
+	public function addRssLink($title = null, $action = null) {
+		if ( empty($title) ) $title = $this->title();
+		if ( empty($action) ) $action = $this->action;
+		$feedlink = <<<EOS
+	<link rel="alternate" type="application/rss+xml" title="RSS 2.0 — $title" href="$this->root/feed/$action" />
+EOS;
+		$this->addHeadContent($feedlink);
+	}
+
 
 	/**
 	 * Output page content
 	 */
 	public function output($elapsedTime) {
 		if ( $this->outputDone ) { return; } // already outputted
+		if ( empty($this->fullContent) ) {
+			$this->makeFullContent($elapsedTime);
+		}
+		$this->addTemplates();
+		$this->fullContent = expandTemplates($this->fullContent);
 		if ( !headers_sent() ) {
 			header("Content-Type: $this->contentType; charset=$this->outencoding");
 			header("Content-Language: $this->langCode");
 			header('Content-Style-Type: text/css');
 			header('Content-Script-Type: text/javascript');
-		}
-		if ( empty($this->fullContent) ) {
-			$this->makeFullContent($elapsedTime);
+			header('Content-Length: '. strlen($this->fullContent));
 		}
 		$this->encprint($this->fullContent);
 	}
@@ -160,7 +172,7 @@ class Page {
 	 */
 	protected function makeFullContent($elapsedTime = NULL) {
 		$nav = $this->makeNavigationBar();
-		$pageTitle = strtr($this->title, array('<br />'=>' — '));
+		$pageTitle = strtr($this->title(), array('<br />'=>' — '));
 		$pageTitle = strip_tags($pageTitle);
 		$cacheLink = $this->makeCacheLink();
 		$elapsedTimeMsg = !empty($elapsedTime)
@@ -248,19 +260,23 @@ EOS;
 			$o = iconv($this->masterEncoding,
 				$this->outencoding.'//TRANSLIT', $o);
 		}*/
+		return $this->fullContent;
+	}
+
+
+	protected function addTemplates() {
 		addTemplate('ROOT', $this->root.'/');
 		addTemplate('DOCROOT', $this->rootd.'/');
 		addTemplate('IMGDIR', $this->skin->imageDir());
 		addTemplate('FACTION', $this->root.'/'.$this->action);
 		addTemplate('SITENAME', $this->sitename);
-		$this->fullContent = expandTemplates($this->fullContent);
-		return $this->fullContent;
 	}
 
 
 	protected function makeNavigationBar() {
 		$startwith = isset($this->startwith) ? stripslashes($this->startwith) : '';
 		$startwith = trim( strtr($startwith, '%', ' ') );
+		$startwith = preg_replace('/  +/', ' ', $startwith);
 		$options = array('author'=>'Автор', 'translator'=>'Преводач',
 			'title'=>'Заглавие', 'series'=>'Поредица', 'label'=>'Етикет');
 		$action = $this->out->selectBox('action', '', $options, $this->action);
@@ -291,6 +307,7 @@ EOS;
 	array("$this->root/news", 'Новини относно сайта', 'Новини'),
 	array("$this->root/history", 'Списък на произведенията по месец на добавяне', 'История'),
 	array("$this->root/work", 'Списък на произведения, подготвящи се за добавяне', 'Сканиране'),
+	array("$this->root/comment", 'Читателски коментари за произведенията', 'Читател. мнения'),
 	array("$this->root/liternews", 'Новини, свързани с литературата. Добавят се от потребителите.', 'Литер. новини'),
 	array($this->forum_root, 'Форумната система на сайта', 'Форум'),
 	array("$this->root/statistics", '', 'Статистика'),
@@ -312,10 +329,10 @@ EOS;
 		$prefix = $this->out->hiddenField('prefix', '%');
 		$sortby = $this->out->hiddenField('sortby', 'first');
 		$mode = $this->out->hiddenField('mode', 'simple');
-		$q = $this->out->textField('q', '', $startwith, 14, 40, 0,
-			'Клавиш за достъп — Т', 'style="width:9em" accesskey="т"');
+		$q = $this->out->textField($this->FF_QUERY, 'search-'.$this->FF_QUERY, $startwith, 14, 40, 0,
+			'Клавиш за достъп — Т; натиснете &lt;Enter&gt;, за да започнете търсенето', 'accesskey="т"');
 		$submit = $this->out->submitButton('Показване',
-			'Показване на резултатите от търсенето', 0, false);
+			'Показване на резултатите от търсенето', 0, false, 'id="search-go"');
 		return <<<EOS
 <div id="navigation"><a name="navigation"> </a>
 <div id="logo"><a href="$this->root" title="Към началната страница">$this->sitename</a></div>
@@ -327,11 +344,11 @@ $persTools
 <dl id="search" title="Претърсване на библиотеката">
 <dt>Търсене</dt>
 <dd>
-<form action="$this->root" method="get" style="margin:0.3em 0">
+<form action="$this->root" method="get">
 <div><a name="search"> </a>
-	<label for="action">по:</label>
+	<label for="action" id="search-label-action">по:</label>
 	$action
-	<label for="q" style="display:none">на:</label>
+	<label for="search-$this->FF_QUERY" id="search-label-$this->FF_QUERY" style="display:none">на:</label>
 	$q
 	$submit
 	$prefix
@@ -346,6 +363,7 @@ $persTools
 $this->extra
 <dt>Полезно</dt>
 	<dd>» <a href="http://bg.wikipedia.org/" title="Уикипедия е свободна и безплатна енциклопедия, която непрекъснато се обогатява и обновява от читателите си">Уикипедия</a></dd>
+	<dd>» <a href="http://bgf.zavinagi.org/" title="БГ-Фантастика е свободна енциклопедия, посветена на българската фантастика и сътворявана от любителите й">БГ-Фантастика</a></dd>
 	<dd>» <a href="http://bg.wiktionary.org/" title="Уикиречник е свободен и безплатен речник, който се обогатява и обновява от читателите си">Уикиречник</a></dd>
 	<dd>» <a href="http://www.getfirefox.com/" title="Мозила Файърфокс е свободен и безплатен графичен уеб браузър, достъпен за множество платформи">Файърфокс</a></dd>
 </dl>
@@ -510,6 +528,16 @@ EOS;
 // 		return ltrim( preg_replace('/([^,]+)/e',
 // 		"' $pref<a href=\"$this->root/author/'.urlencode('$1').'$query\">$1</a>$suf'",
 // 		$name) );
+	}
+
+
+	public function makeFromAuthorSuffix($fields) {
+		extract($fields);
+		if ( (!isset($collection) || $collection == 'false' || $collection == false)
+				&& isset($author) && trim($author, ', ') != '' ) {
+			return ' от '.$this->makeAuthorLink($author);
+		}
+		return '';
 	}
 
 
@@ -710,4 +738,3 @@ EOS;
 
 }
 
-?>

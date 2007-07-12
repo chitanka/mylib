@@ -12,7 +12,7 @@ class LabelLogPage extends Page {
 	protected function processSubmission() {
 		$del = array_keys((array) $this->request->value('ch'));
 		if ( !empty($del) ) {
-			$key = array('id' => array('IN', '('.implode(',', $del).')'));
+			$key = array('id IN ('.implode(',', $del).')');
 			if ( $this->db->delete($this->mainDbTable, $key) ) {
 				$this->addMessage('Избраните записи бяха изтрити.');
 			}
@@ -95,4 +95,3 @@ EOS;
 	}
 
 }
-?>

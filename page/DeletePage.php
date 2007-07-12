@@ -44,4 +44,3 @@ class DeletePage extends Page {
 EOS;
 	}
 }
-?>

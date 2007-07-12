@@ -85,4 +85,3 @@ EOS;
 		file_put_contents($this->logFile, $logString, FILE_APPEND);
 	}
 }
-?>

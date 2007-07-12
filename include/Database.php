@@ -170,7 +170,8 @@ class Database {
 			return false;
 		}
 		if ( preg_match('/UPDATE|INSERT|REPLACE|DELETE/', $query) ) {
-			$this->log("/*U={$GLOBALS['user']->id}*/ $query;", false);
+			$u = isset($GLOBALS['user']) ? $GLOBALS['user']->id : 0;
+			$this->log("/*U=$u*/ $query;", false);
 		}
 		return $res;
 	}
@@ -215,13 +216,13 @@ class Database {
 			if ( is_numeric($field) ) { // take the value as is
 				$field = $rel = '';
 				$value = $rawvalue;
-			} elseif ( is_array($rawvalue) ) {
-				list($rel, $value) = $rawvalue;
 			} else {
-				$rel = '='; // default relation
-				$value = $rawvalue;
-			}
-			if ( $value{0} != '(' ) {
+				if ( is_array($rawvalue) ) {
+					list($rel, $value) = $rawvalue;
+				} else {
+					$rel = '='; // default relation
+					$value = $rawvalue;
+				}
 				$value = '\''. $this->normalizeValue($value) .'\'';
 			}
 			$whs[] = "$field $rel $value";
@@ -342,4 +343,3 @@ class Database {
 
 }
 
-?>

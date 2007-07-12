@@ -1,7 +1,9 @@
 <?php
 class EditPage extends Page {
 
-	protected $defLicense = 'fc'; // full (fucking) copyright
+	protected
+		$defLicense = 2, // 'fc' - full (fucking) copyright
+		$defEditComment = '';
 
 	public function __construct() {
 		parent::__construct();
@@ -9,6 +11,7 @@ class EditPage extends Page {
 		$this->title = 'Редактиране';
 		$this->mainDbTable = 'text';
 		$this->licenseDbTable = 'license';
+		$this->editHistoryDbTable = 'edit_history';
 		$this->textId = (int) $this->request->value('textId', 0, 1);
 		$this->obj = $this->request->value('obj', '', 2);
 		$this->withText = true;
@@ -41,6 +44,7 @@ class EditPage extends Page {
 		$this->license_orig = (int) $this->request->value('license_orig', $this->defLicense);
 		$this->license_trans = (int) $this->request->value('license_trans', $this->defLicense);
 		$this->tcontent = rtrim($this->request->value('content', ''));
+		$this->edit_comment = $this->request->value('edit_comment', $this->defEditComment);
 		// Format: USER(,PERCENT)?(;USER(,PERCENT)?)*
 		$this->scanUser = $this->request->value('user');
 	}
@@ -145,11 +149,12 @@ class EditPage extends Page {
 			$qs = $this->makeUpdateChunkQuery($file);
 			$size = filesize($file);
 			$set = array('size' => $size, 'zsize' => $size/3.5,
-				'headlevel' => $this->headlevel, 'lastmod' => date('Y-m-d H:i:s'));
+				'headlevel' => $this->headlevel);
 			$qs[] = $this->db->updateQ($this->mainDbTable, $set, array('id'=>$this->textId));
 			$set = array("size = percent/100 * $size");
 			$key = array('text' => $this->textId);
 			$qs[] = $this->db->updateQ('user_text', $set, $key);
+			$this->addEditCommentQuery($qs);
 		} elseif ( $this->request->checkbox('usecurr') ) {
 			$file = $GLOBALS['contentDirs']['text'].$this->textId;
 			$qs = $this->makeUpdateChunkQuery($file);
@@ -200,6 +205,8 @@ class EditPage extends Page {
 		if ( file_exists($file) ) copy($file, $bak);
 		file_put_contents($file, $this->tcontent);
 		CacheManager::clearCache("text-info$this->textId");
+		# Засега редактирането на доп. информация не се отразява в базата.
+		#$this->addEditCommentQuery($qs);
 		return $qs;
 	}
 
@@ -214,16 +221,34 @@ class EditPage extends Page {
 			$this->tcontent = my_replace($this->tcontent);
 			if ( strpos($this->tcontent, '"') !== false ) {
 				$this->addMessage('Вероятна грешка: останала е непроменена кавичка (").', true);
-				file_put_contents('./log/error.log',
+				file_put_contents('./log/error',
 					"Кавичка при анотация към $this->textId\n", FILE_APPEND);
 			}
 		}
 		$file = $contentDirs['text-anno'] . $this->textId;
 		$bak = $contentDirs['oldtext-anno'] . $this->textId .'-'. time();
-		if ( file_exists($file) ) copy($file, $bak);
+		if ( file_exists($file) ) {
+			copy($file, $bak);
+		} else {
+			$set = array('has_anno' => true);
+			$dbkey = array('id' => $this->textId);
+			$qs[] = $this->db->updateQ($this->mainDbTable, $set, $dbkey);
+		}
 		file_put_contents($file, $this->tcontent);
 		CacheManager::clearCache("text-anno$this->textId");
+		$this->addEditCommentQuery($qs);
 		return $qs;
+	}
+
+
+	protected function addEditCommentQuery(&$qs) {
+		if ( empty($this->edit_comment) ) { return; }
+		$eid = $this->db->autoIncrementId($this->editHistoryDbTable);
+		$set = array('id' => $eid, 'text' => $this->textId, 'user' => $this->user->id,
+			'comment' => $this->edit_comment, 'date' => date('Y-m-d H:i:s'));
+		$qs[] = $this->db->insertQ($this->editHistoryDbTable, $set);
+		$set = array('lastedit' => $eid);
+		$qs[] = $this->db->updateQ($this->mainDbTable, $set, array('id'=>$this->textId));
 	}
 
 
@@ -259,10 +284,12 @@ EOS;
 		$partpref = $this->out->textField('partpref', '', '', 20);
 		$usecurr = $this->out->checkbox('usecurr', '', false, 'Ползване на сегашния файл');
 		$file = $this->out->fileField('file', '', 60);
+		$comment = $this->makeEditComment();
 		$contentInput = <<<EOS
 	<label for="file">Файл със съдържанието на произведението:</label>
 	$file<br />
 	$usecurr<br />
+	$comment<br />
 	<label for="headlevel">Ниво на заглавията за разделяне на текста:</label>
 	$headlevel<br />
 	<label for="partpref">Представка за заглавия-числа:</label>
@@ -420,13 +447,21 @@ EOS;
 
 	protected function makeTextarea() {
 		$content = $this->out->textarea('content', '', $this->tcontent, 25, 90);
+		$comment = $this->makeEditComment();
 		$replace = $this->out->checkbox('replace', '', $this->replace,
 			'Оправяне на кавички и тирета');
 		return <<<EOS
 	<label for="content">Съдържание:</label><br />
 	$content<br />
+	$comment<br />
 	$replace
 EOS;
+	}
+
+
+	protected function makeEditComment() {
+		$comment = $this->out->textField('edit_comment', '', $this->edit_comment, 80);
+		return "<label for='edit_comment'>Ред. коментар:</label> $comment";
 	}
 
 
@@ -633,4 +668,3 @@ EOS;
 	}
 
 }
-?>

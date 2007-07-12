@@ -2,10 +2,10 @@
 
 class SeriesPage extends ViewPage {
 
-	protected $titles = array(
-		'simple' => 'Поредици — ',
-		'extended' => 'Поредици и заглавия — ',
-	);
+	protected
+		$titles = array(
+			'simple' => 'Поредици — ',
+			'extended' => 'Поредици и заглавия — ');
 
 
 	public function __construct() {
@@ -30,7 +30,8 @@ class SeriesPage extends ViewPage {
 
 
 	protected function makeSimpleListQuery() {
-		$query = "SELECT s.id, s.name, s.orig_name, GROUP_CONCAT(a.name) author
+		$query = "SELECT s.id, s.name, s.orig_name, s.type,
+				GROUP_CONCAT(a.name) author
 			FROM /*p*/ser_author_of isSA
 			LEFT JOIN /*p*/series s ON isSA.series = s.id
 			LEFT JOIN /*p*/person a ON isSA.author = a.id";
@@ -59,6 +60,7 @@ class SeriesPage extends ViewPage {
 		$editLink = $this->uCanEditObj ? $this->makeEditSeriesLink($id) : '';
 		$nameEnc = $this->urlencode($name);
 		$author = $this->makeAuthorLink($author);
+		$suff = seriesSuffix($type);
 		if ( !empty($author) ) { $author = '— '.$author; }
 		if ($orig_name == $name) { $orig_name = ''; }
 		if ( !empty($orig_name) ) { $orig_name = " ($orig_name)"; }
@@ -67,7 +69,7 @@ class SeriesPage extends ViewPage {
 		$o .= <<<EOS
 
 <li>
-	<a href="$this->root/series/$nameEnc$query"><em>$name</em></a>
+	<a href="$this->root/series/$nameEnc$query"><em>$name</em>$suff</a>
 	<span class="extra">
 	<em>$orig_name</em>
 	$editLink
@@ -90,7 +92,9 @@ EOS;
 			'makeExtendedListItem', $this);
 		if ( empty($this->serTitles) ) { return false; }
 		$this->data[$this->curSeries] = array(
-			'titles' => $this->serTitles, 'series' => $this->serTitles[0]['series'],
+			'titles' => $this->serTitles,
+			'series' => $this->serTitles[0]['series'],
+			'type' => $this->serTitles[0]['seriesType'],
 			'author' => ($this->displayAuthor ? '' : $this->curAuthor),
 		);
 
@@ -102,7 +106,8 @@ EOS;
 			$fullSerName = ltrim("$author - $series", ' -');
 			$seriesEnc = $this->urlencode($series);
 			$seriesAnchor = strtr($seriesEnc, '%+', '__');
-			$toc .= "\n\t<li><a href=\"#$seriesAnchor\">$series</a></li>";
+			$suff = seriesSuffix($type);
+			$toc .= "\n\t<li><a href='#$seriesAnchor'>$series$suff</a></li>";
 			$displayAuthor = true;
 			if ( !empty($author) ) {
 				$author = ' — '. $this->makeAuthorLink($author);
@@ -111,7 +116,7 @@ EOS;
 			$editLink = $this->uCanEditObj ? $this->makeEditSeriesLink($seriesId) : '';
 			$o .= <<<EOS
 
-<h2 id="$seriesAnchor">$series $editLink $author</h2>
+<h2 id="$seriesAnchor">$series$suff $editLink $author</h2>
 
 <ul>
 EOS;
@@ -176,6 +181,7 @@ EOS;
 
 	protected function makeExtendedListQuery() {
 		$qSelect = "SELECT s.id seriesId, s.name series, s.orig_name orig_series,
+			s.type seriesType,
 			t.id textId, t.title, t.lang, t.orig_title, t.orig_lang,
 			t.year, t.type, t.sernr, t.size, t.zsize, UNIX_TIMESTAMP(t.entrydate) date,
 			GROUP_CONCAT(a.name ORDER BY aof.pos) author";
@@ -210,7 +216,9 @@ EOS;
 		if ($this->curSeries != $seriesId) {
 			if ( !empty($this->curSeries) ) {
 				$this->data[$this->curSeries] = array(
-					'titles' => $this->serTitles, 'series' => $this->serTitles[0]['series'],
+					'titles' => $this->serTitles,
+					'series' => $this->serTitles[0]['series'],
+					'type' => $this->serTitles[0]['seriesType'],
 					'author' => ($this->displayAuthor ? '' : $this->curAuthor),
 				);
 				$this->curAuthor = '';
@@ -274,4 +282,3 @@ EOS;
 		$this->addMessage('Няма намерени поредици.', true);
 	}
 }
-?>

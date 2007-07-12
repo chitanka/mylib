@@ -77,4 +77,3 @@ EOS;
 		return $this->elem['link'] ."\n\n". $this->elem['desc'];
 	}
 }
-?>

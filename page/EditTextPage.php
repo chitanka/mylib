@@ -9,4 +9,3 @@ class EditTextPage extends EditPage {
 	}
 
 }
-?>

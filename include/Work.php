@@ -2,6 +2,9 @@
 
 class Work {
 
+	protected static $exts = array('.jpg', '.png');
+
+
 	public function __construct($fields = array()) {
 		extract2object($fields, $this);
 		if ( empty($this->year) ) {
@@ -88,6 +91,37 @@ class Work {
 	}
 
 
+	public static function getCovers($id, $defCover = null) {
+		$covdir = $GLOBALS['contentDirs']['cover'];
+		$bases = array($covdir . $id);
+		if ( !empty($defCover) ) $bases[] = $covdir . $defCover;
+		$coverFiles = cartesian_product($bases, self::$exts);
+		$covers = array();
+		foreach ($coverFiles as $file) {
+			if ( file_exists( $file ) ) {
+				$covers[] = $file;
+				// search for more images of the form “ID-DIGIT.EXT”
+				for ($i = 2; /* infinite */; $i++) {
+					$efile = strtr($file, array('.'=>"-$i."));
+					if ( file_exists( $efile ) ) {
+						$covers[] = $efile;
+					} else {
+						break;
+					}
+				}
+				break; // don’t check other exts
+			}
+		}
+		return $covers;
+	}
+
+
+	public static function renameCover($cover, $newname) {
+		$rexts = strtr(implode('|', self::$exts), array('.'=>'\.'));
+		return preg_replace("/\d+(-\d+)?($rexts)/", "$newname$1$2", $cover);
+	}
+
+
 	public static function newFromId($id, $reader = 0) {
 		return self::newFromDB( array('t.id'=>$id), $reader );
 	}
@@ -96,9 +130,19 @@ class Work {
 		return self::newFromDB( array('t.title'=>$title), $reader );
 	}
 
+
+	public static function incReadCounter($id) {
+		Setup::db()->update('text', array('read_count=read_count+1'), compact('id'));
+	}
+
+	public static function incDlCounter($id) {
+		Setup::db()->update('text', array('dl_count=dl_count+1'), compact('id'));
+	}
+
 	protected static function newFromDB($dbkey, $reader = 0) {
 		$db = Setup::db();
-		$q = "SELECT t.*, s.name series,
+		$q = "SELECT t.*,
+				s.name series, s.orig_name seriesOrigName, s.type seriesType,
 				lo.code lo_code, lo.name lo_name, lo.copyright lo_copyright,
 				lt.code lt_code, lt.name lt_name, lt.copyright lt_copyright,
 				r.user isRead
@@ -136,4 +180,3 @@ class Work {
 		return new Work($fields);
 	}
 }
-?>

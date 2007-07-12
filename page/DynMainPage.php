@@ -143,9 +143,6 @@ EOS;
 
 	protected function makeLastNews($limit = 10) {
 		$page = PageManager::executePage('news');
-		$regexp = str_repeat('(.*\n)?', $limit);
-		preg_match("/($regexp)/", trim($page->content(), "\n") ."\n", $m);
-		return $m[1];
+		return $page->makeNews($limit, 0, false);
 	}
 }
-?>

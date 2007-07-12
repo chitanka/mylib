@@ -94,12 +94,13 @@ EOS;
 		$qSelect = "SELECT l.id labelId, l.name label,
 			t.id textId, t.title, t.lang, t.orig_title, t.orig_lang, t.collection,
 			t.year, t.type, t.sernr, t.size, t.zsize, UNIX_TIMESTAMP(t.entrydate) date,
-			GROUP_CONCAT(a.name) author";
+			GROUP_CONCAT(a.name) author, s.name series, s.orig_name orig_series";
 		$qFrom = " FROM /*p*/text_label h
 			LEFT JOIN /*p*/label l ON h.label = l.id
 			LEFT JOIN /*p*/text t ON h.text = t.id
 			LEFT JOIN /*p*/author_of aof ON t.id = aof.text
-			LEFT JOIN /*p*/person a ON aof.author = a.id";
+			LEFT JOIN /*p*/person a ON aof.author = a.id
+			LEFT JOIN /*p*/series s ON t.series = s.id";
 		if ($this->user->id > 0) {
 			$qSelect .= ', r.user reader';
 			$qFrom .= "
@@ -125,37 +126,11 @@ EOS;
 	public function makeExtendedListItem($dbrow) {
 		extract($dbrow);
 		$o = '';
-		if ($this->curLabel != $label) {
-			$this->curLabel = $label;
+		if ($this->curLabel != $dbrow['label']) {
+			$this->curLabel = $dbrow['label'];
 			$o .= "</ul>\n<h2>$this->curLabel</h2>\n<ul>";
 		}
-		$extras = array();
-		if ( !empty($orig_title) && $orig_lang != $lang ) {
-			$extras[] = "<em>$orig_title</em>";
-		}
-		$textLink = $this->makeTextLink(compact('textId', 'type', 'size', 'zsize', 'title', 'date', 'reader'));
-		if ($this->order == 'time') {
-			$titleView = '<span class="extra"><tt>'.$this->makeYearView($year).
-				'</tt> — </span>'.$textLink;
-		} else {
-			$titleView = $textLink;
-			if ( !empty($year) ) { $extras[] = $year; }
-		}
-		$extras = empty($extras) ? '' : '('. implode(', ', $extras) .')';
-		$dlLink = $this->makeDlLink($textId, $zsize);
-		$editLink = $this->userCanEdit ? $this->makeEditTextLink($textId) : '';
-		$dlCheckbox = $this->makeDlCheckbox($textId);
-		$author = $collection == 'true' ? '' : $this->makeAuthorLink($author);
-		if ( !empty($author) ) { $author = '— '.$author; }
-		$o .= <<<EOS
-
-<li class="$type" title="{$GLOBALS['types'][$type]}">
-	$dlCheckbox
-	$titleView
-	<span class="extra">$extras — $dlLink$editLink</span>
-	$author
-</li>
-EOS;
+		$o .= $this->makeListItemForTitle($dbrow);
 		return $o;
 	}
 
@@ -224,4 +199,3 @@ EOS;
 		$this->addMessage('Няма намерени етикети.', true);
 	}
 }
-?>

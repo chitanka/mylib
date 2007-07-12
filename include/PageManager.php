@@ -116,4 +116,3 @@ class PageManager {
 	public static function defaultPage() { return self::$defaultPage; }
 	public static function pageDir() { return self::$pageDir; }
 }
-?>

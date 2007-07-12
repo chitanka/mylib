@@ -1,11 +1,14 @@
 <?php
 class CommentPage extends Page {
 
-	protected $sortOrder = 'ASC';
-	protected $wheres = array(0 => '1',
-		-1 => array('`show`' => false),
-		1 => array('`show`' => true) );
-	protected $defListLimit = 20, $maxListLimit = 100;
+	protected
+		$sortOrder = 'ASC',
+		$wheres = array(
+			-1 => array('`show`' => false), // only hidden comments
+			1 => array('`show`' => true), // only visible comments
+			0 => '1'), // all comments
+		$defListLimit = 20,
+		$maxListLimit = 100;
 
 
 	public function __construct() {
@@ -13,12 +16,13 @@ class CommentPage extends Page {
 		$this->action = 'comment';
 		$this->title = 'Читателски мнения';
 		$this->mainDbTable = 'comment';
-		$this->reader = $this->request->value('reader', $this->user->userName());
+		$this->reader = $this->user->isAnon()
+			? $this->request->value('reader')
+			: $this->user->userName();
 		$this->comment = $this->request->value('commenttext');
 		$this->textId = (int) $this->request->value('textId', 0, 1);
 		$this->chunkId = (int) $this->request->value('chunkId', 1, 2);
-		// 0 - all comments, -1 - only hidden, 1 - only visible
-		$this->showMode = 1;
+		$this->showMode = 1; // only visible
 		$this->initDone = false;
 		$this->initPaginationFields();
 	}
@@ -52,6 +56,7 @@ class CommentPage extends Page {
 
 
 	protected function buildContent() {
+		$this->addRssLink();
 		if ( empty($this->textId) ) {
 			return $this->makeAllComments($this->llimit, $this->loffset);
 		}
@@ -70,32 +75,48 @@ class CommentPage extends Page {
 		}
 		$c = '';
 		while ($row = $this->db->fetchAssoc($res)) {
-			extract($row);
-			$c .= $this->makeComment($rname, $ctext, $time);
+			$c .= $this->makeComment($row);
 		}
 		return $c;
 	}
 
 
-	protected function makeComment($name = '', $comment = '', $time = NULL, $textId = NULL, $title = '', $author = '', $edit = false) {
-		if ( empty($name) ) $name = $this->reader;
-		if ( empty($comment) ) $comment = $this->comment;
-		$format = 'd.m.Y H:i:s';
-		$time = empty($time) ? date($format) : date($format, strtotime($time));
-		$comment = str_replace("\n", "<br/>\n", $comment);
-		#$editLink = $this->user->canExecute('editComment')
-		#	? ' — '.$this->makeEditCommentLink($comment) : '';
-		$textLink = empty($textId) ? ''
-			: ' за '.$this->makeSimpleTextLink($title, $textId);
-		if ( !empty($author) ) {
-			$textLink .= ' от '.$this->makeAuthorLink($author);
+	/**
+	 * @param $fields array Associative array containing following (optional)
+	 *        elements: rname, ctext, user, time, textId, textTitle, author,
+	 *        edit, showtime
+	 *
+	 * @return string
+	 */
+	public function makeComment($fields = array()) {
+		extract($fields);
+		if ( empty($id) ) $id = 0;
+		if ( empty($rname) ) $rname = $this->reader;
+		if ( empty($ctext) ) $ctext = $this->comment;
+		$titlev = '';
+		if ( !isset($showtitle) || $showtitle ) { // show per default
+			$rnameview = empty($user) ? $rname : $this->makeUserLink($rname);
+			$format = 'd.m.Y H:i:s';
+			if ( !isset($showtime) || $showtime ) { // show per default
+				$timev = empty($time) ? date($format) : date($format, strtotime($time));
+				$timev = " <small>($timev)</small>";
+			} else {
+				$timev = '';
+			}
+			$textLink = empty($textId) || empty($textTitle) ? ''
+				: ' за '.$this->makeSimpleTextLink($textTitle, $textId) .
+					$this->makeFromAuthorSuffix($fields);
+			$titlev = "<legend><strong>$rnameview</strong>$timev$textLink</legend>";
 		}
-		$editBoxes = $edit ? $this->makeEditBoxes($textId) : '';
+		$ctext = str_replace("\n", "<br/>\n", $ctext);
+		#$editLink = $this->user->canExecute('editComment')
+		#	? ' — '.$this->makeEditCommentLink($ctext) : '';
+		$editBoxes = isset($edit) && $edit ? '<br />'.$this->makeEditBoxes($textId) : '';
 		return <<<EOS
 
-	<fieldset class="readercomment">
-		<legend><strong>$name</strong> <small>($time)</small>$textLink</legend>
-		$comment<br />
+	<fieldset class="readercomment" id="e$id">
+		$titlev
+		$ctext
 		$editBoxes
 	</fieldset>
 EOS;
@@ -125,7 +146,9 @@ EOS;
 	protected function makeEditForm() {
 		$textId = $this->out->hiddenField('textId', $this->textId);
 		$chunkId = $this->out->hiddenField('chunkId', $this->chunkId);
-		$reader = $this->out->textField('reader', '', $this->reader, 40, 160, 1);
+		$reader = $this->user->isAnon()
+			? $this->out->textField('reader', '', $this->reader, 40, 160, 1)
+			: $this->user->username;
 		$comment = $this->out->textarea('commenttext', '', $this->comment, 10, 76, 2);
 		$submit1 = $this->out->submitButton('Предварителен преглед', '', 3, 'preview');
 		$submit2 = $this->out->submitButton('Пращане', '', 4, 'send');
@@ -166,9 +189,27 @@ EOS;
 
 
 	public function makeAllComments($limit = 0, $offset = 0, $order = null, $showPageLinks = true) {
+		$sql = $this->makeSqlQuery($limit, $offset, $order);
+		$res = $this->db->query($sql);
+		if ($this->db->numRows($res) == 0) {
+			$this->addMessage('Няма читателски мнения.');
+			return '';
+		}
+		$count = $this->db->getCount($this->mainDbTable, $this->wheres[$this->showMode]);
+		$pagelinks = $showPageLinks
+			? $this->makePageLinks($count, $this->llimit, $this->loffset) : '';
+		$c = '';
+		while ($row = $this->db->fetchAssoc($res)) {
+			$row['edit'] = $this->showMode == -1;
+			$c .= $this->makeComment($row);
+		}
+		return $pagelinks . $c . $pagelinks;
+	}
+
+
+	public function makeSqlQuery($limit = 0, $offset = 0, $order = null) {
 		if ( is_null($order) ) { $order = $this->sortOrder; }
 		$where = $this->db->makeWhereClause( $this->wheres[$this->showMode] );
-		$count = $this->db->getCount($this->mainDbTable, $this->wheres[$this->showMode]);
 		$sql = "SELECT c.*, t.id textId, t.title textTitle, t.collection,
 			GROUP_CONCAT(DISTINCT a.name ORDER BY aof.pos) author
 			FROM /*p*/$this->mainDbTable c
@@ -177,20 +218,7 @@ EOS;
 			LEFT JOIN /*p*/person a ON aof.author = a.id
 			$where GROUP BY c.id ORDER BY `time` $order";
 		if ( $limit > 0 ) $sql .= " LIMIT $offset, $limit";
-		$res = $this->db->query($sql);
-		if ($this->db->numRows($res) == 0) {
-			$this->addMessage('Няма читателски мнения.');
-			return '';
-		}
-		$pagelinks = $showPageLinks
-			? $this->makePageLinks($count, $this->llimit, $this->loffset) : '';
-		$c = '';
-		while ($row = $this->db->fetchAssoc($res)) {
-			extract($row);
-			$author = $collection == 'true' ? '' : trim($author, ',');
-			$c .= $this->makeComment($rname, $ctext, $time, $textId, $textTitle, $author, $this->showMode == -1);
-		}
-		return $pagelinks . $c . $pagelinks;
+		return $sql;
 	}
 
 
@@ -211,18 +239,13 @@ EOS;
 			return;
 		}
 		extract2object($data, $this);
-		$this->authorlink = $this->collection == true ? ''
-			: $this->makeAuthorLink($this->author);
-		if ( !empty($this->authorlink) ) $this->authorlink = 'от '.$this->authorlink;
-		$this->titlelink = "„<a href='$this->root/text/$this->textId'>$this->textTitle</a>“
-$this->authorlink";
-		$this->title .= ' за '.$this->titlelink;
+		$this->title .= " за „<a href='$this->root/text/$this->textId'>$this->textTitle</a>“".
+			$this->makeFromAuthorSuffix($data);
 	}
 
 
 	protected function userCanPostComments() {
-		return $this->user->canExecute('editComments') || !$this->user->isAnon();
+		return !$this->user->isAnon();
 	}
 
 }
-?>

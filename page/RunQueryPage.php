@@ -45,4 +45,3 @@ class RunQueryPage extends Page {
 EOS;
 	}
 }
-?>

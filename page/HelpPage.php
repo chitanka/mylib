@@ -46,4 +46,3 @@ class HelpPage extends WikiPage {
 		return $t;
 	}
 }
-?>

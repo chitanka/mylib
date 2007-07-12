@@ -16,12 +16,10 @@ class MarkReadPage extends Page {
 			$this->addMessage('Това произведение вече е било отбелязано като прочетено!');
 			return '';
 		}
-		$set = array('user'=>$this->user->id, 'text'=>$this->textId, 'date' => date('Y-m-d'));
+		$set = $key + array('date' => date('Y-m-d'));
 		$this->db->insert($this->mainDbTable, $set);
-		$res = $this->db->select('text', array('id' => $this->textId), 'title');
-		$data = $this->db->fetchAssoc($res);
-		$this->addMessage("Произведението <strong>„<a href='$this->root/text/$this->textId'>$data[title]</a>“</strong> беше отбелязано като прочетено.");
+		$work = Work::newFromId($this->textId);
+		$this->addMessage("Произведението <strong>„<a href='$this->root/text/$this->textId'>$work->title</a>“</strong> беше отбелязано като прочетено.");
 		return '';
 	}
 }
-?>

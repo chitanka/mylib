@@ -5,7 +5,6 @@ class TitlePage extends ViewPage {
 	protected $FF_TYPE = 'type', $FF_ORIGLANG = 'orig_lang';
 	protected $titles = array(
 		'simple' => 'Заглавия — ',
-		'extended' => 'Заглавия — ',
 	);
 
 
@@ -19,6 +18,7 @@ class TitlePage extends ViewPage {
 		if ($this->order == 'time' && empty($this->startwith)) {
 			$this->showHeaders = false;
 		}
+		$this->titles['extended'] = $this->titles['simple'];
 	}
 
 
@@ -50,10 +50,12 @@ EOS;
 	protected function makeSimpleListQuery() {
 		$qSelect = "SELECT GROUP_CONCAT(a.name ORDER BY aof.pos) author,
 			t.id textId, t.title, t.orig_title, t.year, t.type, t.size, t.zsize,
-			t.lang, t.orig_lang, t.collection, UNIX_TIMESTAMP(t.entrydate) date";
+			t.lang, t.orig_lang, t.collection, UNIX_TIMESTAMP(t.entrydate) date,
+			s.name series, s.orig_name orig_series";
 		$qFrom = " FROM /*p*/author_of aof
 			LEFT JOIN /*p*/text t ON aof.text = t.id
-			LEFT JOIN /*p*/person a ON aof.author = a.id";
+			LEFT JOIN /*p*/person a ON aof.author = a.id
+			LEFT JOIN /*p*/series s ON t.series = s.id";
 		if ($this->user->id > 0) {
 			$qSelect .= ', r.user reader';
 			$qFrom .= "
@@ -93,41 +95,22 @@ EOS;
 
 
 	public function makeSimpleListItem($dbrow) {
-		extract($dbrow);
+		if ( !$this->isShownSimpleListItem($dbrow) ) {
+			return;
+		}
 		$o = '';
-		$lcurch = $this->firstChar($title);
+		$lcurch = $this->firstChar($dbrow['title']);
 		if ($this->showHeaders && $this->curch != $lcurch) {
 			$this->curch = $lcurch;
 			$o .= "</ul>\n<h2>$this->curch</h2>\n<ul>";
 		}
-		$extras = array();
-		if ( !empty($orig_title) && $orig_lang != $lang ) {
-			$extras[] = "<em>$orig_title</em>";
-		}
-		$textLink = $this->makeTextLink(compact('textId', 'type', 'size', 'zsize', 'title', 'date', 'reader'));
-		if ($this->order == 'time') {
-			$titleView = '<span class="extra"><tt>'.$this->makeYearView($year).
-				'</tt> — </span>'.$textLink;
-		} else {
-			$titleView = $textLink;
-			if ( !empty($year) ) { $extras[] = $year; }
-		}
-		$extras = empty($extras) ? '' : '('. implode(', ', $extras) .')';
-		$dlLink = $this->makeDlLink($textId, $zsize);
-		$editLink = $this->userCanEdit ? $this->makeEditTextLink($textId) : '';
-		$dlCheckbox = $this->makeDlCheckbox($textId);
-		$author = $collection == 'true' ? '' : $this->makeAuthorLink($author);
-		if ( !empty($author) ) { $author = '— '.$author; }
-		$o .= <<<EOS
-
-<li class="$type" title="{$GLOBALS['types'][$type]}">
-	$dlCheckbox
-	$titleView
-	<span class="extra">$extras — $dlLink$editLink</span>
-	$author
-</li>
-EOS;
+		$o .= $this->makeListItemForTitle($dbrow);
 		return $o;
+	}
+
+
+	protected function isShownSimpleListItem($dbrow) {
+		return true;
 	}
 
 
@@ -219,4 +202,3 @@ EOS;
 		$this->addMessage('Няма намерени заглавия.', true);
 	}
 }
-?>

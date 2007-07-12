@@ -10,4 +10,3 @@ class EditOwnPagePage extends EditUserPagePage {
 	}
 
 }
-?>

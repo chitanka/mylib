@@ -22,7 +22,7 @@ class EditTextLabelsPage extends Page {
 		$del = array_diff($old, $cur);
 		if ( !empty($del) ) {
 			$dels = implode(',', $del);
-			$key = array('text'=>$this->textId, 'label'=>array('IN', "($dels)"));
+			$key = array('text'=>$this->textId, "label IN ($dels)");
 			$this->db->delete($this->suplDbTable, $key);
 			$this->log('-', $dels);
 			$changed = true;
@@ -171,4 +171,3 @@ EOS;
 		$this->db->insert('label_log', $set);
 	}
 }
-?>

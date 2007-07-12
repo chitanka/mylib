@@ -12,23 +12,27 @@ class HistoryPage extends Page {
 	public function __construct() {
 		parent::__construct();
 		$this->action = 'history';
+		$this->title = 'История';
 		$this->date = $this->request->value('date', date('Y-n'));
 		if ( preg_match('/[^\d-]/', $this->date) ) { $this->date = '0'; }
 		$this->getby = $this->request->value('getby', $this->defGetby);
 		if ( !in_array($this->getby, $this->validGetbys) ) {
 			$this->getby = $this->defGetby;
 		}
-		$this->isEditMode = $this->getby == 'lastmod';
-		$this->title = 'История — '. $this->headerExts[$this->getby];
 		$this->orderby = $this->request->value('orderby', 'date');
 		$this->media = $this->request->value('media', 'screen');
+	}
+
+
+	public function title() {
+		return $this->title = 'История — '. $this->headerExts[$this->getby];
 	}
 
 
 	protected function buildContent() {
 		$inputContent = $this->makeMonthInput() .' &nbsp; '.
 			$this->makeGetbyInput() .' &nbsp; '. $this->makeOrderInput();
-		$submit = $this->out->submitButton('Обновяване');
+		$submit = $this->out->submitButton('Обновяване', 'Обновяване на страницата', 0, false);
 		$limits = array(10, 25, 50);
 		$feednew = $this->makeFeedLinks($limits, 'new');
 		$feededit = $this->makeFeedLinks($limits, 'edit');
@@ -56,22 +60,19 @@ EOS;
 			$keyword = $this->getby == 'entrydate' ? 'добавени' : 'редактирани';
 			$list = "<p>През избрания месец не са $keyword произведения.</p>";
 		}
-		$feedlink = <<<EOS
-	<link rel='alternate' type='application/rss+xml' title='RSS 2.0 — добавени текстове' href='$this->root/feed/new' />
-	<link rel='alternate' type='application/rss+xml' title='RSS 2.0 — редактирани текстове' href='$this->root/feed/edit' />
-EOS;
-		$this->addHeadContent($feedlink);
+		$this->addRssLink('добавени текстове', 'new');
+		$this->addRssLink('редактирани текстове', 'edit');
 		return $o . $list;
 	}
 
 
 	public function makeListByDate($limit = 0, $showHeader = true) {
 		$this->texts = array();
-		$query = $this->makeDbQuery($limit);
+		$query = $this->makeSqlQuery($limit);
 		$this->db->iterateOverResult($query, 'addTextForListByDate', $this);
-		$o = '';
+		$o = $edit_comment = '';
 		$mark = ' <span class="newmark">Н</span>';
-		if ($this->isEditMode) {
+		if ($this->isEditMode()) {
 			$o .= "\n<p><em>Легенда:</em> $mark — новодобавен текст (първа редакция)</p>";
 		}
 		foreach ($this->texts as $datekey => $textsForDate) {
@@ -92,13 +93,15 @@ EOS;
 						: $this->makeTranslatorLink($translator, 'first', '', '', '');
 				} else { $stranslator = ''; }
 				$vdate = $textData[$this->getby];
-				if ($this->isEditMode) {
-					$vdate .= $entrydate >= substr($lastmod, 0, 8) ? $mark : ' &nbsp;';
+				if ($this->isEditMode()) {
+					$vdate .= $entrydate >= substr($lastmod, 0, 10) ? $mark : ' &nbsp;';
 				}
+				$seriesLink = empty($series) ? ''
+					: '<span class="extra">'.$this->makeSeriesLink($series, true) .':</span> ';
 				$o .= $this->media == 'screen'
-					? "\n\t<li class='$type'><tt>$vdate</tt> <a class='$readClass' href='$this->root/text/$textId'><em>$title</em></a>".
+					? "\n\t<li class='$type'><tt title='$edit_comment'>$vdate</tt> $seriesLink<a class='$readClass' href='$this->root/text/$textId'><em>$title</em></a>".
 					' — <span class="extra">'. $this->makeDlLink($textId, $zsize) .'</span>'
-					: "\n\t<li>$title [http://purl.org/NET$this->root/text/$textId]";
+					: "\n\t<li>$seriesLink$title [$this->purl/text/$textId]";
 				if ( !empty($sauthor) || !empty($stranslator) ) {
 					$o .= ' — '. $sauthor . $stranslator;
 				}
@@ -133,7 +136,7 @@ EOS;
 
 	public function makeListByAuthor($limit = 0) {
 		$this->texts = array();
-		$query = $this->makeDbQuery($limit);
+		$query = $this->makeSqlQuery($limit);
 		$this->db->iterateOverResult($query, 'addTextForListByAuthor', $this);
 		$o = '';
 		$translator = '';
@@ -156,10 +159,12 @@ EOS;
 					} else { $stranslator = ''; }
 					$readClass = empty($reader) ? 'unread' : 'read';
 					$dl = $this->makeDlLink($textId, $zsize);
+					$seriesLink = empty($series) ? ''
+						: '<span class="extra">'.$this->makeSeriesLink($series, true) .':</span> ';
 					$o .= $this->media == 'screen'
-						? "\n\t<li class='$type'><a class='$readClass' href='$this->root/text/$textId'><em>$title</em></a>".
+						? "\n\t<li class='$type'>$seriesLink<a class='$readClass' href='$this->root/text/$textId'><em>$title</em></a>".
 						' — <span class="extra">'. $this->makeDlLink($textId, $zsize) .'</span>'.$stranslator
-						: "\n\t<li>$title [http://purl.org/NET$this->root/text/$textId]</li>";
+						: "\n\t<li>$seriesLink$title [$this->purl/text/$textId]</li>";
 				}
 				$o .= '</ul></li>';
 			}
@@ -218,16 +223,23 @@ EOS;
 	}
 
 
-	protected function makeDbQuery($limit = 0) {
+	public function makeSqlQuery($limit = 0, $offset = 0, $order = null) {
+		if ($this->getby == 'lastmod') {
+			$this->extQS .= ', h.user editor, h.date lastmod, h.comment edit_comment';
+			$this->extQF .= ' LEFT JOIN /*p*/edit_history h ON t.lastedit = h.id';
+		}
 		$qSelect = "SELECT GROUP_CONCAT(DISTINCT a.name ORDER BY aof.pos) author,
 			t.id textId, t.title, t.lang, t.orig_lang, t.type, t.collection,
-			t.entrydate, t.lastmod, t.size, t.zsize,
-			GROUP_CONCAT(DISTINCT tr.name ORDER BY tof.pos) translator $this->extQS";
-		$qFrom = " FROM /*p*/author_of aof
-			LEFT JOIN /*p*/text t ON aof.text = t.id
+			t.entrydate, t.size, t.zsize,
+			GROUP_CONCAT(DISTINCT tr.name ORDER BY tof.pos) translator,
+			s.name series, s.orig_name orig_series
+			$this->extQS";
+		$qFrom = " FROM /*p*/text t
+			LEFT JOIN /*p*/author_of aof ON t.id = aof.text
 			LEFT JOIN /*p*/person a ON aof.author = a.id
 			LEFT JOIN /*p*/translator_of tof ON t.id = tof.text
 			LEFT JOIN /*p*/person tr ON tof.translator = tr.id
+			LEFT JOIN /*p*/series s ON t.series = s.id
 			$this->extQF";
 		$qGroup = ' GROUP BY t.id';
 		if ($this->user->id > 0) {
@@ -235,14 +247,15 @@ EOS;
 			$qFrom .= " LEFT JOIN /*p*/reader_of r ON t.id = r.text AND r.user = {$this->user->id}";
 		}
 		$qW = array();
+		$col = $this->getby == 'entrydate' ? 't.entrydate' : 'h.date';
 		if ($this->date != -1) {
-			$qW[] = $this->date === '0' ? "t.$this->getby != '0000-00-00'"
-				: "t.$this->getby >= '$this->date-1' AND t.$this->getby < '".$this->nextMonthDate()."-1'";
+			$qW[] = $this->date === '0' ? "$col != '0000-00-00'"
+				: "$col >= '$this->date-1' AND $col < '".$this->nextMonthDate()."-1'";
 		}
 		if ( !empty($this->extQW) ) $qW[] = $this->extQW;
 		$q = $qSelect.$qFrom.(empty($qW) ? '' :
 		' WHERE '.implode(' AND ', $qW));
-		$q .= $qGroup ." ORDER BY t.$this->getby DESC, t.id DESC";
+		$q .= $qGroup ." ORDER BY $col DESC, t.id DESC";
 		if ($limit > 0) $q .= " LIMIT $limit";
 		return $q;
 	}
@@ -276,5 +289,10 @@ EOS;
 			: (($m - 1) % 7 % 2 ? 30 : 31);
 		return $date;
 	}
+
+
+	protected function isEditMode() {
+		return $this->getby == 'lastmod';
+	}
+
 }
-?>
