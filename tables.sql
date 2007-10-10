@@ -1,9 +1,9 @@
 --
--- Table structure for table /*prefix*/author_of
+-- Table structure for table /*$prefix*/author_of
 --
 
-DROP TABLE IF EXISTS /*prefix*/author_of;
-CREATE TABLE /*prefix*/author_of (
+DROP TABLE IF EXISTS /*$prefix*/author_of;
+CREATE TABLE /*$prefix*/author_of (
   `author` mediumint(8) unsigned NOT NULL default '0',
   `text` mediumint(8) unsigned NOT NULL default '0',
   `pos` tinyint(2) unsigned NOT NULL default '0',
@@ -15,11 +15,11 @@ CREATE TABLE /*prefix*/author_of (
 -- --------------------------------------------------------
 
 --
--- Table structure for table /*prefix*/comment
+-- Table structure for table /*$prefix*/comment
 --
 
-DROP TABLE IF EXISTS /*prefix*/comment;
-CREATE TABLE /*prefix*/comment (
+DROP TABLE IF EXISTS /*$prefix*/comment;
+CREATE TABLE /*$prefix*/comment (
   `id` int(11) unsigned NOT NULL auto_increment,
   `text` mediumint(8) unsigned NOT NULL COMMENT 'Text ID',
   `rname` varchar(160) NOT NULL COMMENT 'Reader (or user) name',
@@ -27,6 +27,7 @@ CREATE TABLE /*prefix*/comment (
   `ctext` text NOT NULL COMMENT 'Text of the comment',
   `ctexthash` varchar(32) character set latin1 NOT NULL COMMENT 'MD5 hash of the comment',
   `time` datetime NOT NULL COMMENT 'Entry ime of the comment',
+  `replyto` int(11) unsigned NOT NULL COMMENT 'In reply to the comment ...',
   `show` enum('false','true') character set latin1 NOT NULL COMMENT 'Show this comment?',
   PRIMARY KEY  (`id`),
   UNIQUE KEY `title` (`text`,`rname`,`ctexthash`)
@@ -35,15 +36,15 @@ CREATE TABLE /*prefix*/comment (
 -- --------------------------------------------------------
 
 --
--- Table structure for table /*prefix*/edit_history
+-- Table structure for table /*$prefix*/edit_history
 --
 
-DROP TABLE IF EXISTS /*prefix*/edit_history;
-CREATE TABLE /*prefix*/edit_history (
+DROP TABLE IF EXISTS /*$prefix*/edit_history;
+CREATE TABLE /*$prefix*/edit_history (
   `id` int(10) unsigned NOT NULL auto_increment,
   `text` mediumint(8) unsigned NOT NULL,
   `user` mediumint(8) unsigned NOT NULL,
-  `comment` varchar(255) character set utf8 NOT NULL,
+  `comment` varchar(255) NOT NULL,
   `date` datetime NOT NULL,
   PRIMARY KEY  (`id`),
   KEY `date` (`date`),
@@ -53,11 +54,11 @@ CREATE TABLE /*prefix*/edit_history (
 -- --------------------------------------------------------
 
 --
--- Table structure for table /*prefix*/header
+-- Table structure for table /*$prefix*/header
 --
 
-DROP TABLE IF EXISTS /*prefix*/header;
-CREATE TABLE /*prefix*/header (
+DROP TABLE IF EXISTS /*$prefix*/header;
+CREATE TABLE /*$prefix*/header (
   `text` mediumint(8) unsigned NOT NULL default '0',
   `nr` smallint(3) unsigned NOT NULL default '1',
   `level` tinyint(1) unsigned NOT NULL default '1' COMMENT 'Header level',
@@ -70,11 +71,11 @@ CREATE TABLE /*prefix*/header (
 -- --------------------------------------------------------
 
 --
--- Table structure for table /*prefix*/label
+-- Table structure for table /*$prefix*/label
 --
 
-DROP TABLE IF EXISTS /*prefix*/label;
-CREATE TABLE /*prefix*/label (
+DROP TABLE IF EXISTS /*$prefix*/label;
+CREATE TABLE /*$prefix*/label (
   `id` smallint(5) unsigned NOT NULL auto_increment,
   `name` varchar(80) NOT NULL,
   PRIMARY KEY  (`id`),
@@ -84,11 +85,11 @@ CREATE TABLE /*prefix*/label (
 -- --------------------------------------------------------
 
 --
--- Table structure for table /*prefix*/label_log
+-- Table structure for table /*$prefix*/label_log
 --
 
-DROP TABLE IF EXISTS /*prefix*/label_log;
-CREATE TABLE /*prefix*/label_log (
+DROP TABLE IF EXISTS /*$prefix*/label_log;
+CREATE TABLE /*$prefix*/label_log (
   `id` mediumint(8) unsigned NOT NULL auto_increment,
   `text` mediumint(8) unsigned NOT NULL,
   `user` mediumint(8) unsigned NOT NULL,
@@ -103,39 +104,40 @@ CREATE TABLE /*prefix*/label_log (
 -- --------------------------------------------------------
 
 --
--- Table structure for table `ml_license`
+-- Table structure for table /*$prefix*/license
 --
 
-DROP TABLE IF EXISTS /*prefix*/license;
-CREATE TABLE /*prefix*/license (
+DROP TABLE IF EXISTS /*$prefix*/license;
+CREATE TABLE /*$prefix*/license (
   `id` smallint(5) unsigned NOT NULL auto_increment,
   `code` varchar(20) NOT NULL,
   `name` varchar(255) NOT NULL,
   `free` enum('false','true') NOT NULL COMMENT 'Free license?',
   `copyright` enum('false','true') NOT NULL default 'true' COMMENT 'Contains any copyright?',
+  `uri` varchar(255) NOT NULL,
   PRIMARY KEY  (`id`),
   UNIQUE KEY `code` (`code`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8 AUTO_INCREMENT=10 ;
 
 
-INSERT INTO /*prefix*/license VALUES (1, 'pd', 'Обществено достояние', 'true', 'false'),
-(2, 'fc', 'Пълни авторски права', 'false', 'true'),
-(3, 'gfdl', 'Лиценз за свободна документация на ГНУ', 'true', 'true'),
-(4, 'cc-by', 'Криейтив Комънс — Признание', 'true', 'true'),
-(5, 'cc-by-sa', 'Криейтив Комънс — Признание — Споделяне на споделеното', 'true', 'true'),
-(6, 'cc-by-nc', 'Криейтив Комънс — Признание — Некомерсиално', 'false', 'true'),
-(7, 'cc-by-nc-sa', 'Криейтив Комънс — Признание — Некомерсиално — Споделяне на споделеното', 'false', 'true'),
-(8, 'cc-by-nd', 'Криейтив Комънс — Признание — Без производни', 'false', 'true'),
-(9, 'cc-by-nc-nd', 'Криейтив Комънс — Признание — Некомерсиално — Без производни', 'false', 'true');
+INSERT INTO /*$prefix*/license VALUES (1, 'pd', 'Обществено достояние', 'true', 'false', 'http://bg.wikipedia.org/wiki/Public_domain'),
+(2, 'fc', 'Пълни авторски права', 'false', 'true', ''),
+(3, 'gfdl', 'Лиценз за свободна документация на ГНУ', 'true', 'true', 'http://www.gnu.org/copyleft/fdl.html'),
+(4, 'cc-by', 'Криейтив Комънс — Позоваване', 'true', 'true', 'http://creativecommons.org/licenses/by/2.5/'),
+(5, 'cc-by-sa', 'Криейтив Комънс — Позоваване — Споделяне на споделеното', 'true', 'true', 'http://creativecommons.org/licenses/by-sa/2.5/'),
+(6, 'cc-by-nc', 'Криейтив Комънс — Позоваване — Некомерсиално', 'false', 'true', 'http://creativecommons.org/licenses/by-nc/2.5/'),
+(7, 'cc-by-nc-sa', 'Криейтив Комънс — Позоваване — Некомерсиално — Споделяне на споделеното', 'false', 'true', 'http://creativecommons.org/licenses/by-nc-sa/2.5/'),
+(8, 'cc-by-nd', 'Криейтив Комънс — Позоваване — Без производни', 'false', 'true', 'http://creativecommons.org/licenses/by-nd/2.5/'),
+(9, 'cc-by-nc-nd', 'Криейтив Комънс — Позоваване — Некомерсиално — Без производни', 'false', 'true', 'http://creativecommons.org/licenses/by-nc-nd/2.5/');
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table /*prefix*/liternews
+-- Table structure for table /*$prefix*/liternews
 --
 
-DROP TABLE IF EXISTS /*prefix*/liternews;
-CREATE TABLE /*prefix*/liternews (
+DROP TABLE IF EXISTS /*$prefix*/liternews;
+CREATE TABLE /*$prefix*/liternews (
   `id` int(11) unsigned NOT NULL auto_increment,
   `username` varchar(160) NOT NULL,
   `user` mediumint(8) unsigned NOT NULL,
@@ -152,10 +154,11 @@ CREATE TABLE /*prefix*/liternews (
 -- --------------------------------------------------------
 
 --
--- Table structure for table /*prefix*/news
+-- Table structure for table /*$prefix*/news
 --
 
-CREATE TABLE /*prefix*/news (
+DROP TABLE IF EXISTS /*$prefix*/news;
+CREATE TABLE /*$prefix*/news (
   `id` mediumint(8) unsigned NOT NULL auto_increment,
   `user` mediumint(8) unsigned NOT NULL,
   `text` mediumtext NOT NULL,
@@ -167,11 +170,11 @@ CREATE TABLE /*prefix*/news (
 -- --------------------------------------------------------
 
 --
--- Table structure for table /*prefix*/person
+-- Table structure for table /*$prefix*/person
 --
 
-DROP TABLE IF EXISTS /*prefix*/person;
-CREATE TABLE /*prefix*/person (
+DROP TABLE IF EXISTS /*$prefix*/person;
+CREATE TABLE /*$prefix*/person (
   `id` mediumint(8) unsigned NOT NULL auto_increment,
   `name` varchar(100) NOT NULL default '',
   `orig_name` varchar(100) NOT NULL default '',
@@ -192,11 +195,11 @@ CREATE TABLE /*prefix*/person (
 -- --------------------------------------------------------
 
 --
--- Table structure for table /*prefix*/person_alt
+-- Table structure for table /*$prefix*/person_alt
 --
 
-DROP TABLE IF EXISTS /*prefix*/person_alt;
-CREATE TABLE /*prefix*/person_alt (
+DROP TABLE IF EXISTS /*$prefix*/person_alt;
+CREATE TABLE /*$prefix*/person_alt (
   `id` mediumint(8) unsigned NOT NULL auto_increment,
   `person` mediumint(8) unsigned NOT NULL default '0' COMMENT 'Person ID',
   `name` varchar(100) NOT NULL default '',
@@ -212,11 +215,31 @@ CREATE TABLE /*prefix*/person_alt (
 -- --------------------------------------------------------
 
 --
--- Table structure for table /*prefix*/reader_of
+-- Table structure for table /*$prefix*/question
 --
 
-DROP TABLE IF EXISTS /*prefix*/reader_of;
-CREATE TABLE /*prefix*/reader_of (
+DROP TABLE IF EXISTS /*$prefix*/question;
+CREATE TABLE /*$prefix*/question (
+  `id` smallint(5) unsigned NOT NULL auto_increment,
+  `question` varchar(255) NOT NULL,
+  `answers` varchar(255) NOT NULL COMMENT 'One or more answers, separated with commas',
+  PRIMARY KEY  (`id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 AUTO_INCREMENT=6;
+
+INSERT INTO /*$prefix*/question VALUES (1, 'Колко прави 2 по 2 (с думи)?', 'четири'),
+(2, 'Колко прави 2 по 4 (с думи)?', 'осем'),
+(3, 'Колко прави 4 по 5 (с думи)?', 'двайсет,двадесет'),
+(4, 'Колко прави 3 по 3 (с думи)?', 'девет'),
+(5, 'Колко прави 5 минус 3 (с думи)?', 'две');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table /*$prefix*/reader_of
+--
+
+DROP TABLE IF EXISTS /*$prefix*/reader_of;
+CREATE TABLE /*$prefix*/reader_of (
   `id` int(10) unsigned NOT NULL auto_increment,
   `user` mediumint(8) unsigned NOT NULL default '0',
   `text` mediumint(8) unsigned NOT NULL default '0',
@@ -229,11 +252,11 @@ CREATE TABLE /*prefix*/reader_of (
 -- --------------------------------------------------------
 
 --
--- Table structure for table /*prefix*/ser_author_of
+-- Table structure for table /*$prefix*/ser_author_of
 --
 
-DROP TABLE IF EXISTS /*prefix*/ser_author_of;
-CREATE TABLE /*prefix*/ser_author_of (
+DROP TABLE IF EXISTS /*$prefix*/ser_author_of;
+CREATE TABLE /*$prefix*/ser_author_of (
   `author` mediumint(8) unsigned NOT NULL default '0',
   `series` smallint(5) unsigned NOT NULL default '0',
   PRIMARY KEY  (`author`,`series`)
@@ -242,11 +265,11 @@ CREATE TABLE /*prefix*/ser_author_of (
 -- --------------------------------------------------------
 
 --
--- Table structure for table /*prefix*/series
+-- Table structure for table /*$prefix*/series
 --
 
-DROP TABLE IF EXISTS /*prefix*/series;
-CREATE TABLE /*prefix*/series (
+DROP TABLE IF EXISTS /*$prefix*/series;
+CREATE TABLE /*$prefix*/series (
   `id` smallint(5) unsigned NOT NULL auto_increment,
   `name` varchar(255) NOT NULL default '',
   `orig_name` varchar(255) NOT NULL default '',
@@ -258,11 +281,11 @@ CREATE TABLE /*prefix*/series (
 -- --------------------------------------------------------
 
 --
--- Table structure for table /*prefix*/text
+-- Table structure for table /*$prefix*/text
 --
 
-DROP TABLE IF EXISTS /*prefix*/text;
-CREATE TABLE /*prefix*/text (
+DROP TABLE IF EXISTS /*$prefix*/text;
+CREATE TABLE /*$prefix*/text (
   `id` mediumint(8) unsigned NOT NULL auto_increment,
   `title` varchar(255) NOT NULL default '',
   `subtitle` varchar(200) NOT NULL,
@@ -301,11 +324,11 @@ CREATE TABLE /*prefix*/text (
 -- --------------------------------------------------------
 
 --
--- Table structure for table /*prefix*/text_label
+-- Table structure for table /*$prefix*/text_label
 --
 
-DROP TABLE IF EXISTS /*prefix*/text_label;
-CREATE TABLE /*prefix*/text_label (
+DROP TABLE IF EXISTS /*$prefix*/text_label;
+CREATE TABLE /*$prefix*/text_label (
   `text` mediumint(8) unsigned NOT NULL,
   `label` smallint(5) unsigned NOT NULL,
   PRIMARY KEY  (`text`,`label`),
@@ -315,11 +338,11 @@ CREATE TABLE /*prefix*/text_label (
 -- --------------------------------------------------------
 
 --
--- Table structure for table /*prefix*/translator_of
+-- Table structure for table /*$prefix*/translator_of
 --
 
-DROP TABLE IF EXISTS /*prefix*/translator_of;
-CREATE TABLE /*prefix*/translator_of (
+DROP TABLE IF EXISTS /*$prefix*/translator_of;
+CREATE TABLE /*$prefix*/translator_of (
   `translator` mediumint(8) unsigned NOT NULL default '0',
   `text` mediumint(8) unsigned NOT NULL default '0',
   `pos` tinyint(2) unsigned NOT NULL default '0',
@@ -331,39 +354,37 @@ CREATE TABLE /*prefix*/translator_of (
 -- --------------------------------------------------------
 
 --
--- Table structure for table /*prefix*/user
+-- Table structure for table /*$prefix*/user
 --
 
-DROP TABLE IF EXISTS /*prefix*/user;
-CREATE TABLE /*prefix*/user (
+DROP TABLE IF EXISTS /*$prefix*/user;
+CREATE TABLE /*$prefix*/user (
   `id` mediumint(8) unsigned NOT NULL auto_increment,
   `username` varchar(100) NOT NULL default '',
   `realname` varchar(120) NOT NULL default '',
   `lastname` varchar(60) NOT NULL default '',
-  `password` varchar(100) character set latin1 NOT NULL,
-  `newpassword` varchar(100) character set latin1 NOT NULL default '',
+  `password` varchar(32) character set latin1 NOT NULL,
+  `newpassword` varchar(32) character set latin1 NOT NULL,
   `email` varchar(100) character set latin1 NOT NULL default '',
-  `allowemail` enum('false', 'true') NOT NULL default 'false' COMMENT 'Allow email from other users?',
+  `allowemail` enum('false','true') NOT NULL default 'false' COMMENT 'Allow email from other users',
   `group` enum('nu','c0','c','a','mod') NOT NULL default 'nu',
-  `news` enum('false', 'true') NOT NULL default 'false' COMMENT 'Receive a monthly newsletter?',
+  `news` enum('false','true') NOT NULL default 'false' COMMENT 'Receive a monthly newsletter?',
   `opts` varchar(255) NOT NULL,
   `login_tries` tinyint(3) unsigned NOT NULL,
   `registration` datetime NOT NULL COMMENT 'Registration date',
   `touched` datetime NOT NULL COMMENT 'Last user visit',
   PRIMARY KEY  (`id`),
   UNIQUE KEY `username` (`username`),
-  KEY `realname` (`realname`),
-  KEY `lastname` (`lastname`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table /*prefix*/user_text
+-- Table structure for table /*$prefix*/user_text
 --
 
-DROP TABLE IF EXISTS /*prefix*/user_text;
-CREATE TABLE /*prefix*/user_text (
+DROP TABLE IF EXISTS /*$prefix*/user_text;
+CREATE TABLE /*$prefix*/user_text (
   `user` mediumint(8) unsigned NOT NULL,
   `text` mediumint(8) unsigned NOT NULL,
   `size` mediumint(8) unsigned NOT NULL,
@@ -375,11 +396,11 @@ CREATE TABLE /*prefix*/user_text (
 -- --------------------------------------------------------
 
 --
--- Table structure for table /*prefix*/work
+-- Table structure for table /*$prefix*/work
 --
 
-DROP TABLE IF EXISTS /*prefix*/work;
-CREATE TABLE /*prefix*/work (
+DROP TABLE IF EXISTS /*$prefix*/work;
+CREATE TABLE /*$prefix*/work (
   `id` smallint(5) unsigned NOT NULL auto_increment,
   `type` tinyint(4) NOT NULL,
   `title` varchar(100) NOT NULL,
@@ -393,17 +414,18 @@ CREATE TABLE /*prefix*/work (
   `tmpfiles` varchar(255) NOT NULL,
   `tfsize` smallint(5) unsigned NOT NULL COMMENT 'Size of the temporary files',
   `uplfile` varchar(255) NOT NULL COMMENT 'Uploaded file',
-  PRIMARY KEY  (`id`)
+  PRIMARY KEY  (`id`),
+  UNIQUE KEY `title` (`title`,`author`,`user`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table /*prefix*/work_multi
+-- Table structure for table /*$prefix*/work_multi
 --
 
-DROP TABLE IF EXISTS /*prefix*/work_multi;
-CREATE TABLE /*prefix*/work_multi (
+DROP TABLE IF EXISTS /*$prefix*/work_multi;
+CREATE TABLE /*$prefix*/work_multi (
   `id` smallint(5) unsigned NOT NULL auto_increment,
   `pid` smallint(5) unsigned NOT NULL,
   `user` mediumint(8) unsigned NOT NULL,

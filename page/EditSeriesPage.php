@@ -1,17 +1,19 @@
 <?php
 class EditSeriesPage extends Page {
 
+	const DB_TABLE = DBT_SERIES;
+
 	public function __construct() {
 		parent::__construct();
 		$this->action = 'editSeries';
-		$this->seriesId = (int) $this->request->value('seriesId', 0, 1);
+		$this->seriesId = (int) $this->request->value('id', 0, 1);
 		$this->title = ($this->seriesId == 0
 			? 'Добавяне' : 'Редактиране') .' на поредица';
 		$this->name = $this->request->value('name', '');
 		$this->orig_name = $this->request->value('orig_name', '');
 		$this->author = (array) $this->request->value('author');
+		$this->type = $this->request->value('type');
 		$this->showagain = $this->request->checkbox('showagain');
-		$this->mainDbTable = 'series';
 	}
 
 
@@ -28,29 +30,34 @@ class EditSeriesPage extends Page {
 
 
 	protected function buildContent() {
-		if ($this->seriesId != 0) { $this->initData(); }
-		$addLink = '<p style="text-align:center"><a href="'.$this->root.'/addSeries">Добавяне на поредица</a><p>';
-		return $addLink . $this->makeEditForm();
+		if ( !empty($this->seriesId) ) {
+			$this->initData();
+		}
+		$add = $this->out->internLink('Добавяне на поредица',
+			array(self::FF_ACTION=>$this->action), 1);
+		return '<p style="text-align:center">'.$add.'</p>'. $this->makeEditForm();
 	}
 
 
 	protected function makeUpdateQueries() {
 		$key = $this->seriesId;
 		if ($this->seriesId == 0) {
-			$this->seriesId = $this->db->autoIncrementId('series');
+			$this->seriesId = $this->db->autoIncrementId(DBT_SERIES);
 		}
 		$set = array('id' => $this->seriesId, 'name' => $this->name,
-			'orig_name' => $this->orig_name);
+			'orig_name' => $this->orig_name, 'type' => $this->type);
 		$queries = array();
-		$queries[] = $this->db->makeInsertOrUpdateQuery($this->mainDbTable, $set, $key);
+		$queries[] = $this->db->updateQ(self::DB_TABLE, $set, $key);
 		$is_changed = (array) $this->request->value('is_changed');
 		if ( $is_changed['author'] ) {
 			$key = array('series' => $this->seriesId);
-			$queries[] = $this->db->deleteQ('ser_author_of', $key);
+			$queries[] = $this->db->deleteQ(DBT_SER_AUTHOR_OF, $key);
 			foreach ($this->author as $pos => $author) {
-				if ( empty($author) ) { continue; }
+				if ( empty($author) ) {
+					continue;
+				}
 				$set = array('author' => $author, 'series' => $this->seriesId);
-				$queries[] = $this->db->insertQ('ser_author_of', $set);
+				$queries[] = $this->db->insertQ(DBT_SER_AUTHOR_OF, $set);
 			}
 		}
 		return $queries;
@@ -58,9 +65,9 @@ class EditSeriesPage extends Page {
 
 
 	protected function initData() {
-		$sel = array('name', 'orig_name');
+		$sel = array('name', 'orig_name', 'type');
 		$key = array('id' => $this->seriesId);
-		$res = $this->db->select($this->mainDbTable, $key, $sel);
+		$res = $this->db->select(self::DB_TABLE, $key, $sel);
 		$data = $this->db->fetchAssoc($res);
 		extract2object($data, $this);
 	}
@@ -69,9 +76,11 @@ class EditSeriesPage extends Page {
 	protected function makeEditForm() {
 		$this->addJs( $this->makePersonJs() );
 		$author = $this->makePersonInput(1);
-		$seriesId = $this->out->hiddenField('seriesId', $this->seriesId);
+		$seriesId = $this->out->hiddenField('id', $this->seriesId);
 		$name = $this->out->textField('name', '', $this->name, 50);
 		$orig_name = $this->out->textField('orig_name', '', $this->orig_name, 50);
+		$opts = array('series'=>'Цикъл', 'collection'=>'Сборник', 'book'=>'Книга');
+		$type = $this->out->selectBox('type', '', $opts, $this->type);
 		$showagain = $this->out->checkbox('showagain', '', $this->showagain,
 			'Показване на формуляра отново');
 		$submit = $this->out->submitButton('Съхраняване');
@@ -86,6 +95,9 @@ class EditSeriesPage extends Page {
 </tr><tr>
 	<td><label for="orig_name">Оригинално име:</label></td>
 	<td>$orig_name</td>
+</tr><tr>
+	<td><label for="type">Тип:</label></td>
+	<td>$type</td>
 </tr><tr>
 	<td><label for="authors">Автор(и):</label></td>
 	<td>$author
@@ -108,17 +120,17 @@ EOS;
 		$key = $keys[$ind];
 		$js = "\npersons['$key'] = {";
 		$dbkey = array("(role & $ind)");
-		foreach ($this->db->getObjects('person', null, null, $dbkey) as $id => $name) {
+		foreach ($this->db->getObjects(DBT_PERSON, null, null, $dbkey) as $id => $name) {
 			$js .= "\n\t$id: '$name',";
 		}
 		$js = rtrim($js, ',') . "\n}; // end of array persons['$key']\n";
 		$this->addJs($js);
 		$dbkey = array('series' => $this->seriesId);
-		$q = $this->db->selectQ('ser_'.$key.'_of', $dbkey, $key);
+		$q = $this->db->selectQ(DBT_SER_AUTHOR_OF, $dbkey, $key);
 		$addRowFunc = create_function('$row',
 			'return "addRow(\''.$key.'\', $row['.$key.']); ";');
 		$load = $this->db->iterateOverResult($q, $addRowFunc);
-		if ( empty($load) ) { $load = "addRow('$key', 0); "; }
+		fillOnEmpty($load, "addRow('$key', 0); ");
 		$is_changed = $this->out->hiddenField("is_changed[$key]", 0);
 		return <<<EOS
 	<table><tbody id="t$key"><tbody></table>

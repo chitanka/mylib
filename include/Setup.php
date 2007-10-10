@@ -3,27 +3,41 @@
 class Setup {
 
 	// the encoding used for internal representation
-	public static $masterEncoding = 'utf-8';
+	const IN_ENCODING = 'utf-8';
 
-	private static $configFile = './conf/main.ini';
-	private static $config = array();
+	private static
+		$configFile = './config.php',
+		$cfg = array();
 
-	/** @var Request */	private static $request;
-	/** @var User */	private static $user;
-	/** @var Skin */	private static $skin;
-	/** @var Database */	private static $db;
-	/** @var OutputMaker */	private static $outputMaker;
-	/** @var PHPMailer */	private static $mailer;
+	private static
+	/** @var Request */		$request,
+	/** @var User */		$user,
+	/** @var Skin */		$skin,
+	/** @var Database */	$db,
+	/** @var OutputMaker */	$outputMaker,
+	/** @var PHPMailer */	$mailer;
 
 
 	public static function doSetup() {
 		// Read configuration file
-		self::$config = parse_ini_file(self::$configFile, true);
-		define('ADMIN', self::$config['admin']);
-		define('ADMIN_EMAIL', self::$config['admin_email']);
+		if ( !file_exists(self::$configFile) ) {
+			echo 'The configuration file <strong>'.self::$configFile.'</strong> does not exist.';
+			exit(0);
+		}
+		require_once self::$configFile;
+		self::$cfg = $cfg;
+		if ( !empty(self::$cfg['db']['prefix']) ) {
+			self::$cfg['db']['prefix'] .= '_';
+		}
+		// Път, използван за бисквитките
+		self::$cfg['path'] = dirname(self::$cfg['webroot']);
+
+		self::defineDbTableConsts( self::$cfg['db']['prefix'] );
+		define('ADMIN', self::$cfg['admin']);
+		define('ADMIN_EMAIL', self::$cfg['admin_email']);
 		define('ADMIN_EMAIL_ENC', header_encode(ADMIN) .' <'. ADMIN_EMAIL .'>');
-		define('SITENAME', self::$config['sitename']);
-		define('SITE_EMAIL', self::$config['site_email']);
+		define('SITENAME', self::$cfg['sitename']);
+		define('SITE_EMAIL', self::$cfg['site_email']);
 		define('SITE_EMAIL_ENC', header_encode(SITENAME) .' <'. SITE_EMAIL .'>');
 		self::setupIni();
 		addIncludePath( PageManager::pageDir() );
@@ -39,16 +53,16 @@ class Setup {
 	}
 
 	public static function canUseCache() {
-		return self::$config['cache'] == '1';
+		return self::$cfg['use_cache'];
 	}
 
 	public static function hasPathInfo() {
-		return self::$config['has_path_info'] == '1';
+		return self::$cfg['has_path_info'];
 	}
 
 	public static function setting($settingName) {
-		return isset(self::$config[$settingName])
-			? self::$config[$settingName] : '';
+		return isset(self::$cfg[$settingName])
+			? self::$cfg[$settingName] : '';
 	}
 
 
@@ -58,7 +72,7 @@ class Setup {
 
 	public static function skin() { return self::setupSkin(); }
 
-	public static function db() { return self::setupDB(); }
+	public static function db() { return self::setupDb(); }
 
 	public static function outputMaker() { return self::setupOutputMaker(); }
 
@@ -66,32 +80,28 @@ class Setup {
 
 
 	/**
-	 * Change some INI-settings
-	 */
+	Change some INI-settings
+	*/
 	protected static function setupIni() {
 		ini_set('zlib.output_compression', 'On');
 		ini_set('zlib.output_compression_level', 5);
 		ini_set('session.use_trans_sid', 0);
 		ini_set('session.use_only_cookies', 1);
 		ini_set('arg_separator.output', '&amp;');
-		ini_set('date.timezone', self::$config['default_timezone']);
+		ini_set('date.timezone', self::$cfg['default_timezone']);
 	}
 
 
 	protected static function setupUserRights() {
-		foreach (self::$config['rights'] as $group => $grights ) {
-			$grights = preg_replace('/\s/', '', $grights);
-			self::$config['rights'][$group] = explode(',', $grights);
-		}
-		User::$userRights = self::$config['rights'];
+		User::$userRights = self::$cfg['rights'];
 	}
 
 
-	private static function setupDB() {
+	private static function setupDb() {
 		if ( !isset(self::$db) ) {
-			extract(self::$config['db']);
+			extract(self::$cfg['db']);
 			self::$db = new Database($server, $user, $pass, $name);
-			if ( !empty($prefix) ) { self::$db->setPrefix($prefix.'_'); }
+			self::$db->setPrefix($prefix);
 		}
 		return self::$db;
 	}
@@ -135,16 +145,46 @@ class Setup {
 
 	private static function setupMailer() {
 		if ( !isset(self::$mailer) ) {
-			extract(self::$config['mail']);
+			extract(self::$cfg['mail']);
 			require_once 'Mail.php';
 			$params = array(
-				'host' => $host, 'port' => $port, 'auth' => $auth == '1',
+				'host' => $host, 'port' => $port, 'auth' => $auth,
 				'username' => $user, 'password' => $pass,
-				'persist' => $persist == '1',
+				'persist' => $persist,
 			);
 			self::$mailer = Mail::factory($backend, $params);
 		}
 		return self::$mailer;
 	}
 
+
+	private static function defineDbTableConsts($prefix) {
+		$tables = array(
+			'AUTHOR_OF' => 'author_of',
+			'COMMENT' => 'comment',
+			'EDIT_HISTORY' => 'edit_history',
+			'HEADER' => 'header',
+			'LABEL' => 'label',
+			'LABEL_LOG' => 'label_log',
+			'LICENSE' => 'license',
+			'LITERNEWS' => 'liternews',
+			'NEWS' => 'news',
+			'PERSON' => 'person',
+			'PERSON_ALT' => 'person_alt',
+			'QUESTION' => 'question',
+			'READER_OF' => 'reader_of',
+			'SER_AUTHOR_OF' => 'ser_author_of',
+			'SERIES' => 'series',
+			'TEXT' => 'text',
+			'TEXT_LABEL' => 'text_label',
+			'TRANSLATOR_OF' => 'translator_of',
+			'USER' => 'user',
+			'USER_TEXT' => 'user_text',
+			'WORK' => 'work',
+			'WORK_MULTI' => 'work_multi',
+		);
+		foreach ($tables as $constant => $table) {
+			define('DBT_' . $constant, $prefix . $table);
+		}
+	}
 }

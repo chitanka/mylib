@@ -14,7 +14,7 @@ class TitleWoAnnoPage extends TitlePage {
 
 	protected function isShownSimpleListItem($dbrow) {
 		// show only texts without annotation
-		return !file_exists($GLOBALS['contentDirs']['text-anno'] . $dbrow['textId']);
+		return !file_exists( getContentFilePath('text-anno', $dbrow['textId']) );
 	}
 
 }

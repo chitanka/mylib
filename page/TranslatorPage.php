@@ -2,17 +2,18 @@
 
 class TranslatorPage extends ViewPage {
 
-	protected $FF_SORTBY = 'sortby';
-	protected $titles = array(
-		'simple' => 'Преводачи — ',
-		'extended' => 'Преводачи и заглавия — ',
-	);
+	const
+		DB_TABLE = DBT_PERSON, FF_SORTBY = 'sortby';
+	protected
+		$titles = array(
+			'simple' => 'Преводачи — ',
+			'extended' => 'Преводачи и заглавия — ',
+		);
 
 
 	public function __construct() {
 		parent::__construct();
 		$this->action = 'translator';
-		$this->mainDbTable = 'person';
 		$this->sortby = $this->request->value('sortby', '');
 		$this->dbsortby = $this->sortby == 'last' ? 'last_name' : 'name';
 		$this->uCanEditObj = $this->user->canExecute('editPerson');
@@ -34,23 +35,20 @@ class TranslatorPage extends ViewPage {
 
 
 	protected function makeSimpleListQuery() {
-		$query = "SELECT id, name, last_name, country
-			FROM /*p*/$this->mainDbTable";
-		$qWheres = array('role & 2');
-		if ( !empty($this->country) ) {
-			$dbcountry = $this->db->escape($this->country);
-			$qWheres[] = "country='$dbcountry'";
-		}
+		$qa = array(
+			'SELECT' => 'id, name, last_name, country',
+			'FROM' => self::DB_TABLE,
+			'WHERE' => array('role & 2'),
+			'ORDER BY' => "$this->dbsortby, name",
+		);
 		if ( !empty($this->startwith) ) {
 			$dbstartwith = strtr($this->startwith, '.', '%');
-			$dbstartwith = $this->db->escape($dbstartwith);
-			$qWheres[] = "$this->dbsortby LIKE '$dbstartwith%'";
+			$qa['WHERE'][$this->dbsortby] = array('LIKE', $dbstartwith .'%');
 		}
-		if ( !empty($qWheres) ) {
-			$query .= ' WHERE '. implode(' AND ', $qWheres);
+		if ( !empty($this->country) ) {
+			$qa['WHERE']['country'] = $this->country;
 		}
-		$query .= " ORDER BY $this->dbsortby, name";
-		return $query;
+		return $this->db->extselectQ($qa);
 	}
 
 
@@ -64,8 +62,9 @@ class TranslatorPage extends ViewPage {
 		}
 		$editLink = $this->uCanEditObj
 			? $this->makeEditTranslatorLink($id) : '';
-		$query = $this->showDlForm ? "/$this->FF_DLMODE=$this->dlMode" : '';
-		$query .= $this->order == 'time' ? "/$this->FF_ORDER=$this->order" : '';
+		$query = array();
+		if ($this->showDlForm) $query[self::FF_DLMODE] = $this->dlMode;
+		if ($this->order == 'time') $query[self::FF_ORDER] = $this->order;
 		$link = $this->makeTranslatorLink($name, $this->sortby, '', '', $query);
 		$o .= <<<EOS
 
@@ -85,30 +84,35 @@ EOS;
 		$reader = NULL;
 		$this->db->iterateOverResult($this->makeExtendedListQuery(),
 			'makeExtendedListItem', $this);
-		if ( empty($this->translators) ) { return false; }
-
+		if ( empty($this->translators) ) {
+			return false;
+		}
 		$o = '';
 		$toc = '<div id="toc"><h2>Съдържание</h2><ul>';
 		$userCanEdit = $this->user->canExecute('edit');
 		foreach ($this->translators as $translatorId) {
 			extract( $this->translatorsData[$translatorId] );
-			$translatorEnc = $this->urlencode($translator);
-			$anchor = strtr($translatorEnc, '%+', '__');
+			$anchor = md5($translator);
 			$showName = $this->formatPersonName($translator, $this->sortby);
-			$toc .= "\n\t<li><a href=\"#$anchor\">$showName</a></li>";
+			$toc .= "\n\t<li><a href='#$anchor'>$showName</a></li>";
 			$editLink = $this->uCanEditObj
 				? $this->makeEditTranslatorLink($translatorId) : '';
-			$infoLink = empty($info) ? $this->makeInfoLink($translator)
+			$ainfo = array();
+			if ( !empty($real_name) && $translator != $real_name ) {
+				$ainfo[] = 'Пълно име: '.$real_name;
+			}
+			if ($is_a) {
+				$params = array(self::FF_ACTION=>'author', 'q'=>$translator);
+				$ainfo[] = $this->out->internLink('Авторски произведения',
+					$params, 2, 'Преглед на авторските произведения на '.$translator);
+			}
+			$ainfo[] = empty($info) ? $this->makeInfoLink($translator)
 				: $this->makeMwLink($translator, $info);
-			$authorLink = $is_a
-				? "<a href='$this->root/author/$translatorEnc' title='Преглед на авторските произведения на $translator'>Авторски произведения</a>, "
-				: '';
-			$real_name = empty($real_name) || $translator == $real_name ? ''
-				: "Пълно име: $real_name, ";
+			$ainfo = implode(', ', $ainfo);
 			$o .= <<<EOS
 
 <h2 id="$anchor">$showName $editLink</h2>
-<p class="info">$real_name $authorLink $infoLink</p>
+<p class="info">$ainfo</p>
 
 EOS;
 			$series = $this->translators_titles[$translatorId];
@@ -137,7 +141,7 @@ EOS;
 					if ( !empty($year) ) {
 						$extras[] = $this->makeYearView($year, 0, $year2);
 					}
-					$textLink = $this->makeTextLink(compact('textId', 'type', 'size', 'zsize', 'title', 'date', 'reader'));
+					$textLink = $this->makeTextLink(compact('textId', 'type', 'size', 'zsize', 'title', 'date', 'datestamp', 'reader'));
 					if ($this->order == 'time') {
 						$titleView = '<span class="extra"><tt>'.
 							$this->makeYearView($trans_year, $tr_trans_year, $trans_year2).
@@ -151,9 +155,10 @@ EOS;
 					if ( $sernr > 0 ) { $title = "$sernr. $title"; }
 					$author = $collection == 'true' ? '' : $this->makeAuthorLink($author);
 					if ( !empty($author) ) { $author = 'от '.$author; }
+					$title = workType($type);
 					$o .=<<<EOS
 
-<li class="$type" title="{$GLOBALS['types'][$type]}">
+<li class="$type" title="$title">
 	$dlCheckbox
 	$titleView
 	$author
@@ -171,12 +176,12 @@ EOS;
 		$toc .= "</ul></div><p style='clear:both'></p>\n";
 		if (count($this->translators) < 2) { $toc = ''; }
 		if ($this->showDlForm) {
-			$action = $this->out->hiddenField('action', 'download');
+			$action = $this->out->hiddenField(self::FF_ACTION, 'download');
 			$o = <<<EOS
-<form action="$this->root" method="post">
+<form action="$this->root" method="post"><div>
 	$action
 $o
-</form>
+</div></form>
 EOS;
 		}
 		$o .= $this->makeColorLegend();
@@ -185,41 +190,41 @@ EOS;
 
 
 	protected function makeExtendedListQuery() {
-		$qSelect = "SELECT tr.id translatorId, tr.name translator,
-		tr.real_name, tr.country,
-		(tr.role & 1) is_a, tr.info, tof.year tr_trans_year,
-		t.id textId, t.title, t.lang, t.orig_title, t.collection,
-		t.orig_lang, t.year, t.year2, t.trans_year, t.trans_year2, t.type,
-		t.sernr, t.size, t.zsize, UNIX_TIMESTAMP(t.entrydate) date,
-		GROUP_CONCAT(a.name ORDER BY aof.pos) author,
-		s.name series, s.orig_name orig_series, s.type seriesType";
-		$qFrom = " FROM /*p*/translator_of tof
-		LEFT JOIN /*p*/text t ON tof.text = t.id
-		LEFT JOIN /*p*/$this->mainDbTable tr ON tof.translator = tr.id
-		LEFT JOIN /*p*/author_of aof ON aof.text = tof.text
-		LEFT JOIN /*p*/$this->mainDbTable a ON aof.author = a.id
-		LEFT JOIN /*p*/series s ON t.series = s.id";
+		$qa = array(
+			'SELECT' => 'tr.id translatorId, tr.name translator,
+				tr.real_name, tr.country, (tr.role & 1) is_a, tr.info,
+				tof.year tr_trans_year,
+				t.id textId, t.title, t.lang, t.orig_title, t.collection,
+				t.orig_lang, t.year, t.year2, t.trans_year, t.trans_year2, t.type,
+				t.sernr, t.size, t.zsize, t.entrydate date,
+				UNIX_TIMESTAMP(t.entrydate) datestamp,
+				GROUP_CONCAT(a.name ORDER BY aof.pos) author,
+				s.name series, s.orig_name orig_series, s.type seriesType',
+			'FROM' => DBT_TRANSLATOR_OF .' tof',
+			'LEFT JOIN' => array(
+				DBT_TEXT .' t' => 'tof.text = t.id',
+				self::DB_TABLE .' tr' => 'tof.translator = tr.id',
+				DBT_AUTHOR_OF .' aof' => 'aof.text = tof.text',
+				self::DB_TABLE .' a' => 'aof.author = a.id',
+				DBT_SERIES .' s' => 't.series = s.id',
+			),
+			'GROUP BY' => 'tr.id, t.id',
+			'ORDER BY' => "tr.$this->dbsortby, tr.name",
+// 			'LIMIT' => array($this->qstart, $this->qlimit)
+		);
 		if ($this->user->id > 0) {
-			$qSelect .= ', r.user reader';
-			$qFrom .= "\nLEFT JOIN /*p*/reader_of r ON t.id = r.text AND r.user = {$this->user->id}";
+			$qa['SELECT'] .= ', r.user reader';
+			$qa['LEFT JOIN'][DBT_READER_OF .' r'] =
+				't.id = r.text AND r.user = '. $this->user->id;
 		}
-		$query = $qSelect . $qFrom;
-
-		$qWheres = array();
 		if ( !empty($this->country) ) {
-			$dbcountry = $this->db->escape($this->country);
-			$qWheres[] = "country='$dbcountry'";
+			$qa['WHERE']['country'] = $this->country;
 		}
 		if ( !empty($this->startwith) ) {
 			$dbstartwith = strtr($this->startwith, '.', '%');
-			$dbstartwith = $this->db->escape($dbstartwith);
-			$qWheres[] = "tr.$this->dbsortby LIKE '$dbstartwith%'";
+			$qa['WHERE']["tr.$this->dbsortby"] = array('LIKE', $dbstartwith .'%');
 		}
-		if ( !empty($qWheres) ) {
-			$query .= ' WHERE '. implode(' AND ', $qWheres);
-		}
-		$query .= " GROUP BY tr.id, t.id ORDER BY tr.$this->dbsortby, tr.name";
-		return $query;
+		return $this->db->extselectQ($qa);
 	}
 
 
@@ -234,7 +239,7 @@ EOS;
 			$this->translators[] = $translatorId;
 		}
 		$this->textsData[$textId] = $dbrow;
-		$series = empty($series) ? $GLOBALS['typesPl'][$type] : ' '.$series;
+		$series = empty($series) ? workType($type, false) : ' '.$series;
 		$this->translatorsData[$translatorId]['ser'][$series] = array($orig_series, $seriesType);
 		$key = '';
 		if ($this->order == 'time') {
@@ -247,16 +252,17 @@ EOS;
 
 
 	protected function makeNavElements() {
-		$extra = array($this->FF_SORTBY=>'!first', $this->FF_ORDER => '',
-			$this->FF_DLMODE => 'one');
+		$extra = array(self::FF_SORTBY=>'!first',
+			self::FF_ORDER => $this->defOrder,
+			self::FF_DLMODE => $this->defDlMode);
 		$tocFirst = $this->makeNavButtons($extra, $this->sortby == 'first');
-		$extra[$this->FF_SORTBY] = '!last';
+		$extra[self::FF_SORTBY] = '!last';
 		$tocLast = $this->makeNavButtons($extra, $this->sortby == 'last');
 		$modeInput = $this->makeModeInput();
 		$orderInput = $this->makeOrderInput();
 		$dlModeInput = $this->makeDlModeInput();
 		$inputFields = $this->request->makeInputFieldsForGetVars(
-			array($this->FF_MODE, $this->FF_ORDER, $this->FF_DLMODE));
+			array(self::FF_MODE, self::FF_ORDER, self::FF_DLMODE));
 		$submit = $this->out->submitButton('Обновяване');
 		return <<<EOS
 <p>Преглед на преводачите по:</p>
@@ -264,15 +270,13 @@ EOS;
 	<li title="Това са препратки към списъци на преводачите, подредени по първо име"><em>Първо име</em> — $tocFirst</li>
 	<li title="Това са препратки към списъци на преводачите, подредени по фамилия"><em>Фамилия</em> — $tocLast</li>
 </ul>
-<form action="$this->root" style="text-align:center">
-<div>
+<form action="$this->root" style="text-align:center"><div>
 	$inputFields
 $modeInput &nbsp;
 $orderInput &nbsp;
 $dlModeInput
 	<noscript><div style="display:inline">$submit</div></noscript>
-</div>
-</form>
+</div></form>
 EOS;
 	}
 
@@ -281,17 +285,14 @@ EOS;
 		$extra = $this->mode1 == 'extended' ? ', заедно със заглавията,' : '';
 		$modeExpl = $this->makeModeExplanation();
 		$dlModeExpl = $this->makeDlModeExplanation();
+		$params = array(self::FF_ACTION=>'title', 'mode'=>'simple', 'woTransl'=>1);
+		$notrans = $this->out->internLink('списък на тези произведения', $params, 1);
 		return <<<EOS
-<p>Горните връзки водят към списъци на преводачите$extra
-чиито имена (първо име или фамилия) започват със съответната буква.
-Чрез препратките „Всички“ (такива има и в навигационното меню) можете
-да разгледате всички преводачи наведнъж.</p>
+<p>Горните връзки водят към списъци на преводачите$extra чиито имена (първо име или фамилия) започват със съответната буква. Чрез препратките „Всички“ (такива има и в навигационното меню) можете да разгледате всички преводачи наведнъж.</p>
 $modeExpl
 $dlModeExpl
 
-<p>Не са въведени преводачите на около половината преводни текстове.
-Ето <a href="$this->root/title/mode=simple/woTransl=1">списък на тези
-произведения</a>. Всяка помощ за попълване на лиспващата информация е добре дошла.</p>
+<p>Не са въведени преводачите на много преводни текстове. Ето $notrans. Всяка помощ за попълване на лиспващата информация е добре дошла.</p>
 EOS;
 	}
 

@@ -13,14 +13,22 @@ class StatisticsPage extends Page {
 
 	protected function buildContent() {
 		$tdata = array(
-			array($this->out->link('Автори', 'author'), $this->getAuthorCount()),
-			array($this->out->link('Преводачи', 'translator'), $this->getTranslatorCount()),
-			array($this->out->link('Заглавия', 'title'), $this->getTextCount()),
-			array($this->out->link('Поредици', 'series'), $this->getSeriesCount()),
-			array($this->out->link('Етикети', 'label'), $this->getLabelCount()),
-			array($this->out->link('Читателски мнения', 'comment'), $this->getCommentCount()),
-			array($this->out->link('Литературни новини', 'liternews'), $this->getLiternewsCount()),
-			array($this->out->link('Потребители', 'user'), $this->getUserCount()),
+			array($this->out->internLink('Автори', 'author'),
+				$this->getAuthorCount()),
+			array($this->out->internLink('Преводачи', 'translator'),
+				$this->getTranslatorCount()),
+			array($this->out->internLink('Заглавия', 'title'),
+				$this->getTextCount()),
+			array($this->out->internLink('Поредици', 'series'),
+				$this->getSeriesCount()),
+			array($this->out->internLink('Етикети', 'label'),
+				$this->getLabelCount()),
+			array($this->out->internLink('Читателски мнения', 'comment'),
+				$this->getCommentCount()),
+			array($this->out->internLink('Литературни новини', 'liternews'),
+				$this->getLiternewsCount()),
+			array($this->out->internLink('Потребители', 'user'),
+				$this->getUserCount()),
 		);
 		$o = '<div style="float:left; width:33%">'. $this->out->simpleTable('Основни данни', $tdata) .'</div>';
 		$o .= '<div style="float:left; width:33%">'.$this->makePersonCountryStats(1) .'</div>';
@@ -30,7 +38,7 @@ class StatisticsPage extends Page {
 
 
 	protected function makeTextTypeStats() {
-		$q = $this->db->selectQ('text', array(), array('type', 'COUNT(*) count'),
+		$q = $this->db->selectQ(DBT_TEXT, array(), array('type', 'COUNT(*) count'),
 			'count DESC',  0, 0, 'type');
 		$this->textTypeItems = array();
 		$this->db->iterateOverResult($q, 'getTextTypeStatsItem', $this);
@@ -38,21 +46,21 @@ class StatisticsPage extends Page {
 		$l = $curRowClass = '';
 		foreach ($this->textTypeItems as $name => $tc) {
 			extract($tc);
-			$qvars = array('type' => $type);
+			$qvars = array(self::FF_ACTION=>'title', 'type' => $type);
 			if ($count < $this->maxCountToList) $qvars['mode'] = 'simple';
 			$curRowClass = $this->out->nextRowClass($curRowClass);
-			$link = $this->out->link($name, 'title', $qvars);
+			$link = $this->out->internLink($name, $qvars, 1);
 			$l .= "<tr class='$curRowClass'><td>$link</td><td>$count</td></tr>";
 		}
 		return "<div><table class='content'><caption>Произведения по форма</caption>$l</table></div>";
 	}
 
 	public function getTextTypeStatsItem($dbrow) {
-		$this->textTypeItems[ $GLOBALS['typesPl'][ $dbrow['type'] ] ] = $dbrow;
+		$this->textTypeItems[ workType($dbrow['type']) ] = $dbrow;
 	}
 
 	protected function makePersonCountryStats($role) {
-		$q = $this->db->selectQ('person', array("(role & $role)"),
+		$q = $this->db->selectQ(DBT_PERSON, array("(role & $role)"),
 			array('country', 'COUNT(*) count'), 'count DESC, country ASC',  0, 0, 'country');
 		$this->personCountryItems = array();
 		$this->db->iterateOverResult($q, 'getPersonCountryStatsItem', $this);
@@ -62,22 +70,22 @@ class StatisticsPage extends Page {
 
 	public function getPersonCountryStatsItem($dbrow) {
 		extract($dbrow);
-		$link = $this->out->link(countryName($country, '(Невъведена)'), 'author',
-			array('country' => $country, 'mode' => 'simple'));
+		$p = array(self::FF_ACTION=>'author', 'country'=>$country, 'mode'=>'simple');
+		$link = $this->out->internLink(countryName($country, '(Невъведена)'), $p, 1);
 		$this->personCountryItems[] = array($link, $count);
 	}
 
 
 	protected function getTextCount() {
-		return $this->db->getCount('text');
+		return $this->db->getCount(DBT_TEXT);
 	}
 
 	protected function getSeriesCount() {
-		return $this->db->getCount('series');
+		return $this->db->getCount(DBT_SERIES);
 	}
 
 	protected function getLabelCount() {
-		return $this->db->getCount('label');
+		return $this->db->getCount(DBT_LABEL);
 	}
 
 	protected function getAuthorCount() {
@@ -89,19 +97,19 @@ class StatisticsPage extends Page {
 	}
 
 	protected function getPersonCount($role) {
-		return $this->db->getCount('person', array("(role & $role)"));
+		return $this->db->getCount(DBT_PERSON, array("(role & $role)"));
 	}
 
 	protected function getCommentCount() {
-		return $this->db->getCount('comment', array('`show`' => true));
+		return $this->db->getCount(DBT_COMMENT, array('`show`' => true));
 	}
 
 	protected function getLiternewsCount() {
-		return $this->db->getCount('liternews', array('`show`' => true));
+		return $this->db->getCount(DBT_LITERNEWS, array('`show`' => true));
 	}
 
 	protected function getUserCount() {
-		return $this->db->getCount('user');
+		return $this->db->getCount(User::DB_TABLE);
 	}
 
 }

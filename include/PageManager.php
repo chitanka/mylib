@@ -2,20 +2,20 @@
 
 class PageManager {
 
-	private static $pageDir = 'page/';
-	private static $defaultPage = 'main';
-	private static $cachedPagesServer = array('main', 'about', 'links', 'help',
-		'blacklist', 'title', 'series', 'author', 'translator', 'label',
-		'statistics');
-	private static $cachedPagesClient = array('css', 'user', 'text', 'comment',
-		'download', 'history', 'sendNewPassword', 'add', 'liternews',
-		'suggestData');
+	private static
+		$pageDir = 'page/', $defaultPage = 'main', $errorPage = 'noPage',
+		$cachedPagesServer = array('main', 'about', 'links', 'help',
+			'blacklist', 'title', 'series', 'author', 'translator', 'label',
+			'statistics', 'text'),
+		$cachedPagesClient = array('css', 'user', 'comment',
+			'download', 'history', 'sendNewPassword', 'add', 'liternews',
+			'suggestData');
 
 
 	/**
-	 * Tests whether a given page exists
-	 * @return bool
-	 */
+	Tests whether a given page exists.
+	@return bool
+	*/
 	public static function pageExists($page) {
 		return file_exists(self::$pageDir."$page.php");
 	}
@@ -39,39 +39,41 @@ class PageManager {
 
 
 	/**
-	 * Returns a page class name for a given action.
-	 * @param string $action
-	 * @return string
-	 */
+	Returns a page class name for a given action.
+
+	@param string $action
+	@return string
+	*/
 	public static function getPageClass($action) {
 		return ucfirst($action) .'Page';
 	}
 
 
 	/**
-	 * Creates a new page and executes it or sets its content from cache
-	 * @param string $action
-	 * @param bool $useCache
-	 * @param string hash
-	 * @return Page
-	 */
+	Creates a new page and executes it or sets its content from cache.
+
+	@param string $action
+	@param bool $useCache
+	@param string hash
+	@return Page
+	*/
 	public static function executePage($action, $useCache = false, $hash = '') {
 		global $user;
 		if ( PageManager::pageCanBeCachedServer($action) && $user->isAnon() && !empty($hash) ) {
-			if ( $useCache && CacheManager::cacheExists($hash) ) {
+			if ( $useCache && CacheManager::cacheExists($action, $hash) ) {
 				$page = new Page($action);
-				$data = unserialize( CacheManager::getCache($hash) );
+				$data = unserialize( CacheManager::getCache($action, $hash) );
 				$page->setTitle( $data['title'] );
 				$page->setContent( $data['content'] );
 				$page->setMessages( $data['messages'] );
 			} else {
 				$page = PageManager::buildPage($action);
 				$data = array(
-					'title' => $page->title(),
 					'content' => $page->execute(),
+					'title' => $page->title(),
 					'messages' => $page->messages()
 				);
-				CacheManager::setCache( $hash, serialize($data) );
+				CacheManager::setCache( $action, $hash, serialize($data) );
 			}
 		} else {
 			$page = PageManager::buildPage($action);
@@ -82,10 +84,11 @@ class PageManager {
 
 
 	/**
-	 * Loads class file for a given page name and create the page object
-	 * @param string $action Action (or the page name)
-	 * @return Page
-	 */
+	Loads class file for a given page name and create the page object.
+
+	@param string $action Action (or the page name)
+	@return Page
+	*/
 	public static function buildPage($action) {
 		$pageClass = PageManager::loadPage($action);
 		return new $pageClass();
@@ -93,10 +96,11 @@ class PageManager {
 
 
 	/**
-	 * Loads class file for a given page name
-	 * @param string $action Action (or the page name)
-	 * @return string Page class name
-	 */
+	Loads class file for a given page name.
+
+	@param string $action Action (or the page name)
+	@return string Page class name
+	*/
 	public static function loadPage($action) {
 		$page = PageManager::getPageClass($action);
 // 		if ( ! PageManager::pageExists($page) ) {
@@ -108,11 +112,18 @@ class PageManager {
 
 
 	public static function validatePage($action) {
-		if ( empty($action) ) return self::$defaultPage;
+		if ( empty($action) ) {
+			return self::$defaultPage;
+		}
 		$page = PageManager::getPageClass($action);
 		return PageManager::pageExists($page) ? $action : self::$defaultPage;
 	}
 
-	public static function defaultPage() { return self::$defaultPage; }
-	public static function pageDir() { return self::$pageDir; }
+	public static function defaultPage() {
+		return self::$defaultPage;
+	}
+
+	public static function pageDir() {
+		return self::$pageDir;
+	}
 }

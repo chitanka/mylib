@@ -46,6 +46,7 @@ class MailPage extends Page {
 		$headers = array(
 			'Content-type' => 'text/plain; charset=utf-8',
 			'From' => $this->mailFrom,
+			'Reply-To' => $this->mailFrom,
 			'Subject' => header_encode($this->mailSubject),
 			'X-Mailer' => 'Mylib',
 		);
@@ -60,8 +61,8 @@ class MailPage extends Page {
 
 
 	protected function makeFullAddress($user, $email) {
-		if ( empty($user) ) $user = 'Анонимен';
-		if ( empty($email) ) $email = 'anonymous@anonymous.net';
+		fillOnEmpty($user, 'Анонимен');
+		fillOnEmpty($email, 'anonymous@anonymous.net');
 		return header_encode($user) ." <$email>";
 	}
 

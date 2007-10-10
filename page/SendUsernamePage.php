@@ -13,7 +13,7 @@ class SendUsernamePage extends MailPage {
 
 	protected function processSubmission() {
 		$key = array('email' => $this->email);
-		$res = $this->db->select(User::MAIN_DB_TABLE, $key, 'username');
+		$res = $this->db->select(User::DB_TABLE, $key, 'username');
 		$data = $this->db->fetchAssoc($res);
 		if ( empty($data) ) {
 			$this->addMessage("Не съществува потребител с електронна поща
@@ -24,11 +24,12 @@ class SendUsernamePage extends MailPage {
 		$this->username = $username;
 		$this->mailTo = header_encode($username) ." <$this->email>";
 		$this->mailSubject = 'Напомняне за име от '.$this->sitename;
+		$sendpass = $this->out->internLink('Изпращане на нова парола', 'sendNewPassword');
+		$login = $this->out->internLink('влезете', 'login');
 		$this->mailSuccessMessage = "На адреса <strong>$this->email</strong> беше
 			изпратено напомнящо писмо. Ако не се сещате и за паролата си,
-			ползвайте функцията
-			„<a href='$this->root/sendNewPassword'>Изпращане на нова парола</a>“.
-			Иначе можете спокойно да <a href='$this->root/login'>влезете</a>.";
+			ползвайте функцията „{$sendpass}“.
+			Иначе можете спокойно да $login.";
 		$this->mailFailureMessage = 'Изпращането на напомняне не сполучи.';
 		return parent::processSubmission();
 	}
@@ -39,7 +40,7 @@ class SendUsernamePage extends MailPage {
 		$submit = $this->out->submitButton('Изпращане на потребителското име', '', 2);
 		return <<<EOS
 
-<p>Е, на всекиго може да се случи да си забрави името. ;) Няма страшно!
+<p>Е, на всекиго може да се случи да си забрави името. ;-) Няма страшно!
 Ако в потребителските си данни сте посочили валидна електронна поща, сега
 можете да поискате напомняне за името, с което сте се регистрирали в
 <em>$this->sitename</em>.</p>
@@ -62,13 +63,13 @@ EOS;
 Здравейте!
 
 Някой (най-вероятно вие) поиска да ви изпратим потребителското име, с което сте
-се регистрирали в $this->sitename (http://purl.org/NET/mylib).
+се регистрирали в $this->sitename ($this->purl).
 Ако все пак не сте били вие, можете да не обръщате внимание на това писмо.
 
 Потребителското име, отговарящо на адреса $this->email, е
 „{$this->username}“ (без кавичките).
 Ако не се сещате и за паролата си, ползвайте функцията
-„Изпращане на нова парола“ (http://purl.org/NET/mylib/sendNewPassword).
+„Изпращане на нова парола“ ($this->purl/sendNewPassword).
 
 $this->sitename
 

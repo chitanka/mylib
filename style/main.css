@@ -59,7 +59,7 @@ hr {
 /* кутии за групиране */
 fieldset {
 	margin: 1em 0;
-	padding: 0.5em 1em;
+	padding: 0.5em 0.8em;
 	border: thin solid <?php echo $fieldsetBordColor?>;
 }
 fieldset ul, #footer ul {
@@ -88,6 +88,12 @@ em em {
 pre { line-height: 1em; margin: 0; }
 pre p { display: inline; }
 /* полета за цитати */
+blockquote.letter, blockquote.cite, blockquote.poem {
+	margin-top: 1.5em;
+	padding: 0.5em 0 0.5em 1em;
+	border: medium dotted <?php echo $fieldsetBordColor?>;
+	border-top: none; border-right: none;
+}
 blockquote, q { font-style: italic; }
 /* какво да се появява преди и след цитатите */
 q:before { content: '„'; }
@@ -104,8 +110,8 @@ code {
 /* картинки */
 img { border: none; vertical-align: middle; }
 p img { margin: 0.2em auto; }
-img.float-left { float: left; margin: 0 1em 1em 0; }
-img.float-right { float: right; margin: 0 0 1em 1em; }
+img.float-left { float: left; margin: 0.5em 1em 1em 0; }
+img.float-right { float: right; margin: 0.5em 0 1em 1em; }
 
 /* елементи на формуляри */
 input, textarea, select {
@@ -190,7 +196,8 @@ a.ok:before { content: url('<?php echo $skin->image('ok')?>'); }
 	margin-left: 0;
 	padding-left: .6em;
 }
-#navigation dd.selected, option[selected=selected] {
+#navigation .selected, option[selected=selected] {
+	font-weight: bold;
 	color: <?php echo $headerFgColor?>;
 	background-color: <?php echo $headerBgColor?>;
 	border-top: thin solid <?php echo $headerBordColor?>;
@@ -254,7 +261,7 @@ li.novella { list-style-image: url('<?php echo $skin->image('novella')?>'); }
 li.shortstory, li.novelette { list-style-image: url('<?php echo $skin->image('shortstory')?>'); }
 li.poetry, li.poem { list-style-image: url('<?php echo $skin->image('poetry')?>'); }
 li.tale, li.fable { list-style-image: url('<?php echo $skin->image('tale')?>'); }
-li.othergenre, li.essay, li.article, li.play, li.screenplay,
+li.othergenre, li.essay, li.article, li.play, li.screenplay, li.anecdote,
 li.playbook, li.science, li.intro, li.travelnotes, li.other, li.textbook {
 	list-style-image: url('<?php echo $skin->image('othergenre')?>');
 }
@@ -317,15 +324,15 @@ dl#search {
 	display: inline;
 }
 /* полето за търсене */
-#search-q { width: 20em; }
+#q { width: 20em; }
 /* бутона за активиране на търсенето */
 #search-go { display: none; /* скриване */ }
 
-#propaganda, #propaganda p, #searchhelpbox, #searchhelpbox p {
+.propaganda, .propaganda p, #searchhelpbox, #searchhelpbox p {
 	text-indent: 0;
 	text-align: center;
 }
-#propaganda img, #searchhelpbox {
+.propaganda img, #searchhelpbox {
 	border: thin solid <?php echo $navTitleBgColor?>;
 }
 #searchhelpbox {
@@ -338,6 +345,11 @@ dl#search {
 	background-color: <?php echo $tocBgColor?>;
 	clear: both;
 }
+/* читателските мнения */
+#readercomments ul { list-style-type: none; }
+/* first ul child of readercomments */
+#readercomments > ul { padding-left: 0; }
+
 .tooltip {
 	padding: 0.4em 0.6em;
 	border: thin solid <?php echo $mainFgColor?>;
@@ -429,14 +441,14 @@ dl#search {
 	margin-top: .5em;
 }
 table.content {
-	margin: 0 auto 1em auto;
+	margin: 0.5em auto 1em auto;
 	border-collapse: collapse;
 }
 table.content th, table.content td {
 	padding: 0.15em 0.4em;
 	border: thin solid <?php echo $headerBordColor?>;
 }
-table.content caption { font-weight: bold; margin: 0 auto; }
+table.content caption { font-weight: bold; margin: 1em auto 0 auto; }
 th {
 	color: <?php echo $headerFgColor?>;
 	background-color: <?php echo $headerBgColor?>;
@@ -444,6 +456,12 @@ th {
 /* обикновено за редове на таблици */
 .odd { color: <?php echo $oddFgColor?>; background-color: <?php echo $oddBgColor?>; }
 .even { color: <?php echo $evenFgColor?>; background-color: <?php echo $evenBgColor?>; }
+
+/* невидими знаци (табулации, интервали), които трябва да бъдат видими */
+.visible-ws {
+	background-color: <?php echo $mainFgColor?>;
+	opacity: .08;
+}
 
 /* неща, предвидени за текстови браузъри */
 .non-graphic { display: none; }
@@ -481,6 +499,7 @@ pre.example, div.example {
 }
 
 .post dt {
+	color: <?php echo $toolbarFgColor?>;
 	background-color: <?php echo $toolbarBgColor?>;
 	padding: 0.3em 0.5em;
 	margin: 1em 1em 0 1em;
@@ -489,6 +508,16 @@ pre.example, div.example {
 .post dt a { text-decoration: none; }
 .post dd { margin: 0 1em 0 3em; }
 
+/* реда с автора на новина  */
+.postauthor {
+	color: <?php echo $toolbarFgColor?>;
+	background-color: <?php echo $toolbarBgColor?>;
+	font-size: small;
+	text-align: right;
+	padding-right: 0.5em;
+	margin-bottom: 0.8em;
+	border: thin outset <?php echo $toolbarBgColor?>;
+}
 
 /* текст, който е вмъкнат */
 ins {
@@ -546,3 +575,14 @@ div.tabbedpanebody {
 }
 /* за таблици */
 .fieldname-left { text-align: right; }
+
+/* бележки под линия */
+.ref:target {
+	background-color: <?php echo $headerBgColor?>;
+}
+.footnotes :target {
+	font-size: 1.1em;
+	background-color: <?php echo $tocBgColor?>;
+	padding: 1em;
+	border: medium dashed <?php echo $tocBordColor?>;
+}

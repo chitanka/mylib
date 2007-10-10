@@ -1,18 +1,19 @@
 <?php
 class EditLabelPage extends Page {
 
+	const DB_TABLE = DBT_LABEL;
+
 	public function __construct() {
 		parent::__construct();
 		$this->action = 'editLabel';
-		$this->labelId = (int) $this->request->value('labelId', 0, 1);
+		$this->labelId = (int) $this->request->value('id', 0, 1);
 		$this->title = ($this->labelId == 0 ? 'Добавяне' : 'Редактиране').' на етикет';
 		$this->name = $this->request->value('name', '');
-		$this->mainDbTable = 'label';
 	}
 
 
 	protected function processSubmission() {
-		$res = $this->db->insertOrUpdate($this->mainDbTable,
+		$res = $this->db->update(self::DB_TABLE,
 			$this->makeSetData(), $this->labelId);
 		if ( $res !== false ) {
 			$this->addMessage('Редакцията беше успешна.');
@@ -36,16 +37,18 @@ class EditLabelPage extends Page {
 
 	protected function initData() {
 		$key = array('id' => $this->labelId);
-		$res = $this->db->select($this->mainDbTable, $key, 'name');
+		$res = $this->db->select(self::DB_TABLE, $key, 'name');
 		$data = $this->db->fetchAssoc($res);
-		if ( empty($data) ) return false;
+		if ( empty($data) ) {
+			return false;
+		}
 		extract2object($data, $this);
 		return true;
 	}
 
 
 	protected function makeEditForm() {
-		$labelId = $this->out->hiddenField('labelId', $this->labelId);
+		$labelId = $this->out->hiddenField('id', $this->labelId);
 		$name = $this->out->textField('name', '', $this->name, 30);
 		$submit = $this->out->submitButton('Съхраняване');
 		return <<<EOS
@@ -68,7 +71,7 @@ EOS;
 
 
 	protected function makeList() {
-		$q = $this->db->selectQ($this->mainDbTable, array(), '*', 'name');
+		$q = $this->db->selectQ(self::DB_TABLE, array(), '*', 'name');
 		$items = $this->db->iterateOverResult($q, 'makeListItem', $this);
 		return "<ul>$items</ul>";
 	}
@@ -76,15 +79,13 @@ EOS;
 
 	public function makeListItem($dbrow) {
 		extract($dbrow);
-		return <<<EOS
-
-	<li><a href="$this->root/label/$name"
-		title="Преглед на заглавията с етикет „{$name}“">$name</a> —
-		<a class="edit" href="$this->root/editLabel/$id"
-		title="Редактиране на етикет „{$name}“">ред</a>,
-		<a class="delete" href="$this->root/deleteLabel/$id"
-		title="Изтриване на етикет „{$name}“">изтр</a>
-	</li>
-EOS;
+		$p = array(self::FF_ACTION=>'label', self::FF_QUERY => $name);
+		$label = $this->out->internLink($name, $p, 2,
+			"Преглед на заглавията с етикет „{$name}“");
+		$edit = $this->makeEditLabelLink($id, $name);
+		$p = array(self::FF_ACTION=>'deleteLabel', 'id' => $id);
+		$del = $this->out->internLink('изтр.', $p, 2,
+			"Изтриване на етикета „{$name}“", array('class'=>'delete'));
+		return "\n\t<li>$label — $edit, $del</li>";
 	}
 }

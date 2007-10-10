@@ -2,18 +2,19 @@
 
 class LabelPage extends ViewPage {
 
-	protected $titles = array(
-		'simple' => 'Етикети — ',
-		'extended' => 'Етикети и заглавия — ',
-	);
+	protected
+		$titles = array(
+			'simple' => 'Етикети — ',
+			'extended' => 'Етикети и заглавия — ',
+		),
+		$defListLimit = 100, $maxListLimit = 500;
 
 
 	public function __construct() {
 		parent::__construct();
 		$this->action = 'label';
 		$this->uCanEditObj = $this->user->canExecute('editLabel');
-		$this->qstart = $this->request->value('start', 0);
-		$this->qlimit = $this->request->value('limit', 100);
+		$this->initPaginationFields();
 	}
 
 
@@ -31,27 +32,27 @@ class LabelPage extends ViewPage {
 
 
 	protected function makeSimpleListQuery() {
-		$q = "SELECT id, name, COUNT(h.text) count FROM /*p*/label l
-			LEFT JOIN /*p*/text_label h ON l.id = h.label";
-		$qWheres = array();
+		$qa = array(
+			'SELECT' => 'id, name, COUNT(h.text) count',
+			'FROM' => DBT_LABEL .' l',
+			'LEFT JOIN' => array(DBT_TEXT_LABEL .' h' => 'l.id = h.label'),
+			'GROUP BY' => 'id',
+			'ORDER BY' => 'name',
+		);
 		if ( !empty($this->startwith) ) {
-			$this->startwith = $this->db->escape($this->startwith);
-			$qWheres[] = "name LIKE '$this->startwith%'";
+			$qa['WHERE']['name'] = array('LIKE', $this->startwith .'%');
 		}
-		if ( !empty($qWheres) ) {
-			$q .= ' WHERE '. implode(' AND ', $qWheres);
-		}
-		$q .= " GROUP BY id ORDER BY name";
-		return $q;
+		return $this->db->extselectQ($qa);
 	}
 
 
 	public function makeSimpleListItem($dbrow) {
 		extract($dbrow);
 		$editLink = $this->uCanEditObj ? $this->makeEditLabelLink($id) : '';
-		$q = $this->showDlForm ? "/$this->FF_DLMODE=$this->dlMode" : '';
-		$q .= $this->order == 'time' ? "/$this->FF_ORDER=$this->order" : '';
-		$labelLink = $this->makeLabelLink($name, $q);
+		$query = array();
+		if ($this->showDlForm) $query[self::FF_DLMODE] = $this->dlMode;
+		if ($this->order == 'time') $query[self::FF_ORDER] = $this->order;
+		$labelLink = $this->makeLabelLink($name, $query);
 		$o = <<<EOS
 
 <li>
@@ -67,22 +68,22 @@ EOS;
 		$reader = NULL;
 		$this->curLabel = '';
 		$this->userCanEdit = $this->user->canExecute('edit');
-		$this->qWheres = '';
-		$items = $this->db->iterateOverResult($this->makeExtendedListQuery(),
-			'makeExtendedListItem', $this);
+		$this->qWhere = array(); // save here the WHERE clause of the query
+		$q = $this->makeExtendedListQuery();
+		$items = $this->db->iterateOverResult($q, 'makeExtendedListItem', $this);
 		if ( empty($items) ) { return false; }
-		$chunkLinks = $this->makeChunkLinks($this->qWheres);
+		$chunkLinks = $this->makeChunkLinks();
 		$o = $chunkLinks .'<ul style="display:none"><li></li>'. $items .'</ul>';
 		if ($this->showDlForm) {
-			$action = $this->out->hiddenField('action', 'download');
+			$action = $this->out->hiddenField(self::FF_ACTION, 'download');
 			$submit = $this->out->submitButton('Сваляне на избраните текстове');
 			$o = <<<EOS
 
-<form action="$this->root" method="post">
+<form action="$this->root" method="post"><div>
 	$action
 $o
 	$submit
-</form>
+</div></form>
 EOS;
 		}
 		$o .= $chunkLinks . $this->makeColorLegend();
@@ -90,36 +91,41 @@ EOS;
 	}
 
 
+	/**
+	Side effect: initializes $this->qWhere with the “WHERE” clause
+	*/
 	protected function makeExtendedListQuery() {
-		$qSelect = "SELECT l.id labelId, l.name label,
-			t.id textId, t.title, t.lang, t.orig_title, t.orig_lang, t.collection,
-			t.year, t.type, t.sernr, t.size, t.zsize, UNIX_TIMESTAMP(t.entrydate) date,
-			GROUP_CONCAT(a.name) author, s.name series, s.orig_name orig_series";
-		$qFrom = " FROM /*p*/text_label h
-			LEFT JOIN /*p*/label l ON h.label = l.id
-			LEFT JOIN /*p*/text t ON h.text = t.id
-			LEFT JOIN /*p*/author_of aof ON t.id = aof.text
-			LEFT JOIN /*p*/person a ON aof.author = a.id
-			LEFT JOIN /*p*/series s ON t.series = s.id";
-		if ($this->user->id > 0) {
-			$qSelect .= ', r.user reader';
-			$qFrom .= "
-			LEFT JOIN /*p*/reader_of r ON t.id = r.text AND r.user={$this->user->id}";
-		}
-		$q = $qSelect . $qFrom;
-		$qWhere = array();
-		if ( !empty($this->startwith) ) {
-			$this->startwith = $this->db->escape($this->startwith);
-			$qWhere[] = "l.name LIKE '$this->startwith%'";
-		}
-		if ( !empty($qWhere) ) {
-			$this->qWheres = ' WHERE '. implode(' AND ', $qWhere);
-			$q .= $this->qWheres;
-		}
 		$chrono = $this->order == 'time' ? 't.year,' : '';
-		$q .= " GROUP BY l.id, t.id ORDER BY l.name, $chrono t.title";
-		$q .= " LIMIT $this->qstart, $this->qlimit";
-		return $q;
+		$qa = array(
+			'SELECT' => 'l.id labelId, l.name label,
+				t.id textId, t.title, t.lang, t.orig_title, t.orig_lang,
+				t.collection, t.year, t.type, t.sernr, t.size, t.zsize,
+				t.entrydate date, UNIX_TIMESTAMP(t.entrydate) datestamp,
+				GROUP_CONCAT(a.name) author,
+				s.name series, s.orig_name orig_series',
+			'FROM' => DBT_TEXT_LABEL .' h',
+			'LEFT JOIN' => array(
+				DBT_LABEL .' l' => 'h.label = l.id',
+				DBT_TEXT .' t' => 'h.text = t.id',
+				DBT_AUTHOR_OF .' aof' => 't.id = aof.text',
+				DBT_PERSON .' a' => 'aof.author = a.id',
+				DBT_SERIES .' s' => 't.series = s.id',
+			),
+			'WHERE' => array(),
+			'GROUP BY' => 'l.id, t.id',
+			'ORDER BY' => "l.name, $chrono t.title",
+			'LIMIT' => array($this->loffset, $this->llimit)
+		);
+		if ($this->user->id > 0) {
+			$qa['SELECT'] .= ', r.user reader';
+			$qa['LEFT JOIN'][DBT_READER_OF .' r'] =
+				't.id = r.text AND r.user = '. $this->user->id;
+		}
+		if ( !empty($this->startwith) ) {
+			$qa['WHERE']['l.name'] = array('LIKE', $this->startwith .'%');
+		}
+		$this->qWhere = $qa['WHERE'];
+		return $this->db->extselectQ($qa);
 	}
 
 
@@ -135,48 +141,44 @@ EOS;
 	}
 
 
-	protected function makeChunkLinks($where = '') {
-		$q = "SELECT COUNT(*) FROM /*p*/text_label h
-			LEFT JOIN /*p*/label l ON h.label = l.id
-			LEFT JOIN /*p*/text t ON h.text = t.id $where";
-		list($count) = $this->db->fetchRow($this->db->query($q));
-		if ( $count <= $this->qlimit ) { return ''; }
-		$curCnt = $i = 0;
-		$o = '';
-		$urlq = $this->FF_QUERY.'='.urlencode($this->startwith)."/$this->FF_MODE=$this->mode";
-		while ($curCnt < $count) {
-			$i++;
-			$o .= $this->qstart == $curCnt ? "· <strong>$i</strong> ·" : " <a href='$this->root/$this->action/$urlq/start=$curCnt/limit=$this->qlimit'>$i</a> ";
-			$curCnt += $this->qlimit;
-		}
-		return '<div class="buttonlinks" style="text-align:center; margin-top:1em">Страници:'.
-			trim($o, '·').'</div>';
+	protected function makeChunkLinks() {
+		$qa = array(
+			'SELECT' => 'COUNT(*)',
+			'FROM' => DBT_TEXT_LABEL .' h',
+			'LEFT JOIN' => array(
+				DBT_LABEL .' l' => 'h.label = l.id',
+				DBT_TEXT .' t' => 'h.text = t.id',
+			),
+			'WHERE' => $this->qWhere,
+		);
+		list($count) = $this->db->fetchRow($this->db->extselect($qa));
+		$urlq = array(self::FF_QUERY => $this->startwith,
+			self::FF_MODE => $this->mode);
+		return $this->makePageLinks($count, $this->llimit, $this->loffset, $urlq);
 	}
 
 
 	protected function makeNavElements() {
-		$toc = $this->makeNavButtons(array($this->FF_ORDER => '',
-			$this->FF_DLMODE => 'one'));
+		$toc = $this->makeNavButtons(array(self::FF_ORDER => $this->defOrder,
+			self::FF_DLMODE => $this->defDlMode));
 		$modeInput = $this->makeModeInput();
 		$orderInput = $this->makeOrderInput();
 		$dlModeInput = $this->makeDlModeInput();
 		$inputFields = $this->request->makeInputFieldsForGetVars(
-			array($this->FF_MODE, $this->FF_ORDER, $this->FF_DLMODE));
+			array(self::FF_MODE, self::FF_ORDER, self::FF_DLMODE));
 		$submit = $this->out->submitButton('Обновяване');
 		return <<<EOS
 <p class="buttonlinks" style="margin-bottom:1em;"
 	title="Това са препратки към списъци на етикети, започващи със съответната буква">
 $toc
 </p>
-<form action="$this->root" style="text-align:center">
-<div>
+<form action="$this->root" style="text-align:center"><div>
 	$inputFields
 $modeInput &nbsp;
 $orderInput &nbsp;
 $dlModeInput
 	<noscript><div style="display:inline">$submit</div></noscript>
-</div>
-</form>
+</div></form>
 EOS;
 	}
 
@@ -186,9 +188,7 @@ EOS;
 		$modeExpl = $this->makeModeExplanation();
 		$dlModeExpl = $this->makeDlModeExplanation();
 		return <<<EOS
-<p>Горните връзки водят към списъци на етикетите$extra
-започващи със съответната буква. Чрез препратката „Всички“
-можете да разгледате всички етикети наведнъж.</p>
+<p>Горните връзки водят към списъци на етикетите$extra започващи със съответната буква. Чрез препратката „Всички“ можете да разгледате всички етикети наведнъж.</p>
 $modeExpl
 $dlModeExpl
 EOS;

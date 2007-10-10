@@ -5,17 +5,15 @@ class ViewVersionsPage extends Page {
 		parent::__construct();
 		$this->action = 'viewVersions';
 		$this->title = 'Преглед на версиите';
-		$this->type = $this->request->value('type', 'text');
 		$this->textId = (int) $this->request->value('textId', 0, 1);
-		$this->chunkId = (int) $this->request->value('chunkId', 1, 2);
-		$vers = (array) $this->request->value('vers');
+		$this->type = $this->request->value('type', 'text');
+		$vers = array_keys((array) $this->request->value('vers'));
 		$this->ver1 = array_shift($vers);
 		$this->ver2 = array_shift($vers);
 		$this->delOthers = $this->request->checkbox('delOthers');
 		$this->ignoreSpaces = $this->request->checkbox('ignoreSpaces');
-		global $contentDirs;
-		$this->dir = $contentDirs['text'];
-		$this->olddir = $contentDirs['oldtext'];
+		$this->dir = getContentFilePath($this->type, $this->textId, false);
+		$this->olddir = getContentFilePath('old'. $this->type, $this->textId, false);
 	}
 
 
@@ -28,18 +26,20 @@ class ViewVersionsPage extends Page {
 		foreach ($actions as $action) {
 			$req = $this->request->value($action);
 			if ( !empty($req) ) {
-				$cont = '<pre class="example">'. $this->$action() .'</pre>';
+				$cont = '<p>'. $this->$action() .'</p>';
 				break;
 			}
 		}
 		if ( !empty($cont) ) {
-			$cont .= '<p>Легенда: <del>изтрито</del>, <ins>вмъкнато</ins></p>';
+			$cont .= '<hr /><p>Легенда: <del>изтрито</del>, <ins>добавено</ins></p>';
 		}
 		$form = $this->makeForm();
-		$editLink = $this->makeEditTextLink($this->textId, $this->chunkId);
+		$editLink = $this->makeEditTextLink($this->textId);
+		$alltexts = $this->out->internLink('Преглед на всички текстове', $this->action);
+		$tlink = $this->makeSimpleTextLink('', $this->textId, 1, 'Текст '.$this->textId);
 		return <<<EOS
-<p><a href="$this->root/$this->action">Преглед на всички текстове</a></p>
-<p><a href="$this->root/text/$this->textId/$this->chunkId">Текст $this->textId-$this->chunkId</a> $editLink</p>
+<p>$alltexts</p>
+<p>$tlink $editLink</p>
 $cont
 $form
 EOS;
@@ -53,7 +53,7 @@ EOS;
 			return '';
 		}
 		$textId = $this->out->hiddenField('textId', $this->textId);
-		$chunkId = $this->out->hiddenField('chunkId', $this->chunkId);
+		$type = $this->out->hiddenField('type', $this->type);
 		$submit1 = $this->out->submitButton('Сравнение на избраните версии', '', 0, 'doCompare');
 		$submit2 = $this->out->submitButton('Връщане към избраната версия', '', 0, 'doRevert');
 		$submit3 = $this->out->submitButton('Изтриване на всички стари версии', '', 0, 'doDelete');
@@ -66,8 +66,7 @@ EOS;
 <form action="{FACTION}" method="post" style="margin: 1em 0">
 <div>
 	$textId
-	$chunkId
-
+	$type
 	<fieldset>
 	<legend>Версии</legend>
 	$vers
@@ -94,9 +93,9 @@ EOS;
 
 
 	protected function makeVersionsInput() {
-		$o = '';
+		$vo = array();
 		if ($dh = opendir($this->olddir)) {
-			$pref = "$this->textId-$this->chunkId-";
+			$pref = "$this->textId-";
 			while (($file = readdir($dh)) !== false) {
 				if ( $file{0} == '.' ) { continue; }
 				if ( strpos($file, $pref) !== 0 ) { continue; }
@@ -104,32 +103,35 @@ EOS;
 				$timestamp = $m[1];
 				$date = date('Y-m-d H:i:s', $timestamp);
 				$size = filesize($this->olddir . $file);
-				$ver = $this->out->checkbox('vers[]', "v$timestamp",
+				$ver = $this->out->checkbox("vers[$timestamp]", "v$timestamp",
 					$this->ver1 == $timestamp || $this->ver2 == $timestamp,
 					"$date, $size байта");
-				$o .= "\n\t$ver<br />";
+				$vo[$timestamp] = "\n\t$ver<br />";
 			}
 			closedir($dh);
 		}
-		return $o;
+		#krsort($vo);
+		return implode('', $vo);
 	}
 
 
 	protected function doCompare() {
-		$common = $this->textId .'-'. $this->chunkId;
 		$file1 = empty($this->ver1)
-			? $this->dir.$common : $this->olddir ."$common-$this->ver1";
+			? $this->dir . $this->textId
+			: $this->olddir ."$this->textId-$this->ver1";
 		$file2 = empty($this->ver2)
-			? $this->dir.$common : $this->olddir ."$common-$this->ver2";
+			? $this->dir . $this->textId
+			: $this->olddir ."$this->textId-$this->ver2";
 		if ($file1 == $file2) {
-			$this->addMessage("Показано е съдържанието на файла
-				„<a href='$this->rootd/$file1'>$file1</a>“.");
+			$link = $this->out->link($this->rootd.'/'.$file1, $file1);
+			$this->addMessage("Показано е съдържанието на файла „{$link}“.");
 			$cont = file_get_contents($file1);
 			return $cont;
 		}
 		require 'Text/Diff.php';
 		#require 'Text/Diff/Renderer.php';
 		require 'Text/Diff/Renderer/inline.php';
+		#require 'Text/Diff/Renderer/unified.php';
 		$cont1 = file_get_contents($file1);
 		$cont2 = file_get_contents($file2);
 		if ($this->ignoreSpaces) {
@@ -141,18 +143,20 @@ EOS;
 		$diff = &new Text_Diff($lines1, $lines2);
 		$renderer = &new Text_Diff_Renderer_inline();
 		$renderer->_block_header = '<hr />';
-		$this->addMessage("Показано е сравнение на
-			„<a href='$this->rootd/$file1'>$file1</a>“ с
-			„<a href='$this->rootd/$file2'>$file2</a>“.");
-		return str_replace("\n", "␊\n", $renderer->render($diff));
+		$link1 = $this->out->link($this->rootd.'/'.$file1, $file1);
+		$link2 = $this->out->link($this->rootd.'/'.$file2, $file2);
+		$this->addMessage("Показано е сравнение на „{$link1}“ с „{$link2}“.");
+		# ␊
+		$repl = array("\n" => "<br />\n", "\t" => '&nbsp; &nbsp; &nbsp; ');
+		return strtr($renderer->render($diff), $repl);
 	}
 
 
 	protected function doRevert() {
-		$file = $this->dir."$this->textId-$this->chunkId";
-		$old = $this->olddir."$this->textId-$this->chunkId-$this->ver1";
-		$nold = $this->olddir."$this->textId-$this->chunkId-".time();
-		if ( file_exists($old) && copy($file, $nold) && copy($old, $file) ) {
+		$file = $this->dir . $this->textId;
+		$old = $this->olddir . $this->textId .'-'. $this->ver1;
+		$nold = $this->olddir . $this->textId .'-'. time();
+		if ( file_exists($old) && mycopy($file, $nold) && mycopy($old, $file) ) {
 			$date = date('Y-m-d H:i:s', $this->ver1);
 			$this->addMessage("Версията от <strong>$date</strong> беше възвърната.");
 			unlink($old);
@@ -165,7 +169,7 @@ EOS;
 
 	protected function doDelete() {
 		if ($dh = opendir($this->olddir)) {
-			$pref = "$this->textId-$this->chunkId-";
+			$pref = "$this->textId-";
 			while (($file = readdir($dh)) !== false) {
 				if ( $file{0} == '.' ) { continue; }
 				if ( strpos($file, $pref) !== 0 ) { continue; }
@@ -182,7 +186,7 @@ EOS;
 		$texts = array();
 		$dh = opendir($this->olddir);
 		while (($file = readdir($dh)) !== false) {
-			if ( !preg_match('/(\d+-\d+)-\d+/', $file, $m) ) { continue; }
+			if ( !preg_match('/(\d+)-\d+/', $file, $m) ) { continue; }
 			$text = $m[1];
 			$mod = filemtime($this->olddir . $file);
 			if ( !isset($texts[$text]) || $texts[$text] < $mod ) {
@@ -197,15 +201,14 @@ EOS;
 		arsort($texts);
 		$l = '';
 		foreach ( $texts as $text => $mod ) {
-			list($tid, $cid) = explode('-', $text);
 			$date = date('Y-m-d H:i:s', $mod);
-			$l .= "\n<li><span class='extra'><tt>$date</tt></span> &nbsp;
-				<a href='$this->root/viewVersions/$tid/$cid'>$text</a></li>";
+			$p = array(self::FF_ACTION=>$this->action, 'textId'=>$text, 'type'=>$this->type);
+			$link = $this->out->internLink($text, $p, 2);
+			$l .= "\n<li><span class='extra'><tt>$date</tt></span> &nbsp; $link</li>";
 		}
 		return <<<EOS
 <p>Следните текстове имат стари версии (сортирани по време на последна промяна):</p>
-<ul>
-$l
+<ul>$l
 </ul>
 EOS;
 	}

@@ -17,7 +17,13 @@ class Skin {
 		return $this->imgDir.$this->skinDir.$img;
 	}
 
-	public function imageDir() { return $this->imgDir; }
+	public function imageDir() {
+		return $this->imgDir;
+	}
+
+	public function bannerDir() {
+		return $this->imgDir . 'banner/';
+	}
 
 	public function useAbsolutePath() {
 		$this->imgDir = 'http://'.$_SERVER['SERVER_NAME'] . $this->imgDir;

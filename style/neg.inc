@@ -60,4 +60,3 @@ $oddFgColor = $mainFgColor;
 $oddBgColor = $mainBgColor;
 $evenFgColor = $mainFgColor;
 $evenBgColor = '#021232';
-?>

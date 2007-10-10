@@ -1,4 +1,8 @@
 <?php
+if ( !defined('MYLIB') ) { die('This is not a valid entry point.'); }
+
+/** Application name */
+define('APP_NAME', 'mylib');
 
 /** Cookie name for the user ID */
 define('UID_COOKIE', 'mylibUserID');
@@ -10,17 +14,26 @@ define('OPTS_COOKIE', 'mylibOptions');
 define('ENC_COOKIE', 'mylibEncoding');
 define('ONEDAYSECS', 60*60*24); // number of seconds in a day
 /** Timelife for cookies */
-define('COOKIE_EXP', time()+ONEDAYSECS*30); // 30 days
+define('COOKIE_EXP', time() + ONEDAYSECS * 30); // 30 days
 
-define('SESSION_NAME', 'MYLIB_SESSION');
+define('SESSION_NAME', 'mylibSession');
 /** Session key for the User object */
 define('U_SESSION', 'user');
+
+
+/**
+	Load a class file.
+	@param $class Class name
+*/
+function __autoload($class) {
+	require_once $class .'.php';
+}
 
 function addIncludePath($path) {
 	if ( is_array($path) ) {
 		$path = implode(PATH_SEPARATOR, $path);
 	}
-	ini_set('include_path', ini_get('include_path') . PATH_SEPARATOR . $path);
+	set_include_path(get_include_path() . PATH_SEPARATOR . $path);
 }
 
 
@@ -41,6 +54,26 @@ foreach ($contentDirs as $key => $dir) {
 	$contentDirs['old'.$key] = $oldcontentDir . $dir;
 }
 
+function getContentFilePath($key, $num, $full = true) {
+	global $contentDirs;
+	$pref = arrVal($contentDirs, $key, $key .'/');
+	return $pref . makeContentFilePath( (int) $num, $full );
+}
+
+// use this for sfbzip too
+function makeContentFilePath($num, $full = true) {
+	$word = 4; // a word is four bytes long
+	$bin_in_hex = 4; // one hex character corresponds to four binary digits
+	$path = str_repeat('+/', $num >> ($word * $bin_in_hex));
+	$hex = str_pad(dechex($num), $word, '0', STR_PAD_LEFT);
+	$hex = substr($hex, -$word); // take last $word characters
+	$path .= substr($hex, 0, 2) . '/';
+	if ($full) {
+		$path .= $num;
+	}
+	return $path;
+}
+
 $latUppers = 'A B C D E F G H I J K L M N O P Q R S T U V W X Y Z';
 $cyrs = array(
 	'а', 'б', 'в', 'г', 'д', 'е', 'ж', 'з', 'и', 'й',
@@ -50,48 +83,45 @@ $cyrs = array(
 	'К', 'Л', 'М', 'Н', 'О', 'П', 'Р', 'С', 'Т', 'У',
 	'Ф', 'Х', 'Ц', 'Ч', 'Ш', 'Щ', 'Ъ', 'Ь', 'Ю', 'Я',
 );
+
 $types = array(
-	'fable' => 'Басни',
-	'essay' => 'Есе',
-	'playbook' => 'Книга-игра',
-	'science' => 'Научно',
-	'novelette' => 'Новела',
-	'shortstory' => 'Разказ',
-	'novel' => 'Роман',
-	'play' => 'Пиеса',
-	'poetry' => 'Поезия',
-	'poem' => 'Поема',
-	'novella' => 'Повест',
-	'intro' => 'Предговор',
-	'tale' => 'Приказка',
-	'travelnotes' => 'Пътепис',
-	'speech' => 'Реч',
-	'article' => 'Статия',
-	'screenplay' => 'Сценарий',
-	'textbook' => 'Учебник',
-	'other' => 'Разни',
+	// code => array(singular, plural)
+	'anecdote' => array('Анекдот', 'Анекдоти'),
+	'fable' => array('Басни', 'Басни'),
+	'essay' => array('Есе', 'Есета'),
+	'playbook' => array('Книга-игра', 'Книги-игри'),
+	'science' => array('Научно', 'Научни'),
+	'novelette' => array('Новела', 'Новели'),
+	'shortstory' => array('Разказ', 'Разкази'),
+	'novel' => array('Роман', 'Романи'),
+	'play' => array('Пиеса', 'Пиеси'),
+	'poetry' => array('Поезия', 'Поезия'),
+	'poem' => array('Поема', 'Поеми'),
+	'novella' => array('Повест', 'Повести'),
+	'intro' => array('Предговор', 'Предговори'),
+	'tale' => array('Приказка', 'Приказки'),
+	'travelnotes' => array('Пътепис', 'Пътеписи'),
+	'speech' => array('Реч', 'Речи'),
+	'article' => array('Статия', 'Статии'),
+	'screenplay' => array('Сценарий', 'Сценарии'),
+	'textbook' => array('Учебник', 'Учебници'),
+	'other' => array('Разни', 'Разни'),
 );
-$typesPl = array(
-	'fable' => 'Басни',
-	'essay' => 'Есета',
-	'playbook' => 'Книги-игри',
-	'science' => 'Научни',
-	'novelette' => 'Новели',
-	'shortstory' => 'Разкази',
-	'novel' => 'Романи',
-	'play' => 'Пиеси',
-	'poetry' => 'Поезия',
-	'poem' => 'Поеми',
-	'novella' => 'Повести',
-	'intro' => 'Предговори',
-	'tale' => 'Приказки',
-	'speech' => 'Речи',
-	'travelnotes' => 'Пътеписи',
-	'article' => 'Статии',
-	'screenplay' => 'Сценарии',
-	'textbook' => 'Учебници',
-	'other' => 'Разни',
-);
+
+function workType($code, $singular = true) {
+	global $types;
+	if ( !array_key_exists($code, $types) ) return '';
+	return $singular ? $types[$code][0] : $types[$code][1];
+}
+
+function workTypes($singular = true) {
+	global $types;
+	$ntypes = array();
+	foreach ($types as $code => $name) {
+		$ntypes[$code] = $singular ? $types[$code][0] : $types[$code][1];
+	}
+	return $ntypes;
+}
 
 $langs = array(
 	'sq' => 'Албански',
@@ -188,13 +218,27 @@ $months = array(
 	'Юли', 'Август', 'Септември', 'Октомври', 'Ноември', 'Декември'
 );
 function monthName($m, $asUpper = true) {
-	$name = $GLOBALS['months'][(int)$m];
+	$name = @$GLOBALS['months'][(int)$m];
 	return $asUpper ? $name : mystrtolower($name);
 }
 
-$serSuffices = array('series' => '',
-	'collection' => ' (сборник)',
-	'book' => ' (книга)');
+function humanDate($isodate = '') {
+	if ( empty($isodate) ) {
+		$isodate = date('Y-m-d H:i:s');
+	}
+	if ( strpos($isodate, ' ') === false ) { // no hours
+		$ymd = $isodate;
+		$hours = '';
+	} else {
+		list($ymd, $his) = explode(' ', $isodate);
+		list($h, $i, $s) = explode(':', $his);
+		$hours = " $h:$i";
+	}
+	list($y, $m, $d) = explode('-', $ymd);
+	return trim($d, '0') .' '. mystrtolower(monthName($m)) .' '. $y . $hours;
+}
+
+$serSuffices = array('series' => '', 'collection' => ' (сборник)', 'book' => ' (книга)');
 function seriesSuffix($seriesType) {
 	return isset($GLOBALS['serSuffices'][$seriesType]) ? $GLOBALS['serSuffices'][$seriesType] : '';
 }
@@ -319,12 +363,12 @@ function header_encode($header) {
 }
 
 /**
- * Копира някои кирилски букви от местата им според cp866 на местата им
- * според нестандартното досовско кирилско кодиране MIK.
- * В крайна сметка въпросните букви ще се намират по два пъти в новополученото
- * кодиране, което означава, че кирилицата ще се вижда хем при cp866, хем при MIK.
- * Въобще не прави пълно прекодиране между двете кодови таблици.
- */
+	Копира някои кирилски букви от местата им според cp866 на местата им
+	според нестандартното досовско кирилско кодиране MIK.
+	В крайна сметка въпросните букви ще се намират по два пъти в новополученото
+	кодиране, което означава, че кирилицата ще се вижда хем при cp866, хем при MIK.
+	Въобще не прави пълно прекодиране между двете кодови таблици.
+*/
 function cp8662mik($s) {
 	return strtr($s, array(
 		chr(0xB0) => chr(0xE0),
@@ -362,29 +406,54 @@ function cartesian_product($arr1, $arr2) {
 }
 
 function normInt($val, $max, $min = 1) {
-	if ($val > $max) $val = $max;
-	elseif ($val < $min) $val = $min;
+	if ($val > $max) {
+		$val = $max;
+	} else if ($val < $min) {
+		$val = $min;
+	}
 	return (int) $val;
 }
 
 /**
- * @param $key Key
- * @param $data Associative array
- * @param $defKey Default key
- * @return $key if it exists as key in $data, otherwise $defKey
- */
-function normKey($key, $data, $defKey) {
+	@param $key Key
+	@param $data Associative array
+	@param $defKey Default key
+	@return $key if it exists as key in $data, otherwise $defKey
+*/
+function normKey($key, $data, $defKey = '') {
 	return array_key_exists($key, $data) ? $key : $defKey;
 }
 
 /**
- * @param $val Value
- * @param $data Associative array
- * @param $defVal Default value
- * @return $val if it exists in $data, otherwise $defVal
- */
-function normVal($val, $data, $defVal) {
+	@param $val Value
+	@param $data Associative array
+	@param $defVal Default value
+	@return $val if it exists in $data, otherwise $defVal
+*/
+function normVal($val, $data, $defVal = null) {
 	return in_array($val, $data) ? $val : $defVal;
+}
+
+
+function arrVal($arr, $key, $defVal = null) {
+	return array_key_exists($key, $arr) ? $arr[$key] : $defVal;
+}
+
+/**
+	Replace variables in a string.
+*/
+function replaceVars($s, $vars) {
+	foreach ($vars as $var => $val) {
+		$s = str_replace('/*$' . $var . '*/', $val, $s);
+		$s = str_replace('/*$' . $var . '*/`', '`'. $val, $s);
+	}
+	return $s;
+}
+
+function fillOnEmpty(&$var, $value) {
+	if ( empty($var) ) {
+		$var = $value;
+	}
 }
 
 function isArchive($file) {
@@ -398,14 +467,17 @@ function isArchive($file) {
 }
 
 /**
- * Validates an e-mail address
- * Regexps are taken from http://www.iki.fi/markus.sipila/pub/emailvalidator.php
- * (author: Markus Sipilä, version: 1.0, 2006-08-02)
- * @param string $input E-mail address to be validated
- * @return int 1 if valid, 0 if not valid, -1 if valid but strange
- */
-function validateEmailAddress($input) {
-	if ( empty($input) ) { return 1; }
+Validates an e-mail address.
+Regexps are taken from http://www.iki.fi/markus.sipila/pub/emailvalidator.php
+(author: Markus Sipilä, version: 1.0, 2006-08-02)
+
+@param string $input E-mail address to be validated
+@return int 1 if valid, 0 if not valid, -1 if valid but strange
+*/
+function validateEmailAddress($input, $allowEmpty = true) {
+	if ( empty($input) ) {
+		return $allowEmpty ? 1 : 0;
+	}
 	$ct = '[a-zA-Z0-9-]';
 	$cn = '[a-zA-Z0-9_+-]';
 	$cr = '[a-zA-Z0-9,!#$%&\'\*+\/=?^_`{|}~-]';
@@ -416,6 +488,66 @@ function validateEmailAddress($input) {
 	return 0;
 }
 
-function dpr($arr) { echo '<pre>'.print_r($arr, true).'</pre>'; }
-function dprbt() { echo '<pre>'; debug_print_backtrace(); echo '</pre>'; }
+$allowableTags = array('em', 'strong');
 
+function escapeInput($text) {
+	global $allowableTags;
+	$text = htmlspecialchars($text);
+	$repl = array();
+	foreach ($allowableTags as $allowable) {
+		$repl["&lt;$allowable&gt;"] = "<$allowable>";
+		$repl["&lt;/$allowable&gt;"] = "</$allowable>";
+	}
+	$text = strtr($text, $repl);
+	return $text;
+}
+
+function chooseGrammNumber($num, $sing, $plur, $null = '') {
+	settype($num, 'int');
+	if ($num > 1) {
+		return $plur;
+	} else if ($num == 1) {
+		return $sing;
+	} else {
+		return $null;
+	}
+}
+
+function md5_loop($pass, $loops = 1) {
+	for ($i=0; $i < $loops; $i++) {
+		$pass = md5($pass);
+	}
+	return $pass;
+}
+
+
+function dpr($arr) {
+	echo '<pre>'. print_r($arr, true) .'</pre>';
+}
+
+function dprbt() {
+	echo '<pre>'; debug_print_backtrace(); echo '</pre>';
+}
+
+
+function mycopy($source, $dest) {
+	make_parent($dest);
+	return copy($source, $dest);
+}
+
+function myfile_put_contents($filename, $data, $flags = null) {
+	make_parent($filename);
+	return file_put_contents($filename, $data, $flags);
+}
+
+function mymove_uploaded_file($tmp, $dest) {
+	make_parent($dest);
+	return move_uploaded_file($tmp, $dest);
+}
+
+function make_parent($filename) {
+	$dir = dirname($filename);
+	if ( !file_exists($dir) ) {
+		mkdir($dir, 0755, true);
+	}
+}

@@ -2,6 +2,12 @@
 
 class Request {
 
+	protected
+		$bots = array('bot', 'search', 'crawl', 'spider', 'fetch', 'reader',
+			'subscriber', 'google', 'rss'),
+		// hash of the request
+		$hash;
+
 	public function __construct() {
 		$specialVars = array('cache');
 		if ( empty($_SERVER['PATH_INFO']) ) {
@@ -9,32 +15,48 @@ class Request {
 		} else {
 			$this->path = $_SERVER['PATH_INFO'];
 		}
+
+		// buggy Apache 2.0 — PHP 5.0 collaboration, I think
 		if ($this->path == 'php5') { $this->path = ''; }
+
 		$this->params = explode('/', ltrim(urldecode($this->path), '/'));
 		foreach ($this->params as $key => $param) {
-			if ( empty($param) ) { continue; }
-			if ( strpos($param, '=') !== false ) {
+			if ( empty($param) ) {
+				continue;
+			}
+			if ( strpos($param, '=') === false ) {
+				$param = $this->normalizeParamValue($param);
+				$this->params[$key] = $param;
+			} else {
 				list($var, $value) = explode('=', $param);
 				$value = $this->normalizeParamValue($value);
-				$_REQUEST[$var] = $_GET[$var] = $value;
+				if ( preg_match('/(\w+)\[(.*)\]/', $var, $match) ) {
+					// the parameter is an array element
+					list(, $arr, $key) = $match;
+					if ( empty($key) ) {
+						$_REQUEST[$arr][] = $_GET[$arr][] = $value;
+					} else {
+						$_REQUEST[$arr][$key] = $_GET[$arr][$key] = $value;
+					}
+				} else {
+					$_REQUEST[$var] = $_GET[$var] = $value;
+				}
 				#if ( in_array($var, $specialVars) ) {
 					unset($this->params[$key]);
 				#}
-			} else {
-				$param = $this->normalizeParamValue($param);
-				$this->params[$key] = $param;
-				$_REQUEST[] = $_GET[] = $param;
 			}
 		}
 
 		// normalize keys to start from 0
 		$this->params = array_values($this->params);
-		if ( empty($this->params) ) { $this->params[] = ''; }
-		if ( empty($_REQUEST['action']) ) {
+		if ( empty($this->params) ) {
+			$this->params[] = '';
+		}
+		if ( empty($_REQUEST[Page::FF_ACTION]) ) {
 			$this->action = PageManager::validatePage( $this->params[0] );
-			$_REQUEST['action'] = $_GET['action'] = $this->action;
+			$_REQUEST[Page::FF_ACTION] = $_GET[Page::FF_ACTION] = $this->action;
 		} else {
-			$this->action = $_REQUEST['action'];
+			$this->action = $_REQUEST[Page::FF_ACTION];
 		}
 		if ( $this->params[0] != $this->action ) {
 			array_unshift($this->params, $this->action);
@@ -46,10 +68,10 @@ class Request {
 
 		$this->unescapeGlobals();
 
-		$encodingCookie = $this->value(ENC_COOKIE, Setup::$masterEncoding);
+		$encodingCookie = $this->value(ENC_COOKIE, Setup::IN_ENCODING);
 		$this->outputEncoding = $this->value('enc', $encodingCookie);
 		if ( empty($this->outputEncoding) ) {
-			$this->outputEncoding = Setup::$masterEncoding;
+			$this->outputEncoding = Setup::IN_ENCODING;
 		}
 // 		$this->encoding = $this->value('enc', $encodingCookie);
 // 		if ( $this->outputEncoding != $encodingCookie ) {
@@ -57,28 +79,34 @@ class Request {
 // 		}
 // 		$this->normalizeGlobalsEncoding();
 
-		// put encoding in hash in order to generate/retrieve the right cache
-		#$_GET['enc'] = $this->outputEncoding;
-		ksort($_GET);
-		$this->hash = $this->action . md5( serialize($_GET) );
 		$this->cookiePath = Setup::setting('path');
-		#unset( $_GET['enc'] );
+		$this->ua = strtolower(@$_SERVER['HTTP_USER_AGENT']);
 	}
 
 
-	public function action() { return $this->action; }
+	public function action() {
+		return $this->action;
+	}
 
 
 	/**
-	 * Fetch a field value from the request.
-	 *
-	 * @param string $name
-	 * @param string $default Return this if $name isn't set in the request
-	 * @return mixed
-	 */
+	Fetch a field value from the request.
+
+	@param string $name
+	@param string $default Return this if $name isn’t set in the request
+	@return mixed
+	*/
 	public function value($name, $default = NULL, $paramno = NULL) {
-		if ( isset($_REQUEST[$name]) ) { return $_REQUEST[$name]; }
-		return isset($paramno) ? $this->param($paramno, $default) : $default;
+		if ( isset($_REQUEST[$name]) ) {
+			return $_REQUEST[$name];
+		}
+		if ( empty($paramno) ) {
+			return $default;
+		}
+		if ( isset($this->params[$paramno]) ) {
+			return $_REQUEST[$name] = $_GET[$name] = $this->params[$paramno];
+		}
+		return $default;
 	}
 
 	public function setValue($name, $value) {
@@ -87,7 +115,9 @@ class Request {
 
 
 	public function checkbox($name, $dims = NULL) {
-		if ( !isset($_REQUEST[$name]) ) return false;
+		if ( !isset($_REQUEST[$name]) ) {
+			return false;
+		}
 		$val = $_REQUEST[$name];
 		if ( is_array($dims) && !empty($dims) ) {
 			foreach ($dims as $dim) { $val = $val[$dim]; }
@@ -97,8 +127,39 @@ class Request {
 
 
 	/** @return bool */
-	public function wasPosted() { return $_SERVER['REQUEST_METHOD'] == 'POST'; }
+	public function wasPosted() {
+		return $_SERVER['REQUEST_METHOD'] == 'POST';
+	}
 
+
+	public function isBotRequest() {
+		foreach ($this->bots as $bot) {
+			if ( strpos($this->ua, $bot) !== false ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	Tests whether a given set of parameters corresponds to the GET request.
+
+	@param $reqData Associative array
+	@return bool
+	*/
+	public function isCurrentRequest($reqData) {
+		if (	!is_array($reqData) ||
+				count(array_diff_assoc($_GET, $reqData)) > 0 ||
+				count(array_diff_assoc($reqData, $_GET)) > 0 ) {
+			return false;
+		}
+		foreach ($_GET as $param => $val) {
+			if ($reqData[$param] != $val) {
+				return false;
+			}
+		}
+		return true;
+	}
 
 	public function referer() {
 		return isset($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : '';
@@ -108,26 +169,14 @@ class Request {
 		return isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : '';
 	}
 
-	public function addUrlQuery($key, $value) {
-		$newUrl = isset($_SERVER['REQUEST_URI']) ? rtrim($_SERVER['REQUEST_URI'], '/') : '.';
-		$newUrl = preg_replace("!/$key=[^/]*!", '', $newUrl);
-		$newUrl .= "/$key=$value";
-		return $newUrl;
+
+	public function hash() {
+		if ( empty($this->hash) ) {
+			ksort($_GET);
+			$this->hash = md5( serialize($_GET + $this->params) );
+		}
+		return $this->hash;
 	}
-
-
-	/**
-	 * Gets a parameter by its position from the PATH_INFO query
-	 * @param int $level Number greater than zero
-	 * $param string $default Return this if the parameter is not set
-	 * @return string The parameter value
-	 */
-	public function param($level, $default = NULL) {
-		return isset($this->params[$level]) ? $this->params[$level] : $default;
-	}
-
-
-	public function hash() { return $this->hash; }
 
 
 	public function setCookie($name, $value) {
@@ -142,7 +191,9 @@ class Request {
 	public function makeInputFieldsForGetVars($exclude=array()) {
 		$c = '';
 		foreach ($_GET as $name => $value) {
-			if ( in_array($name, $exclude) || is_numeric($name) ) { continue; }
+			if ( in_array($name, $exclude) || is_numeric($name) ) {
+				continue;
+			}
 			$c .= "<input type='hidden' name='$name' value='$value' />\n";
 		}
 		return $c;
@@ -150,7 +201,7 @@ class Request {
 
 
 	public function isMSIE() {
-		return strpos($_SERVER['HTTP_USER_AGENT'], 'MSIE') !== false;
+		return strpos($this->ua, 'msie') !== false;
 	}
 
 
@@ -168,8 +219,8 @@ class Request {
 	}
 
 	/**
-	 * Remove slashes from some global arrays if magic_quotes_gpc option is on
-	 */
+	Remove slashes from some global arrays if magic_quotes_gpc option is on.
+	*/
 	protected function unescapeGlobals() {
 		if ( get_magic_quotes_gpc() ) {
 			$_GET = $this->unescapeArray($_GET);
@@ -180,7 +231,7 @@ class Request {
 	}
 
 	protected function normalizeGlobalsEncoding() {
-		if ( $this->encoding != Setup::$masterEncoding ) {
+		if ( $this->encoding != Setup::IN_ENCODING ) {
 			$_GET = $this->changeArrayEncoding($_GET);
 			$_POST = $this->changeArrayEncoding($_POST);
 			$_REQUEST = $this->changeArrayEncoding($_REQUEST);
@@ -189,10 +240,11 @@ class Request {
 
 
 	/**
-	 * Recursively strips slashes from a given array.
-	 * @param array $arr
-	 * @return array The modified array
-	 */
+	Recursively strips slashes from a given array.
+
+	@param array $arr
+	@return array The modified array
+	*/
 	protected function unescapeArray($arr) {
 		$narr = array();
 		// normalize line delimiter
@@ -207,16 +259,17 @@ class Request {
 
 
 	/**
-	 * Changes the array encoding to the global master encoding.
-	 * @param array $arr
-	 * @return array The modified array
-	 */
+	Changes the array encoding to the global master encoding.
+
+	@param array $arr
+	@return array The modified array
+	*/
 	protected function changeArrayEncoding($arr) {
 		$narr = array();
 		foreach ($arr as $key => $val) {
 			$narr[$key] = is_array($val)
 				? $this->changeArrayEncoding($val)
-				: iconv($this->encoding, Setup::$masterEncoding, $val);
+				: iconv($this->encoding, Setup::IN_ENCODING, $val);
 		}
 		return $narr;
 	}

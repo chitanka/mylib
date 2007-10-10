@@ -2,7 +2,7 @@
 
 class User {
 
-	const MAIN_DB_TABLE = 'user';
+	const DB_TABLE = DBT_USER;
 	public static $defOptions = array(
 		'skin' => 'orange',
 		'nav' => 'right', // navigation position
@@ -12,20 +12,18 @@ class User {
 		'dlcover' => false, // add covers to downloads
 	);
 	public static $userRights;
-	public $id, $username, $password, $realname, $email, $group;
-	private $rights = array(), $options = array(),
-		$readTexts = array(), $dlTexts = array();
+	public
+		$id, $username, $password, $realname, $email, $group;
+	protected
+		$rights = array(), $options = array(),
+		$readTexts = array(), $dlTexts = array(),
+		$isHuman = false;
 
 
-	/**
-	 * @param int $id
-	 * @param string $username
-	 * @param string $realname
-	 * @param string $group
-	 */
 	private function __construct($id = 0, $username = '', $password = '',
 			$realname = '', $email = '', $group = 'anon', $options = array()) {
 		$this->id = $id;
+		$this->setIsHuman($id > 0);
 		$this->username = $username;
 		$this->password = $password; // hash value of the password
 		$this->realname = $realname;
@@ -45,23 +43,23 @@ class User {
 
 
 	/**
-	 * @return User
-	 */
+	@return User
+	*/
 	public static function initUser() {
-		if ( User::isSetSession() ) {
-			$user = User::newFromSession();
-		} elseif ( User::isSetCookie() ) {
-			$user = User::newFromCookie();
+		if ( self::isSetSession() ) {
+			$user = self::newFromSession();
+		} elseif ( self::isSetCookie() ) {
+			$user = self::newFromCookie();
 		} else {
 			$user = new User();
 		}
 		$user->checkMainPage();
-		return $user;
+		return $_SESSION[U_SESSION] = $user;
 	}
 
 
 	public static function randomPassword($passLength = 8) {
-		$chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz123456789';
+		$chars = 'abcdefghijkmnopqrstuvwxyz123456789';
 		$max = strlen($chars) - 1;
 		$password = '';
 		for ($i=0; $i < $passLength; $i++) {
@@ -72,10 +70,11 @@ class User {
 
 
 	/**
-	 * Check a user name for invalid chars
-	 * @param string $username
-	 * @return mixed true if the user name is ok, or the invalid character
-	 */
+	Check a user name for invalid chars.
+
+	@param string $username
+	@return mixed true if the user name is ok, or the invalid character
+	*/
 	public static function isValidUsername($username) {
 		$forbidden = '/+#"{}[]';
 		$len = strlen($forbidden);
@@ -88,10 +87,64 @@ class User {
 	}
 
 
+	/**
+	Encode a password in order to save it in the database.
+
+	@param string $password
+	@return string Encoded password
+	*/
+	public static function encodePasswordDB($password) {
+		return md5_loop($password, 1);
+	}
+
+
+	/**
+	Encode a password in order to save it in a cookie.
+
+	@param string $password
+	@param bool $rawpass Is this a real password or one already stored
+		encoded in the database
+	@return string Encoded password
+	*/
+	public static function encodePasswordCookie($password, $rawpass = true) {
+		if ($rawpass) {
+			$password = self::encodePasswordDB($password);
+		}
+		return md5_loop($password, 5);
+	}
+
+
+	/**
+	Validate an entered password.
+	Encodes an entered password and compares it to the password from the database.
+
+	@param string $inputPass The password from the input
+	@param string $dbPass The password stored in the database
+	@return bool
+	*/
+	public static function validatePassword($inputPass, $dbPass) {
+		return strcmp(self::encodePasswordDB($inputPass), $dbPass) === 0;
+	}
+
+
+	/**
+	Validate a token from a cookie.
+	Properly encodes the password from the database and compares it to the token.
+
+	@param string $cookieToken The token from the cookie
+	@param string $dbPass The password stored in the database
+	@return bool
+	*/
+	public static function validateToken($cookieToken, $dbPass) {
+		$enc = self::encodePasswordCookie($dbPass, false);
+		return strcmp($enc, $cookieToken) === 0;
+	}
+
+
 	public static function getLoginTries($username) {
 		$db = Setup::db();
 		$key = array('username' => $username);
-		$res = $db->select(self::MAIN_DB_TABLE, $key, 'login_tries');
+		$res = $db->select(self::DB_TABLE, $key, 'login_tries');
 		if ( $db->numRows($res) ==  0) return 0;
 		list($cnt) = $db->fetchRow($res);
 		return $cnt;
@@ -100,7 +153,8 @@ class User {
 	public static function incLoginTries($username) {
 		$db = Setup::db();
 		$key = array('username' => $username);
-		return $db->update(self::MAIN_DB_TABLE, array('login_tries = login_tries+1'), $key);
+		$set = array('login_tries = login_tries+1');
+		return $db->update(self::DB_TABLE, $set, $key);
 	}
 
 
@@ -114,16 +168,17 @@ class User {
 
 	public static function getData($dbkey) {
 		$db = Setup::db();
-		$res = $db->select(self::MAIN_DB_TABLE, $dbkey);
+		$res = $db->select(self::DB_TABLE, $dbkey);
 		if ( $db->numRows($res) ==  0) return array();
 		return $db->fetchAssoc($res);
 	}
 
 
 	/**
-	 * Is the user anonymous?
-	 * @return bool
-	 */
+	Is the user anonymous?
+
+	@return bool
+	*/
 	public function isAnon() { return empty($this->username); }
 
 	public function showName() {
@@ -154,24 +209,27 @@ class User {
 		return in_array('*', $this->rights);
 	}
 
+	public function isHuman() {
+		return $this->isHuman;
+	}
+
+	public function setIsHuman($isHuman) {
+		$this->isHuman = $isHuman;
+	}
 
 	public function saveNewPassword($username, $password) {
 		$db = Setup::db();
-		$set = array('newpassword' => $db->encodePasswordDB($password));
+		$set = array('newpassword' => self::encodePasswordDB($password));
 		$key = array('username' => $username);
-		$db->update(self::MAIN_DB_TABLE, $set, $key);
+		$db->update(self::DB_TABLE, $set, $key);
 		return $db->affectedRows() > 0;
 	}
 
 
 	public function activateNewPassword($uid) {
 		$db = Setup::db();
-		$res = $db->select(self::MAIN_DB_TABLE, array('id' => $uid), 'newpassword');
-		$data = $db->fetchAssoc($res);
-		if ( empty($data) ) { return false; }
-		extract($data);
-		$set = array('password' => $newpassword);
-		$db->update(self::MAIN_DB_TABLE, $set, array('id' => $uid));
+		$set = array('password = newpassword');
+		$db->update(self::DB_TABLE, $set, array('id' => $uid));
 		return $db->affectedRows() > 0;
 	}
 
@@ -180,15 +238,15 @@ class User {
 		$db = Setup::db();
 		// delete a previously generated new password, login_tries
 		$set = array('newpassword' => '', 'login_tries' => 0);
-		$db->update(self::MAIN_DB_TABLE, $set, array('id' => $uid));
+		$db->update(self::DB_TABLE, $set, array('id' => $uid));
 		$_COOKIE[UID_COOKIE] = $uid;
-		$_COOKIE[TOKEN_COOKIE] = $db->encodePasswordCookie($upass);
+		$_COOKIE[TOKEN_COOKIE] = self::encodePasswordCookie($upass);
 		if ($remember) {
 			$request = Setup::request();
 			$request->setCookie(UID_COOKIE, $_COOKIE[UID_COOKIE]);
 			$request->setCookie(TOKEN_COOKIE, $_COOKIE[TOKEN_COOKIE]);
 		}
-		return $_SESSION[U_SESSION] = User::newFromDB($uid);
+		return $_SESSION[U_SESSION] = self::newFromDB($uid);
 	}
 
 
@@ -209,15 +267,19 @@ class User {
 
 
 	public function markTextAsRead($textId) {
-		if ( in_array($textId, $this->readTexts) ) return;
+		if ( in_array($textId, $this->readTexts) ) { return; }
 		$this->readTexts[] = $textId;
-		Work::incReadCounter($textId);
+		if ( ! Setup::request()->isBotRequest() ) {
+			Work::incReadCounter($textId);
+		}
 	}
 
 	public function markTextAsDl($textId) {
-		if ( in_array($textId, $this->dlTexts) ) return;
+		if ( in_array($textId, $this->dlTexts) ) { return; }
 		$this->dlTexts[] = $textId;
-		Work::incDlCounter($textId);
+		if ( ! Setup::request()->isBotRequest() ) {
+			Work::incDlCounter($textId);
+		}
 	}
 
 
@@ -229,11 +291,15 @@ class User {
 
 
 	public static function extractOptions($optstr) {
-		if ( empty($optstr) ) { return array(); }
+		if ( empty($optstr) ) {
+			return array();
+		}
 		$rawopts = explode(';', $optstr);
 		$opts = array();
 		foreach ($rawopts as $rawopt) {
-			if ( empty($rawopt) ) continue;
+			if ( empty($rawopt) ) {
+				continue;
+			}
 			list($name, $val) = explode('=', $rawopt);
 			$opts[$name] = strpos($val, ',') === false ? $val : explode(',', $val);
 		}
@@ -259,30 +325,30 @@ class User {
 
 	/** @return User */
 	protected static function newFromCookie() {
-		return User::newFromDB( $_COOKIE[UID_COOKIE] );
+		return self::newFromDB( $_COOKIE[UID_COOKIE] );
 	}
 
 
 	/**
-	 *
-	 * @param integer $uid
-	 * @return User
-	 */
+
+	@param integer $uid
+	@return User
+	*/
 	protected static function newFromDB($uid) {
 		$db = Setup::db();
 		$dbkey = array('id' => $uid);
-		$res = $db->select(self::MAIN_DB_TABLE, $dbkey);
+		$res = $db->select(self::DB_TABLE, $dbkey);
 		if ($db->numRows($res) > 0) {
 			// touch this user
 			$set = array('touched' => date('Y-m-d H:i:s'));
-			$db->update(self::MAIN_DB_TABLE, $set, $dbkey);
+			$db->update(self::DB_TABLE, $set, $dbkey);
 			extract( $db->fetchAssoc($res) );
-			if ( $db->encodePasswordCookie($password) === $_COOKIE[TOKEN_COOKIE] ) {
+			if ( self::validateToken($_COOKIE[TOKEN_COOKIE], $password) ) {
 				$opts = self::extractOptions($opts);
 				$opts['news'] = $db->s2b($news);
 				$opts['allowemail'] = $db->s2b($allowemail);
 				$user = new User($uid, $username, $password, $realname, $email, $group, $opts);
-				return $_SESSION[U_SESSION] = $user;
+				return $user;
 			}
 		}
 		return new User();

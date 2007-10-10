@@ -1,6 +1,7 @@
 <?php
 class EditPage extends Page {
 
+	const DB_TABLE = DBT_TEXT;
 	protected
 		$defLicense = 2, // 'fc' - full (fucking) copyright
 		$defEditComment = '';
@@ -9,10 +10,7 @@ class EditPage extends Page {
 		parent::__construct();
 		$this->action = 'edit';
 		$this->title = 'Редактиране';
-		$this->mainDbTable = 'text';
-		$this->licenseDbTable = 'license';
-		$this->editHistoryDbTable = 'edit_history';
-		$this->textId = (int) $this->request->value('textId', 0, 1);
+		$this->textId = (int) $this->request->value('id', 0, 1);
 		$this->obj = $this->request->value('obj', '', 2);
 		$this->withText = true;
 		$this->textonly = $this->obj == 'textonly';
@@ -68,13 +66,14 @@ class EditPage extends Page {
 			$this->addMessage('Промените бяха съхранени.');
 		}
 		if ( $this->showagain ) {
-			#$this->addMessage("<a href='$this->root/text/$this->textId'>Към текста</a>");
 			return $this->buildContent();
 		}
-		if ( strpos($_SERVER['HTTP_HOST'], 'localhost') !== false ) {
-			$this->addMessage("<a href='$this->root/text/$this->textId'>Към текста</a>");
-			return '';
-		}
+// 		if ( strpos($_SERVER['HTTP_HOST'], 'localhost') !== false ) {
+// 			$link = $this->makeSimpleTextLink('', $this->textId, 1, 'Към текста');
+// 			$this->addMessage($link);
+// 			return '';
+// 		}
+		$this->request->setValue('textId', $this->textId);
 		return $this->redirect('text');
 	}
 
@@ -107,7 +106,7 @@ class EditPage extends Page {
 		$qs = array();
 		if ($this->textId == 0) {
 			$set['entrydate'] = date('Y-m-d');
-			$this->textId = $this->db->autoIncrementId($this->mainDbTable);
+			$this->textId = $this->db->autoIncrementId(self::DB_TABLE);
 			if ( !empty($this->scanUser) ) {
 				foreach ( explode(';', $this->scanUser) as $user_perc ) {
 					$up = explode(',', $user_perc);
@@ -115,28 +114,31 @@ class EditPage extends Page {
 					$perc = isset($up[1]) ? $up[1] : 100;
 					$setut = array('text' => $this->textId, 'user' => (int)$user,
 						'percent' => (int)$perc);
-					$qs[] = $this->db->insertQ('user_text', $setut);
+					$qs[] = $this->db->insertQ(DBT_USER_TEXT, $setut);
 				}
 			}
 		}
 		$set['id'] = $this->textId;
-		$qs[] = $this->db->makeInsertOrUpdateQuery($this->mainDbTable, $set, $key);
+		$qs[] = $this->db->updateQ(self::DB_TABLE, $set, $key);
 		if ( $this->mode == 'full' ) {
 			$is_changed = $this->request->value('is_changed');
-			foreach ( array('author', 'translator') as $key ) {
+			$dbts = array('author'=>DBT_AUTHOR_OF, 'translator'=>DBT_TRANSLATOR_OF);
+			foreach ($dbts as $key => $dbt) {
 				if ( $is_changed[$key] ) {
 					$dbkey = array('text' => $this->textId);
-					$qs[] = $this->db->deleteQ($key.'_of', $dbkey);
+					$qs[] = $this->db->deleteQ($dbt, $dbkey);
 					foreach ($this->$key as $pos => $person) {
-						if ( empty($person) ) { continue; }
+						if ( empty($person) ) {
+							continue;
+						}
 						$set = array($key => $person, 'text' => $this->textId, 'pos' => $pos);
-						$qs[] = $this->db->insertQ($key.'_of', $set);
+						$qs[] = $this->db->insertQ($dbt, $set);
 					}
 				}
 			}
 		}
 		$qs = array_merge($qs, $this->makeUpdateTextContentQueries());
-		CacheManager::clearCache("text$this->textId");
+		CacheManager::clearCache(CacheManager::SFBZIP_DIR, $this->textId);
 		return $qs;
 	}
 
@@ -144,19 +146,19 @@ class EditPage extends Page {
 	protected function makeUpdateTextContentQueries() {
 		$qs = array();
 		if ( is_uploaded_file($_FILES['file']['tmp_name']) ) {
-			$file = $GLOBALS['contentDirs']['text'].$this->textId;
-			move_uploaded_file($_FILES['file']['tmp_name'], $file);
+			$file = getContentFilePath('text', $this->textId);
+			mymove_uploaded_file($_FILES['file']['tmp_name'], $file);
 			$qs = $this->makeUpdateChunkQuery($file);
 			$size = filesize($file);
 			$set = array('size' => $size, 'zsize' => $size/3.5,
 				'headlevel' => $this->headlevel);
-			$qs[] = $this->db->updateQ($this->mainDbTable, $set, array('id'=>$this->textId));
+			$qs[] = $this->db->updateQ(self::DB_TABLE, $set, array('id'=>$this->textId));
 			$set = array("size = percent/100 * $size");
 			$key = array('text' => $this->textId);
-			$qs[] = $this->db->updateQ('user_text', $set, $key);
+			$qs[] = $this->db->updateQ(DBT_USER_TEXT, $set, $key);
 			$this->addEditCommentQuery($qs);
 		} elseif ( $this->request->checkbox('usecurr') ) {
-			$file = $GLOBALS['contentDirs']['text'].$this->textId;
+			$file = getContentFilePath('text', $this->textId);
 			$qs = $this->makeUpdateChunkQuery($file);
 		}
 		return $qs;
@@ -166,7 +168,7 @@ class EditPage extends Page {
 	protected function makeUpdateChunkQuery($file) {
 		require_once 'include/headerextract.php';
 		require_once 'include/replace.php';
-		$q = '';
+		$data = array();
 		$pref = $this->request->value('partpref');
 		foreach (makeDbRows($file, $this->headlevel) as $row) {
 			$name = $row[2];
@@ -175,20 +177,19 @@ class EditPage extends Page {
 			}
 			$name = strtr($name, array('_'=>''));
 			$name = $this->db->escape(my_replace($name));
-			$q .= "($this->textId, $row[0], $row[1], '$name', $row[3], $row[4]), ";
+			$data[] = array($this->textId, $row[0], $row[1], $name, $row[3], $row[4]);
 		}
 		$qs = array();
-		$qs[] = $this->db->deleteQ('header', array('text' => $this->textId));
-		if ( !empty($q) ) {
-			$qs[] = 'INSERT /*p*/header (`text`, `nr`, `level`, `name`, `fpos`, `linecnt`) VALUES '.rtrim($q, ' ,');
+		$qs[] = $this->db->deleteQ(DBT_HEADER, array('text' => $this->textId));
+		if ( !empty($data) ) {
+			$fields = array('text', 'nr', 'level', 'name', 'fpos', 'linecnt');
+			$qs[] = $this->db->multiinsertQ(DBT_HEADER, $data, $fields);
 		}
 		return $qs;
 	}
 
 
 	protected function makeUpdateInfoQueries() {
-		global $contentDirs;
-
 		$qs = array();
 		$this->tcontent = str_replace("\r", '', $this->tcontent);
 		if ($this->replace) {
@@ -196,15 +197,17 @@ class EditPage extends Page {
 			$this->tcontent = my_replace($this->tcontent);
 			if ( strpos($this->tcontent, '"') !== false ) {
 				$this->addMessage('Вероятна грешка: останала е непроменена кавичка (").', true);
-				file_put_contents('./log/error',
+				myfile_put_contents('./log/error',
 					"Кавичка при доп. информация за $this->textId\n", FILE_APPEND);
 			}
 		}
-		$file = $contentDirs['text-info'] . $this->textId;
-		$bak = $contentDirs['oldtext-info'] . $this->textId .'-'. time();
-		if ( file_exists($file) ) copy($file, $bak);
-		file_put_contents($file, $this->tcontent);
-		CacheManager::clearCache("text-info$this->textId");
+		$file = getContentFilePath('text-info', $this->textId);
+		$bak = getContentFilePath('oldtext-info', $this->textId) .'-'. time();
+		if ( file_exists($file) ) {
+			mycopy($file, $bak);
+		}
+		myfile_put_contents($file, $this->tcontent);
+		CacheManager::clearCache(CacheManager::SFBZIP_DIR, $this->textId);
 		# Засега редактирането на доп. информация не се отразява в базата.
 		#$this->addEditCommentQuery($qs);
 		return $qs;
@@ -212,8 +215,6 @@ class EditPage extends Page {
 
 
 	protected function makeUpdateAnnoQueries() {
-		global $contentDirs;
-
 		$qs = array();
 		$this->tcontent = str_replace("\r", '', $this->tcontent);
 		if ($this->replace) {
@@ -221,34 +222,36 @@ class EditPage extends Page {
 			$this->tcontent = my_replace($this->tcontent);
 			if ( strpos($this->tcontent, '"') !== false ) {
 				$this->addMessage('Вероятна грешка: останала е непроменена кавичка (").', true);
-				file_put_contents('./log/error',
+				myfile_put_contents('./log/error',
 					"Кавичка при анотация към $this->textId\n", FILE_APPEND);
 			}
 		}
-		$file = $contentDirs['text-anno'] . $this->textId;
-		$bak = $contentDirs['oldtext-anno'] . $this->textId .'-'. time();
+		$file = getContentFilePath('text-anno', $this->textId);
+		$bak = getContentFilePath('oldtext-anno', $this->textId) .'-'. time();
 		if ( file_exists($file) ) {
-			copy($file, $bak);
+			mycopy($file, $bak);
 		} else {
 			$set = array('has_anno' => true);
 			$dbkey = array('id' => $this->textId);
-			$qs[] = $this->db->updateQ($this->mainDbTable, $set, $dbkey);
+			$qs[] = $this->db->updateQ(self::DB_TABLE, $set, $dbkey);
 		}
-		file_put_contents($file, $this->tcontent);
-		CacheManager::clearCache("text-anno$this->textId");
+		myfile_put_contents($file, $this->tcontent);
+		CacheManager::clearCache(CacheManager::SFBZIP_DIR, $this->textId);
 		$this->addEditCommentQuery($qs);
 		return $qs;
 	}
 
 
 	protected function addEditCommentQuery(&$qs) {
-		if ( empty($this->edit_comment) ) { return; }
-		$eid = $this->db->autoIncrementId($this->editHistoryDbTable);
+		if ( empty($this->edit_comment) ) {
+			return;
+		}
+		$eid = $this->db->autoIncrementId(DBT_EDIT_HISTORY);
 		$set = array('id' => $eid, 'text' => $this->textId, 'user' => $this->user->id,
 			'comment' => $this->edit_comment, 'date' => date('Y-m-d H:i:s'));
-		$qs[] = $this->db->insertQ($this->editHistoryDbTable, $set);
+		$qs[] = $this->db->insertQ(DBT_EDIT_HISTORY, $set);
 		$set = array('lastedit' => $eid);
-		$qs[] = $this->db->updateQ($this->mainDbTable, $set, array('id'=>$this->textId));
+		$qs[] = $this->db->updateQ(self::DB_TABLE, $set, array('id'=>$this->textId));
 	}
 
 
@@ -275,8 +278,10 @@ class EditPage extends Page {
 	</tr></table>
 EOS;
 		} else {
-			$url = $this->request->addUrlQuery('mode', 'full');
-			$personsEdit = "<p style='text-align:right'><a href='$url'>Редактиране на автор и преводач</a></p>";
+			$link = $this->out->link(
+				$this->addUrlQuery(array('mode' => 'full')),
+				'Редактиране на автор и преводач');
+			$personsEdit = "<p style='text-align:right'>$link</p>";
 		}
 		$opts = array('0' => 'Без разделяне',
 			'1' => '1', '2' => '2', '3' => '3', '4' => '4');
@@ -297,10 +302,12 @@ EOS;
 EOS;
 		$formBegin = $this->makeFormBegin();
 		$formEnd = $this->makeFormEnd();
-		if ( empty($author) ) $author = 'неизвестен автор';
-		$toText = !empty($this->textId)  ?
-			"<p>„<a href='$this->root/text/$this->textId'>".
-			"$this->ttitle</a>“ от $author</p>" : '';
+  fillOnEmpty($author, 'неизвестен автор');
+		$toText = '';
+		if ( !empty($this->textId) ) {
+			$tlink = $this->makeSimpleTextLink($this->ttitle, $this->textId);
+			$toText = "<p>„{$tlink}“ от $author</p>";
+		}
 		$mainElements = $this->makeEditTextMainElements();
 		$userInput = $this->makeUserInput();
 		return <<<EOS
@@ -320,7 +327,7 @@ EOS;
 	protected function makeEditTextMainElements() {
 		if ($this->textonly) return '';
 		$series = $this->makeSeriesInput();
-		$type = $this->out->selectBox('type', '', $GLOBALS['types'], $this->type);
+		$type = $this->out->selectBox('type', '', workTypes(), $this->type);
 		$title = $this->out->textField('title', '', $this->ttitle, 60);
 		$orig_title = $this->out->textField('orig_title', '', $this->orig_title, 60);
 		$subtitle = $this->out->textField('subtitle', '', $this->subtitle, 60);
@@ -335,7 +342,7 @@ EOS;
 		$lang = $this->out->selectBox('lang', '', $langs, $this->tlang);
 		$olang = $this->out->selectBox('orig_lang', '', $langs, $this->orig_lang);
 		$collection = $this->out->checkbox('collection', '', $this->collection, 'Колективен сборник');
-		$lopts = $this->db->getObjects('license');
+		$lopts = $this->db->getObjects(DBT_LICENSE);
 		$lopts[0] = 'Неизвестен';
 		$license_orig = $this->out->selectBox('license_orig', '', $lopts, $this->license_orig);
 		$license_trans = $this->out->selectBox('license_trans', '', $lopts, $this->license_trans);
@@ -378,16 +385,18 @@ EOS;
 		$formEnd = $this->makeFormEnd();
 		$author = implode(',', $this->nauthor);
 		$author = $this->makeAuthorLink($author);
-		if ( empty($author) ) $author = 'неизвестен автор';
+		fillOnEmpty($author, 'неизвестен автор');
 		$contentInput = $this->withText ? $this->makeTextarea() : '';
 		$otitle = $this->orig_title != $this->ttitle && !empty($this->orig_title)
 			? "($this->orig_title)" : '';
 		$ctitle = $this->out->textField('ctitle', '', $this->ctitle, 30);
+		$tlink = $this->makeSimpleTextLink($this->ttitle, $this->textId, $this->chunkId);
+		$edithelp = $this->out->internLink('Съвети за редактирането',
+			array(self::FF_ACTION=>'help', 'topic'=>'edit'), 2);
 		return <<<EOS
 
-<p>„<a href="$this->root/text/$this->textId/$this->chunkId">{$this->ttitle}</a>“
-$otitle от $author</p>
-<p style="text-align:right"><a href="$this->root/help/edit">Съвети за редактирането</a></p>
+<p>„{$tlink}“ $otitle от $author</p>
+<p style="text-align:right">$edithelp</p>
 
 $formBegin
 	<label for="ctitle">Заглавие:</label>
@@ -406,15 +415,17 @@ EOS;
 		$formEnd = $this->makeFormEnd();
 		$author = implode(',', $this->nauthor);
 		$author = $this->makeAuthorLink($author);
-		if ( empty($author) ) $author = 'неизвестен автор';
+  fillOnEmpty($author, 'неизвестен автор');
 		$contentInput = $this->makeTextarea();
+		$tlink = $this->makeSimpleTextLink($this->ttitle, $this->textId, $this->chunkId);
 		$otitle = $this->orig_title != $this->ttitle && !empty($this->orig_title)
 			? "($this->orig_title)" : '';
+		$edithelp = $this->out->internLink('Съвети за редактирането',
+			array(self::FF_ACTION=>'help', 'topic'=>'edit'), 2);
 		return <<<EOS
 
-<p>„<a href="$this->root/text/$this->textId/$this->chunkId">{$this->ttitle}</a>“
-$otitle от $author</p>
-<p style="text-align:right"><a href="$this->root/help/edit">Съвети за редактирането</a></p>
+<p>„{$tlink}“ $otitle от $author</p>
+<p style="text-align:right">$edithelp</p>
 $formBegin
 	$contentInput<br />
 $formEnd
@@ -429,15 +440,17 @@ EOS;
 		$formEnd = $this->makeFormEnd();
 		$author = implode(',', $this->nauthor);
 		$author = $this->makeAuthorLink($author);
-		if ( empty($author) ) $author = 'неизвестен автор';
+  fillOnEmpty($author, 'неизвестен автор');
 		$contentInput = $this->makeTextarea();
+		$tlink = $this->makeSimpleTextLink($this->ttitle, $this->textId, $this->chunkId);
 		$otitle = $this->orig_title != $this->ttitle && !empty($this->orig_title)
 			? "($this->orig_title)" : '';
+		$edithelp = $this->out->internLink('Съвети за редактирането',
+			array(self::FF_ACTION=>'help', 'topic'=>'edit'), 2);
 		return <<<EOS
 
-<p>„<a href="$this->root/text/$this->textId/$this->chunkId">{$this->ttitle}</a>“
-$otitle от $author</p>
-<p style="text-align:right"><a href="$this->root/help/edit">Съвети за редактирането</a></p>
+<p>„{$tlink}“ $otitle от $author</p>
+<p style="text-align:right">$edithelp</p>
 $formBegin
 	$contentInput<br />
 $formEnd
@@ -466,7 +479,7 @@ EOS;
 
 
 	protected function makeFormBegin() {
-		$textId = $this->out->hiddenField('textId', $this->textId);
+		$textId = $this->out->hiddenField('id', $this->textId);
 		$obj = $this->out->hiddenField('obj', $this->obj);
 		$mode = $this->out->hiddenField('mode', $this->mode);
 		$chunkId = $this->out->hiddenField('chunkId', $this->chunkId);
@@ -496,22 +509,23 @@ EOS;
 
 
 	protected function makePersonInput($ind) {
-		$keys = array(1 => 'author', 2 => 'translator');
+		$keys = array(1 => 'author', 'translator');
+		$dbtables = array(1 => DBT_AUTHOR_OF, DBT_TRANSLATOR_OF);
 		$key = $keys[$ind];
 		$js = "\npersons['$key'] = {";
 		$dbkey = array("(role & $ind)");
-		foreach ($this->db->getObjects('person', null, null, $dbkey) as $id => $name) {
+		foreach ($this->db->getObjects(DBT_PERSON, null, null, $dbkey) as $id => $name) {
 			if ( empty($name) ) { $name = '(Неизвестен автор)'; }
 			$js .= "\n\t$id: '$name',";
 		}
 		$js = rtrim($js, ',') . "\n}; // end of array persons['$key']\n";
 		$this->addJs($js);
 		$dbkey = array('text' => $this->textId);
-		$q = $this->db->selectQ($key.'_of', $dbkey, $key, 'pos');
+		$q = $this->db->selectQ($dbtables[$ind], $dbkey, $key, 'pos');
 		$addRowFunc = create_function('$row',
 			'return "addRow(\''.$key.'\', $row['.$key.']); ";');
 		$load = $this->db->iterateOverResult($q, $addRowFunc);
-		if ( empty($load) ) { $load = "addRow('$key', 0); "; }
+		fillOnEmpty($load, "addRow('$key', 0); ");
 		$is_changed = $this->out->hiddenField("is_changed[$key]", 0);
 		$o = <<<EOS
 	<table><tbody id="t$key"><tbody></table>
@@ -574,13 +588,16 @@ EOS;
 
 		var ser = new Array();
 EOS;
-		$query = 'SELECT aof.author, s.id, s.name
-			FROM /*p*/ser_author_of aof
-			LEFT JOIN /*p*/series s ON (aof.series = s.id)
-			ORDER BY aof.author, s.name';
+		$qa = array(
+			'SELECT' => 'aof.author, s.id, s.name',
+			'FROM' => DBT_SER_AUTHOR_OF .' aof',
+			'LEFT JOIN' => array(DBT_SERIES .' s' => 'aof.series = s.id'),
+			'ORDER BY' => 'aof.author, s.name',
+		);
 		$this->curInd = 0;
 		$this->curAuthor = 0;
-		$js .= $this->db->iterateOverResult($query, 'makeSeriesJsItem', $this);
+		$q = $this->db->extselectQ($qa);
+		$js .= $this->db->iterateOverResult($q, 'makeSeriesJsItem', $this);
 		$this->addJs($js);
 		$opts = array(0 => '(Не е част от поредица)');
 		$series = $this->out->selectBox('series', '', $opts);
@@ -596,7 +613,9 @@ EOS;
 
 	public function makeSeriesJsItem($dbrow) {
 		extract($dbrow);
-		if ( empty($id) ) { continue; }
+		if ( empty($id) ) {
+			continue;
+		}
 		$js = '';
 		if ($this->curAuthor != $author) {
 			$js .= "\nser[$author]=new Array();";
@@ -623,15 +642,20 @@ EOS;
 		if ( $this->withText && !empty($this->tcontent) ) {
 			$this->initChunkData();
 		}
-		$result = $this->db->query("SELECT title ttitle, orig_title, orig_lang,
-		subtitle, orig_subtitle, trans_year, trans_year2, t.year, year2,
-		license_orig, license_trans, type, series, sernr, collection,
-		GROUP_CONCAT(aof.author) author, GROUP_CONCAT(a.name) nauthor
-		FROM /*p*/$this->mainDbTable t
-		LEFT JOIN /*p*/author_of aof ON (t.id = aof.text)
-		LEFT JOIN /*p*/person a ON (aof.author = a.id)
-		WHERE t.id = $this->textId GROUP BY t.id");
-		$data = $this->db->fetchAssoc($result);
+		$qa = array(
+			'SELECT' => 'title ttitle, orig_title, orig_lang,
+				subtitle, orig_subtitle, trans_year, trans_year2, t.year, year2,
+				license_orig, license_trans, type, series, sernr, collection,
+				GROUP_CONCAT(aof.author) author, GROUP_CONCAT(a.name) nauthor',
+			'FROM' => self::DB_TABLE .' t',
+			'LEFT JOIN' => array(
+				DBT_AUTHOR_OF .' aof' => 't.id = aof.text',
+				DBT_PERSON .' a' => 'aof.author = a.id'
+			),
+			'WHERE' => array('t.id = '.$this->textId),
+			'GROUP BY' => 't.id'
+		);
+		$data = $this->db->fetchAssoc( $this->db->extselect($qa) );
 		extract2object($data, $this);
 		if ( empty($data) ) {
 			$this->nauthor = '';
@@ -643,24 +667,28 @@ EOS;
 
 
 	protected function initChunkData() {
-		global $contentDirs;
 		switch ($this->obj) {
-		case 'info' : $file = $contentDirs['text-info'] .$this->textId; break;
-		case 'anno' : $file = $contentDirs['text-anno'] .$this->textId; break;
-		default: $file = $contentDirs['text'] ."$this->textId-$this->chunkId"; break;
+		case 'info' : $file = getContentFilePath('text-info', $this->textId); break;
+		case 'anno' : $file = getContentFilePath('text-anno', $this->textId); break;
+		default: $file = getContentFilePath('text', $this->textId); break;
 		}
 		$this->tcontent = @file_get_contents($file);
 		$sel = array('title ttitle', 'orig_title');
-		$res = $this->db->select('text', array('id' => $this->textId), $sel);
+		$res = $this->db->select(DBT_TEXT, array('id' => $this->textId), $sel);
 		$data = $this->db->fetchAssoc($res);
-		if ( empty($data) ) { $this->ttitle = ''; }
+		if ( empty($data) ) {
+			$this->ttitle = '';
+		}
 		extract2object($data, $this);
 
-		$query = "SELECT a.name FROM /*p*/author_of aof
-			LEFT JOIN /*p*/person a ON aof.author = a.id
-			WHERE aof.text = $this->textId";
+		$qa = array(
+			'SELECT' => 'a.name',
+			'FROM' => DBT_AUTHOR_OF .' aof',
+			'LEFT JOIN' => array(DBT_PERSON .' a' => 'aof.author = a.id'),
+			'WHERE' => array('aof.text' => $this->textId),
+		);
 		$this->nauthor = array();
-		$this->db->iterateOverResult($query, 'addNAuthor', $this);
+		$this->db->iterateOverResult($this->db->extselectQ($qa), 'addNAuthor', $this);
 	}
 
 	public function addNAuthor($dbrow) {

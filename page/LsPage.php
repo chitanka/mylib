@@ -2,7 +2,7 @@
 
 class LsPage extends Page {
 
-	protected $maxSaveSize = 2000000;
+	protected $maxSaveSize = 20000000;
 
 
 	public function __construct() {
@@ -21,37 +21,48 @@ class LsPage extends Page {
 	protected function buildContent() {
 		global $contentDirs;
 		$dir = $contentDirs[$this->dir];
+		$this->files = array();
+		$this->starttime = time() - $this->days * 24*60*60;
+		$this->processDir($dir);
+
+		ksort($this->files, SORT_NUMERIC);
+		$files = array_reverse($this->files, true);
 		$o = '';
-		$files = array();
-		$starttime = time() - $this->days * 24*60*60;
-		$tfiles = scandir($dir);
-		foreach ($tfiles as $tfile) {
-			if ($tfile{0} == '.') { continue; }
-			$fullname = $dir . $tfile;
-			$mtime = filemtime($fullname);
-			if ($mtime > $starttime) {
-				$files[$mtime][] = $fullname;
-				if ( $this->copy ) {
-					$destfile = './update'.strstr($fullname, '/');
-					if ( filesize($fullname) > $this->maxSaveSize ) {
-						$this->splitCopyFile($fullname, $destfile);
-					} else {
-						copy($fullname, $destfile);
-					}
-				}
-			}
-		}
-		ksort($files, SORT_NUMERIC);
-		$files = array_reverse($files, true);
-		foreach ($files as $mtime => $tfiles) {
+		foreach ($this->files as $mtime => $tfiles) {
 			$date = date('Y-m-d H:i:s', $mtime);
 			foreach ($tfiles as $file) {
-				$o .= "$date  <a href='$this->rootd/$file'>$file</a>\n";
+				$link = $this->out->link($this->rootd.'/'.$file, $file);
+				$o .= "$date  $link\n";
 			}
 		}
 		return $this->makeForm() . '<pre>'. $o .'</pre>';
 	}
 
+
+	protected function processDir($dir) {
+		$dir = rtrim($dir, '/');
+		$tfiles = scandir($dir);
+		foreach ($tfiles as $tfile) {
+			if ($tfile{0} == '.') { continue; }
+			$fullname = $dir .'/'. $tfile;
+			if (is_dir($fullname)) {
+				$this->processDir($fullname);
+				continue;
+			}
+			$mtime = filemtime($fullname);
+			if ($mtime > $this->starttime) {
+				$this->files[$mtime][] = $fullname;
+				if ( $this->copy ) {
+					$destfile = './update'.strstr($fullname, '/');
+					if ( filesize($fullname) > $this->maxSaveSize ) {
+						$this->splitCopyFile($fullname, $destfile);
+					}# else {
+						mycopy($fullname, $destfile);
+					#}
+				}
+			}
+		}
+	}
 
 	protected function splitCopyFile($srcfile, $destfile) {
 		$fp = fopen($srcfile, 'r');
@@ -81,6 +92,7 @@ class LsPage extends Page {
 
 <form action="{FACTION}" method="get">
 <div>
+	{HIDDEN_ACTION}
 	Файловете, променени през последните
 	<input type="" id="days" name="days" size="2" value="$this->days" />
 	<label for="days">дни</label>

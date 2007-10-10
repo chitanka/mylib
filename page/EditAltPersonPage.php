@@ -1,11 +1,12 @@
 <?php
 class EditAltPersonPage extends Page {
 
+	const DB_TABLE = DBT_PERSON_ALT;
+
 	public function __construct() {
 		parent::__construct();
 		$this->action = 'editAltPerson';
-		$this->mainDbTable = 'person_alt';
-		$this->altId = (int) $this->request->value('altId', 0, 1);
+		$this->altId = (int) $this->request->value('id', 0, 1);
 		$this->title = ($this->altId == 0 ? 'Добавяне' : 'Редактиране').
 			' на алтернативно име на автор';
 		$this->name = $this->request->value('name', '');
@@ -17,7 +18,7 @@ class EditAltPersonPage extends Page {
 
 
 	protected function processSubmission() {
-		$res = $this->db->insertOrUpdate($this->mainDbTable,
+		$res = $this->db->update(self::DB_TABLE,
 			$this->makeSetData(), $this->altId);
 		if ( $res !== false ) {
 			$this->addMessage('Редакцията беше успешна.');
@@ -46,19 +47,21 @@ class EditAltPersonPage extends Page {
 	protected function initData() {
 		$sel = array('name', 'orig_name', 'person');
 		$key = array('id' => $this->altId);
-		$res = $this->db->select($this->mainDbTable, $key, $sel);
+		$res = $this->db->select(self::DB_TABLE, $key, $sel);
 		$data = $this->db->fetchAssoc($res);
-		if ( empty($data) ) return false;
+		if ( empty($data) ) {
+			return false;
+		}
 		extract2object($data, $this);
 	}
 
 
 	protected function makeEditForm() {
-		$altId = $this->out->hiddenField('altId', $this->altId);
+		$altId = $this->out->hiddenField('id', $this->altId);
 		$name = $this->out->textField('name', '', $this->name, 30);
 		$orig_name = $this->out->textField('orig_name', '', $this->orig_name, 30);
 		$person = $this->out->selectBox('person', '',
-			$this->db->getObjects('person'), $this->person);
+			$this->db->getObjects(DBT_PERSON), $this->person);
 		$type = $this->makeTypeInput();
 		$showagain = $this->out->checkbox('showagain', '', $this->showagain,
 			'Показване на формуляра отново');

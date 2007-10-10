@@ -2,28 +2,35 @@
 
 class DynMainPage extends Page {
 
-	protected $headers = array(
-		'liternews' => 'Литературни новини',
-		'newtitles' => 'Добавени произведения',
-		'worktitles' => 'Подготвяни произведения',
-		'readercomments' => 'Читателски мнения',
-		'forumnews' => 'Съобщения от форума',
-		'sitenews' => 'Новини относно библиотеката',
-	);
-	protected $urls;
-	protected $functions = array(
-		'liternews' => 'makeLastLiterNews',
-		'newtitles' => 'makeLastNewTitles',
-		'worktitles' => 'makeLastWorkTitles',
-		'readercomments' => 'makeLastReaderComments',
-		'forumnews' => 'makeLastForumPosts',
-		'sitenews' => 'makeLastNews',
-	);
-	protected $canonicalOrder = array('newtitles', 'worktitles', 'forumnews',
-		'readercomments', 'sitenews', 'liternews');
-	protected $FF_EC_COOKIE = 'dynEntryCount', $FF_ENTRY_COUNT = 'ec';
-	protected $deflimit = 5, $maxlimit = 25;
-	protected $baseLimits = array(5, 10, 15);
+	const
+		FF_EC_COOKIE = 'dynEntryCount', FF_ENTRY_COUNT = 'ec';
+	protected
+		$headers = array(
+			'liternews' => 'Литературни новини',
+			'newtitles' => 'Добавени произведения',
+			'worktitles' => 'Подготвяни произведения',
+			'readercomments' => 'Читателски мнения',
+			'forumnews' => 'Съобщения от форума',
+			'sitenews' => 'Новини относно библиотеката',
+		),
+		$urls,
+		$functions = array(
+			'liternews' => 'makeLastLiterNews',
+			'newtitles' => 'makeLastNewTitles',
+			'worktitles' => 'makeLastWorkTitles',
+			'readercomments' => 'makeLastReaderComments',
+			'forumnews' => 'makeLastForumPosts',
+			'sitenews' => 'makeLastNews',
+		),
+		$canonicalOrder = array(
+			'newtitles',
+			'worktitles',
+			'forumnews',
+			'readercomments',
+			'sitenews',
+			'liternews'),
+		$deflimit = 5, $maxlimit = 25,
+		$baseLimits = array(5, 10, 15);
 
 
 	public function __construct() {
@@ -31,18 +38,18 @@ class DynMainPage extends Page {
 		$this->action = 'dynMain';
 		$this->title = 'Начална страница';
 		$this->urls = array(
-			'liternews' => "$this->root/liternews",
-			'newtitles' => "$this->root/history",
-			'worktitles' => "$this->root/work",
-			'readercomments' => "$this->root/comment",
+			'liternews' => $this->out->internUrl('liternews'),
+			'newtitles' => $this->out->internUrl('history'),
+			'worktitles' => $this->out->internUrl('work'),
+			'readercomments' => $this->out->internUrl('comment'),
 			'forumnews' => $this->forum_root,
-			'sitenews' => "$this->root/news",
+			'sitenews' => $this->out->internUrl('news'),
 		);
-		$this->limit = (int) $this->request->value($this->FF_EC_COOKIE, $this->deflimit);
-		$this->limit = (int) $this->request->value($this->FF_ENTRY_COUNT, $this->limit);
+		$this->limit = (int) $this->request->value(self::FF_EC_COOKIE, $this->deflimit);
+		$this->limit = (int) $this->request->value(self::FF_ENTRY_COUNT, $this->limit);
 		if ($this->limit > $this->maxlimit) $this->limit = $this->maxlimit;
 		elseif ($this->limit < 1) $this->limit = $this->deflimit;
-		$this->request->setCookie($this->FF_EC_COOKIE, $this->limit);
+		$this->request->setCookie(self::FF_EC_COOKIE, $this->limit);
 		$this->userOpts = $this->user->options();
 		$this->sectionOrder = array();
 		foreach ($this->canonicalOrder as $pos => $id) {
@@ -69,28 +76,40 @@ class DynMainPage extends Page {
 			$limit = isset($this->userOpts[$id][2])
 				? (int) $this->userOpts[$id][2] : $this->limit;
 			$o .= $this->makeHeader($id) . $this->$makefunc($limit);
-			$this->toc .= "\n\t<li><a href='#$id'>{$this->headers[$id]}</a></li>";
+			$link = $this->out->link('#'.$id, $this->headers[$id]);
+			$this->toc .= "\n\t<li>$link</li>";
 		}
 		return $this->makeIntro() . $o;
 	}
 
 
 	protected function makeHeader($id) {
-		return <<<EOS
-
-<h2><a href="{$this->urls[$id]}" id="$id" name="$id">{$this->headers[$id]}</a></h2>
-EOS;
+		$link = $this->out->link($this->urls[$id], $this->headers[$id], '',
+			array('id' => $id, 'name' => $id));
+		return "\n\n<h2>$link</h2>";
 	}
 
 
 	protected function makeIntro() {
-		$selflink = $this->root.($this->user->option('mainpage') == 'd' ? '' : "/$this->action");
+		$p = array();
+		if ( $this->user->option('mainpage') != 'd' ) {
+			$p[self::FF_ACTION] = $this->action;
+		}
+		$ignorePos = count($p);
 		$selflinks = '';
 		foreach ($this->baseLimits as $cnt) {
-			$selflinks .= $this->limit == $cnt ? "<strong>$cnt</strong>, "
-				: "<a href='$selflink/$this->FF_ENTRY_COUNT=$cnt' title='Показване на най-много $cnt записа в раздел'>$cnt</a>, ";
+			if ($this->limit == $cnt) {
+				$selflinks .= "<strong>$cnt</strong>";
+			} else {
+				$p[self::FF_ENTRY_COUNT] = $cnt;
+				$selflinks .= $this->out->internLink($cnt, $p, $ignorePos,
+					"Показване на най-много $cnt записа в раздел");
+			}
+			$selflinks .= ', ';
 		}
 		$selflinks = rtrim($selflinks, ' ,');
+		$static = $this->out->internLink('статична', 'staticMain', 1,
+			'Към статичната версия на началната страница');
 		return <<<EOS
 
 <div id="toc">
@@ -100,7 +119,7 @@ EOS;
 </div>
 <p style="text-align:right">Максимален брой на записите в раздел: $selflinks</p>
 <p><br/></p>
-<p><em>$this->sitename</em> предлага две версии на началната страница: <a href="$this->root/staticMain" title="Към статичната версия на началната страница">статична</a> и динамична. В настройките можете да изберете коя от двете да се показва по подразбиране.</p>
+<p><em>$this->sitename</em> предлага две версии на началната страница: $static и динамична. В настройките можете да изберете коя от двете да се показва по подразбиране.</p>
 <p>В момента разглеждате динамичната версия, в която накуп са показани последните записи от няколко раздела в библиотеката.</p>
 <p style="clear:both"></p>
 EOS;

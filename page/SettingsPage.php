@@ -56,8 +56,7 @@ class SettingsPage extends RegisterPage {
 	protected function isValidPassword() {
 		// sometimes browsers automaticaly fill the first password field
 		// so the user does NOT want to change it
-		$samepass = $this->db->encodePasswordDB($this->password) == $this->user->password;
-		if ($samepass) {
+		if ( User::validatePassword($this->password, $this->user->password) ) {
 			return true;
 		}
 		return parent::isValidPassword();
@@ -86,10 +85,10 @@ class SettingsPage extends RegisterPage {
 			return $this->makeRegUserForm();
 		}
 		if ( !empty($this->password) && !empty($this->passwordRe) ) { // change password
-			$set['password'] = $this->db->encodePasswordDB($this->password);
+			$set['password'] = User::encodePasswordDB($this->password);
 		}
 		$key = array('id' => $this->userId);
-		if ( $this->db->update(User::MAIN_DB_TABLE, $set, $key) === false ) {
+		if ( $this->db->update(User::DB_TABLE, $set, $key) === false ) {
 			$this->addMessage('Имаше някакъв проблем при промяната на данните.', true);
 		} else {
 			$this->addMessage("Данните ви бяха променени.");
@@ -135,10 +134,10 @@ class SettingsPage extends RegisterPage {
 		$realname = $this->out->textField('realname', '', $this->realname, 25, 60, $this->tabindex++);
 		$email = $this->out->textField('email', '', $this->email, 25, 60, $this->tabindex++);
 		$allowemail = $this->out->checkbox('allowemail', '', $this->allowemail,
-			'Разрешаване на писма от другите потребители', '', $this->tabindex++);
+			'Разрешаване на писма от другите потребители', null, $this->tabindex++);
 		$common = $this->makeCommonInput();
 		$news = $this->out->checkbox('news', '', $this->news,
-			'Получаване на месечно новинарско писмо', '', $this->tabindex++);
+			'Получаване на месечно новинарско писмо', null, $this->tabindex++);
 		$formEnd = $this->makeFormEnd();
 		return <<<EOS
 
@@ -221,7 +220,7 @@ EOS;
 		$nav = $this->makeNavPosInput($this->tabindex++);
 		$mainpage = $this->makeMainPageInput($this->tabindex++);
 		$dlcover = $this->out->checkbox('dlcover', '', $this->opts['dlcover'],
-			'Включване на корицата при сваляне на текст', '', $this->tabindex++);
+			'Включване на корицата при сваляне на текст', null, $this->tabindex++);
 		$mpExtra = $this->makeMainPageExtraInput();
 		return <<<EOS
 
@@ -245,13 +244,15 @@ EOS;
 
 	protected function makeSkinInput($tabindex) {
 		return $this->out->selectBox('skin', '', Setup::setting('skins'),
-			$this->opts['skin'], $tabindex, 'onchange="skin=this.value; changeStyleSheet()"');
+			$this->opts['skin'], $tabindex,
+			array('onchange'=>'skin=this.value; changeStyleSheet()'));
 	}
 
 
 	protected function makeNavPosInput($tabindex) {
 		return $this->out->selectBox('nav', '', Setup::setting('navpos'),
-			$this->opts['nav'], $tabindex, 'onchange="nav=this.value; changeStyleSheet()"');
+			$this->opts['nav'], $tabindex,
+			array('onchange'=>'nav=this.value; changeStyleSheet()'));
 	}
 
 
@@ -290,10 +291,11 @@ EOS;
 		}
 		ksort($ta);
 		$t = implode('', $ta);
+		$dynmain = $this->out->internLink('Динамична начална страница', 'dynMain');
 		return <<<EOS
 
 	<table>
-		<caption><a href="{$this->root}/dynMain">Динамична начална страница</a></caption>
+		<caption>$dynmain</caption>
 		<thead>
 		<tr>
 			<th>Раздел</th>
@@ -359,7 +361,7 @@ EOS;
 			$this->user->set($field,  $this->$field);
 		}
 		// change back the password form plain text to its hash value
-		$this->user->password = $this->db->encodePasswordDB($this->user->password);
+		$this->user->password = User::encodePasswordDB($this->user->password);
 		$this->user->updateSession();
 	}
 

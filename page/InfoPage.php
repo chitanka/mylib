@@ -88,12 +88,12 @@ EOS;
 
 
 	protected function isAuthor() {
-		return $this->db->exists('person', array('name' => $this->term, '(role&1)'));
+		return $this->db->exists(DBT_PERSON, array('name' => $this->term, '(role&1)'));
 	}
 
 
 	protected function isTranslator() {
-		return $this->db->exists('person', array('name' => $this->term, '(role&2)'));
+		return $this->db->exists(DBT_PERSON, array('name' => $this->term, '(role&2)'));
 	}
 
 }

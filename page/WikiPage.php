@@ -12,10 +12,13 @@ class WikiPage extends Page {
 
 	public function filecontent($action, $replace = true) {
 		$file = $this->filename($action);
-		if ( !file_exists($file) ) { return ''; }
-		$parser = new Sfb2HTMLConverter($file);
-		$parser->parse();
-		return explainAcronyms( $parser->text );
+		if ( !file_exists($file) ) {
+			return '';
+		}
+		$this->parser = new Sfb2HTMLConverter($file);
+		$this->customizeParser();
+		$this->parser->parse();
+		return explainAcronyms( $this->parser->text );
 	}
 
 
@@ -25,7 +28,12 @@ class WikiPage extends Page {
 
 
 	protected function filename($action = NULL) {
-		if ( empty($action) ) $action = $this->action;
+		fillOnEmpty($action, $this->action);
 		return $GLOBALS['contentDirs']['wiki'] . $action;
 	}
+
+	/**
+	Subclasses can customize the parser with this method.
+	*/
+	protected function customizeParser() {}
 }

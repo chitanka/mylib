@@ -12,7 +12,9 @@ class RunQueryPage extends Page {
 
 
 	protected function processSubmission() {
-		if ( empty($this->query) ) { return "Празна заявка!"; }
+		if ( empty($this->query) ) {
+			return "Празна заявка!";
+		}
 		$query = str_replace('$1', $this->param, $this->query);
 		$result = $this->db->query($query);
 		if ( $this->db->affectedRows() > 0 ) {
@@ -27,7 +29,7 @@ class RunQueryPage extends Page {
 	protected function buildContent() {
 		$this->param = str_replace('"', '&quot;', stripslashes($this->param));
 		$box = $this->out->textField('db_param', '', $this->param, 50, 255, 1,
-			'', 'style="border:thin solid silver; padding:.1em .2em"');
+			'', array('style'=>'border:thin solid silver; padding:.1em .2em'));
 		$this->query = stripslashes($this->query);
 		$query = $this->out->hiddenField('query', $this->query);
 		$queryView = str_replace('$1', $box, $this->query);

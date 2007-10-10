@@ -36,7 +36,8 @@ class FeedbackPage extends MailPage {
 		if ( empty($this->referer) ) {
 			return '';
 		}
-		return "<p>Обратно към <a href='$this->referer'>предишната страница</a></p>";
+		$link = $this->out->link($this->referer, 'предишната страница');
+		return "<p>Обратно към $link</p>";
 	}
 
 

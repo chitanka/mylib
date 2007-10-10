@@ -1,13 +1,13 @@
 <?php
 class EditPersonPage extends Page {
 
+	const DB_TABLE = DBT_PERSON;
 	protected $roles = array('a' => 'Автор', 't' => 'Преводач');
 
 	public function __construct() {
 		parent::__construct();
 		$this->action = 'editPerson';
-		$this->mainDbTable = 'person';
-		$this->personId = (int) $this->request->value('personId', 0, 1);
+		$this->personId = (int) $this->request->value('id', 0, 1);
 		$this->title = ($this->personId == 0 ? 'Добавяне' : 'Редактиране').' на личност';
 		$this->name = $this->request->value('name', '');
 		$this->orig_name = $this->request->value('orig_name', '');
@@ -21,7 +21,7 @@ class EditPersonPage extends Page {
 
 
 	protected function processSubmission() {
-		$res = $this->db->insertOrUpdate($this->mainDbTable,
+		$res = $this->db->update(self::DB_TABLE,
 			$this->makeSetData(), $this->personId);
 		if ( $res !== false ) {
 			$this->addMessage('Редакцията беше успешна.');
@@ -53,9 +53,11 @@ class EditPersonPage extends Page {
 	protected function initData() {
 		$key = array('id' => $this->personId);
 		$sel = array('name', 'orig_name', 'country', 'role', 'info', 'real_name', 'oreal_name');
-		$res = $this->db->select($this->mainDbTable, $key, $sel);
+		$res = $this->db->select(self::DB_TABLE, $key, $sel);
 		$data = $this->db->fetchAssoc($res);
-		if ( empty($data) ) return false;
+		if ( empty($data) ) {
+			return false;
+		}
 		extract2object($data, $this);
 		$this->role = explode(',', $this->role);
 	}
@@ -64,7 +66,7 @@ class EditPersonPage extends Page {
 	protected function makeEditForm() {
 		$opts = array_merge(array('-' => '(Няма данни)'), $GLOBALS['countries']);
 		$country = $this->out->selectBox('country', '', $opts, $this->country);
-		$personId = $this->out->hiddenField('personId', $this->personId);
+		$personId = $this->out->hiddenField('id', $this->personId);
 		$name = $this->out->textField('name', '', $this->name, 30);
 		$orig_name = $this->out->textField('orig_name', '', $this->orig_name, 30);
 		$real_name = $this->out->textField('real_name', '', $this->real_name, 30);

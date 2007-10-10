@@ -2,7 +2,6 @@
 
 class Database {
 
-	/**#@+ @var string */
 	/** Database server name */
 	protected $server;
 	/** Database user name */
@@ -14,11 +13,10 @@ class Database {
 	protected $prefix = '';
 	protected $charset = 'utf8';
 	protected $collationConn = 'utf8_general_ci';
-	/**#@-*/
 	/**
-	 * Connection to the database
-	 * @var resource
-	 */
+		Connection to the database
+		@var resource
+	*/
 	protected $conn = NULL;
 	protected $logFile = 'log/db-DAY.sql';
 	protected $errLogFile = 'log/db-error-DAY';
@@ -53,6 +51,16 @@ class Database {
 	}
 
 
+	public function getRandomRow($table) {
+		$res = $this->select($table, array(), array('MIN(id)', 'MAX(id)'));
+		list($min, $max) = $this->fetchRow($res);
+		do {
+			$res = $this->select($table, array('id' => rand($min, $max)));
+			$row = $this->fetchAssoc($res);
+			if ( !empty($row) ) return $row;
+		} while (true);
+	}
+
 	public function getCount($table, $keys = array()) {
 		$res = $this->select($table, $keys, 'COUNT(*)');
 		list($count) = mysql_fetch_row($res);
@@ -73,92 +81,237 @@ class Database {
 
 	public function select($table, $keys = array(), $fields = array(),
 			$orderby = '', $offset = 0, $limit = 0, $groupby = '') {
+
 		$q = $this->selectQ($table, $keys, $fields, $orderby, $offset, $limit);
 		return $this->query($q);
 	}
 
 	public function selectQ($table, $keys = array(), $fields = array(),
 			$orderby = '', $offset = 0, $limit = 0, $groupby = '') {
+
 		settype($fields, 'array');
 		$sel = empty($fields) ? '*' : implode(', ', $fields);
 		$sorder = empty($orderby) ? '' : ' ORDER BY '.$orderby;
 		$sgroup = empty($groupby) ? '' : ' GROUP BY '.$groupby;
 		$slimit = $limit > 0 ? " LIMIT $offset, $limit" : '';
-		return "SELECT $sel FROM /*p*/$table".$this->makeWhereClause($keys).
+		return "SELECT $sel FROM $table".$this->makeWhereClause($keys).
 			$sgroup . $sorder . $slimit;
 	}
 
+
+	public function extselect($qparts) {
+		return $this->query( $this->extselectQ($qparts) );
+	}
+
+	/**
+		Build an SQL SELECT statement with LEFT JOIN clause(s) from an array
+		(Idea from phpBB).
+		@param $qparts	Associative array with following possible keys:
+			SELECT, FROM, LEFT JOIN, WHERE, GROUP BY, ORDER BY, LIMIT
+	*/
+	public function extselectQ($qparts, $distinct = false) {
+		$qd = $distinct ? ' DISTINCT' : '';
+		$q = "SELECT$qd $qparts[SELECT] FROM $qparts[FROM]";
+		if ( !empty($qparts['LEFT JOIN']) ) {
+			foreach ($qparts['LEFT JOIN'] as $table => $onrule) {
+				$q .= " LEFT JOIN $table ON ($onrule)";
+			}
+		}
+		if ( !empty($qparts['WHERE']) ) {
+			$q .= $this->makeWhereClause($qparts['WHERE']);
+		}
+		foreach ( array('GROUP BY', 'ORDER BY') as $key ) {
+			if ( !empty($qparts[$key]) ) {
+				$q .= " $key $qparts[$key]";
+			}
+		}
+		if ( !empty($qparts['LIMIT']) ) {
+			if ( is_array($qparts['LIMIT']) ) {
+				list($offset, $limit) = $qparts['LIMIT'];
+			} else {
+				$offset = 0;
+				$limit = (int) $qparts['LIMIT'];
+			}
+			$q .= $limit > 0 ? " LIMIT $offset, $limit" : '';
+		}
+		return $q;
+	}
+
+
 	public function insert($table, $data, $ignore = false) {
-		if ( empty($data) ) return true;
 		return $this->query($this->insertQ($table, $data, $ignore));
 	}
 
 	public function insertQ($table, $data, $ignore = false) {
-		if ( empty($data) ) return '';
+		if ( empty($data) ) {
+			return '';
+		}
 		$signore = $ignore ? ' IGNORE' : '';
-		return "INSERT$signore INTO /*p*/$table". $this->makeSetClause($data);
+		return "INSERT$signore INTO $table". $this->makeSetClause($data);
 	}
 
+
+	public function multiinsert($table, $data, $fields, $ignore = false) {
+		return $this->query($this->multiinsertQ($table, $data, $fields, $ignore));
+	}
+
+	public function multiinsertQ($table, $data, $fields, $ignore = false) {
+		if ( empty($data) || empty($fields) ) {
+			return '';
+		}
+		$vals = ' (`'. implode('`, `', $fields) .'`) VALUES';
+		$fcnt = count($fields);
+		foreach ($data as $rdata) {
+			$vals .= ' (';
+			for ($i=0; $i < $fcnt; $i++) {
+				$val = isset($rdata[$i]) ? $this->normalizeValue($rdata[$i]) : "''";
+				$vals .= $val .', ';
+			}
+			$vals = rtrim($vals, ' ,') .'),';
+		}
+		$signore = $ignore ? ' IGNORE' : '';
+		return "INSERT$signore INTO $table". rtrim($vals, ',');
+	}
+
+
 	public function update($table, $data, $keys) {
-		return $this->query($this->updateQ($table, $data, $keys));
+		return $this->query( $this->updateQ($table, $data, $keys) );
 	}
 
 	public function updateQ($table, $data, $keys) {
-		return 'UPDATE /*p*/'. $table . $this->makeSetClause($data) .
+		if ( empty($data) ) { return ''; }
+		if ( empty($keys) ) { return $this->insertQ($table, $data); }
+		if ( !is_array($keys) ) {
+			$keys = array('id' => $keys);
+		}
+		return 'UPDATE '. $table . $this->makeSetClause($data) .
 			$this->makeWhereClause($keys);
 	}
 
 
-	public function insertOrUpdate($table, $data, $key = NULL, $keyname = 'id') {
-		$q = $this->makeInsertOrUpdateQuery($table, $data, $key, $keyname);
-		return $this->query($q);
-	}
-
-
 	public function replace($table, $data) {
-		if ( empty($data) ) return true;
-		return $this->query($this->replaceQ($table, $data));
+		return $this->query( $this->replaceQ($table, $data) );
 	}
 
 	public function replaceQ($table, $data) {
-		if ( empty($data) ) return '';
-		return 'REPLACE /*p*/'.$table.$this->makeSetClause($data);
+		if ( empty($data) ) { return ''; }
+		return 'REPLACE '.$table.$this->makeSetClause($data);
 	}
 
 	public function delete($table, $keys, $limit = 0) {
-		if ( empty($keys) ) return true;
-		return $this->query($this->deleteQ($table, $keys, $limit));
+		return $this->query( $this->deleteQ($table, $keys, $limit) );
 	}
 
 	public function deleteQ($table, $keys, $limit = 0) {
-		if ( empty($keys) ) return '';
+		if ( empty($keys) ) { return ''; }
 		if ( !is_array($keys) ) $keys = array('id' => $keys);
-		$q = 'DELETE FROM /*p*/'. $table . $this->makeWhereClause($keys);
+		$q = 'DELETE FROM '. $table . $this->makeWhereClause($keys);
 		if ( !empty($limit) ) $q .= " LIMIT $limit";
 		return $q;
 	}
 
-	public function makeInsertOrUpdateQuery($table, $data, $key = NULL, $keyname = 'id') {
-		if ( empty($key) ) {
-			$act = 'INSERT IGNORE INTO ';
-			$qext = '';
-		} else {
-			$act = 'UPDATE ';
-			$qext = " WHERE `$keyname` = '$key'";
+
+	public function makeSetClause($data, $putKeyword = true) {
+		if ( empty($data) ) { return ''; }
+		$keyword = $putKeyword ? ' SET ' : '';
+		$cl = array();
+		foreach ($data as $field => $value) {
+			if ( is_numeric($field) ) { // take the value as is
+				$cl[] = $value;
+			} else {
+				$cl[] = "`$field` = ". $this->normalizeValue($value);
+			}
 		}
-		return $act .'/*p*/'. $table . $this->makeSetClause($data) . $qext;
+		return $keyword . implode(', ', $cl);
 	}
 
 
 	/**
-	 * Send a query to the database
-	 * @param string $query
-	 * @param bool $useBuffer Use buffered or unbuffered query
-	 * @return resource Or false by failure
-	 */
-	public function query($query, $useBuffer = true) {
+	@param $keys Array with mixed keys (associative and numeric).
+		By numeric key take the value as is if the value is a string, or send it
+		recursive to makeWhereClause() with OR-joining if the value is an array.
+		By string key use “=” for compare relation if the value is string;
+		if the value is an array, use the first element as a relation and the
+		second as comparison value.
+		An example follows:
+		$keys = array(
+			'k1 <> 1', // numeric key, string value
+			array('k2' => 2, 'k3' => 3), // numeric key, array value
+			'k4' => 4, // string key, scalar value
+			'k5' => array('>=', 5), // string key, array value (rel, val)
+		)
+	@param $join How to join the elements from $keys
+	@param $putKeyword Should the keyword “WHERE” precede the clause
+	*/
+	public function makeWhereClause($keys, $join = 'AND', $putKeyword = true) {
+		if ( empty($keys) ) {
+			return $putKeyword ? ' WHERE 1' : '';
+		}
+		$cl = $putKeyword ? ' WHERE ' : '';
+		$whs = array();
+		foreach ($keys as $field => $rawval) {
+			if ( is_numeric($field) ) { // take the value as is
+				$field = $rel = '';
+				if ( is_array($rawval) ) {
+					$njoin = $join == 'AND' ? 'OR' : 'AND';
+					$val = '('.$this->makeWhereClause($rawval, $njoin, false).')';
+				} else {
+					$val = $rawval;
+				}
+			} else {
+				if ( is_array($rawval) ) {
+					list($rel, $val) = $rawval;
+					if (($rel == 'IN' || $rel == 'NOT IN') && is_array($val)) {
+						// set relation — build an SQL set
+						$cb = array($this, 'normalizeValue');
+						$val = '('. implode(', ', array_map($cb, $val)) .')';
+					} else {
+						$val = $this->normalizeValue($val);
+					}
+				} else {
+					$rel = '='; // default relation
+					$val = $this->normalizeValue($rawval);
+				}
+			}
+			$whs[] = "$field $rel $val";
+		}
+		$cl .= implode(" $join ", $whs);
+		return $cl;
+	}
+
+
+	public function normalizeValue($value) {
+		/*if ( is_null($value) ) {
+			return 'NULL';
+		} else */
+		if ( is_bool($value) ) {
+			$value = $value ? 'true' : 'false';
+		} else {
+			$value = $this->escape($value);
+		}
+		return '\''. $value .'\'';
+	}
+
+	public function setPrefix($prefix) { $this->prefix = $prefix; }
+
+
+	public function escape($string) {
 		if ( !isset($this->conn) ) { $this->connect(); }
-		$query = str_replace('/*p*/', $this->prefix, $query);
+		return mysql_real_escape_string($string, $this->conn);
+	}
+
+
+	/**
+		Send a query to the database.
+		@param string $query
+		@param bool $useBuffer Use buffered or unbuffered query
+		@return resource, or false by failure
+	*/
+	public function query($query, $useBuffer = true) {
+		if ( empty($query) ) {
+			return true;
+		}
+		if ( !isset($this->conn) ) { $this->connect(); }
 		$res = $useBuffer
 			? mysql_query($query, $this->conn)
 			: mysql_unbuffered_query($query, $this->conn);
@@ -182,7 +335,9 @@ class Database {
 		$this->query('START TRANSACTION');
 		foreach ( (array) $queries as $query) {
 			$lres = $this->query($query);
-			if ($lres === false) return false;
+			if ($lres === false) {
+				return false;
+			}
 			$res[] = $lres;
 		}
 		$this->query('COMMIT');
@@ -190,79 +345,108 @@ class Database {
 	}
 
 
-	public function makeSetClause($data, $putKeyword = true) {
-		if ( empty($data) ) { return ''; }
-		$keyword = $putKeyword ? ' SET ' : '';
-		$cl = array();
-		foreach ($data as $field => $value) {
-			if ( is_numeric($field) ) { // take the value as is
-				$cl[] = $value;
-			} else {
-				$value = $this->normalizeValue($value);
-				$cl[] = "`$field` = '$value'";
-			}
+	/**
+		Read and execute SQL commands from a file.
+		(copied from MediaWiki)
+		@param string $filename File name to open
+		@param callback $lineCallback Optional function called before reading each line
+		@param callback $resultCallback Optional function called for each MySQL result
+		@return true on success, error string on failure
+	*/
+	public function sourceFile( $filename, $lineCallback = false, $resultCallback = false ) {
+		$fp = fopen( $filename, 'r' );
+		if ( false === $fp ) {
+			return "Could not open “{$filename}”.\n";
 		}
-		return $keyword . implode(', ', $cl);
+		$error = $this->sourceStream( $fp, $lineCallback, $resultCallback );
+		fclose( $fp );
+		return $error;
 	}
 
+	/**
+		Read and execute commands from an open file handle.
+		(copied from MediaWiki)
+		@param string $fp File handle
+		@param callback $lineCallback Optional function called before reading each line
+		@param callback $resultCallback Optional function called for each MySQL result
+		@return true on success, error string on failure.
+	*/
+	function sourceStream( $fp, $lineCallback = false, $resultCallback = false ) {
+		$cmd = "";
+		$done = false;
+		$dollarquote = false;
 
-	public function makeWhereClause($keys, $join = 'AND', $putKeyword = true) {
-		if ( empty($keys) ) {
-			return $putKeyword ? ' WHERE 1' : '';
-		}
-		$cl = $putKeyword ? ' WHERE ' : '';
-		$whs = array();
-		foreach ($keys as $field => $rawvalue) {
-			if ( is_numeric($field) ) { // take the value as is
-				$field = $rel = '';
-				$value = $rawvalue;
-			} else {
-				if ( is_array($rawvalue) ) {
-					list($rel, $value) = $rawvalue;
-				} else {
-					$rel = '='; // default relation
-					$value = $rawvalue;
+		while ( ! feof( $fp ) ) {
+			if ( $lineCallback ) {
+				call_user_func( $lineCallback );
+			}
+			$line = trim( fgets( $fp, 1024 ) );
+			$sl = strlen( $line ) - 1;
+
+			if ( $sl < 0 ) { continue; }
+			if ( '-' == $line{0} && '-' == $line{1} ) { continue; }
+
+			## Allow dollar quoting for function declarations
+			if (substr($line,0,4) == '$ml$') {
+				if ($dollarquote) {
+					$dollarquote = false;
+					$done = true;
 				}
-				$value = '\''. $this->normalizeValue($value) .'\'';
+				else {
+					$dollarquote = true;
+				}
 			}
-			$whs[] = "$field $rel $value";
+			else if (!$dollarquote) {
+				if ( ';' == $line{$sl} && ($sl < 2 || ';' != $line{$sl - 1})) {
+					$done = true;
+					$line = substr( $line, 0, $sl );
+				}
+			}
+
+			if ( '' != $cmd ) { $cmd .= ' '; }
+			$cmd .= "$line\n";
+
+			if ( $done ) {
+				$cmd = str_replace(';;', ";", $cmd);
+				$vars = array('prefix' => $this->prefix);
+				$cmd = replaceVars($cmd, $vars);
+				$res = $this->query( $cmd, __METHOD__, true );
+				if ( $resultCallback ) {
+					call_user_func( $resultCallback, $res );
+				}
+
+				if ( false === $res ) {
+					$err = $this->error();
+					return "Query “{$cmd}” failed with error code “{$err}”.\n";
+				}
+
+				$cmd = '';
+				$done = false;
+			}
 		}
-		$cl .= implode(" $join ", $whs);
-		return $cl;
-	}
-
-
-	public function normalizeValue($value) {
-		if ( is_bool($value) ) {
-			$value = $value ? 'true' : 'false';
-		} else {
-			$value = $this->escape($value);
-		}
-		return $value;
-	}
-
-	public function setPrefix($prefix) { $this->prefix = $prefix; }
-
-
-	public function escape($string) {
-		if ( !isset($this->conn) ) { $this->connect(); }
-		return mysql_real_escape_string($string, $this->conn);
+		return true;
 	}
 
 
 	/**
-	 * string to boolean: 'true' returns true, everything else - false
-	 * @param string $str
-	 * @return bool
-	 */
-	public function s2b($str) { return $str == 'true'; }
+		string to boolean: the string 'true' returns true, everything else — false
+		@param string $str
+		@return bool
+	*/
+	public static function s2b($str) {
+		return $str == 'true';
+	}
 
 
 	/** @return int Current MySQL error number */
-	public function errno() { return $this->errno; }
+	public function errno() {
+		return $this->errno;
+	}
 
 	/** @return string Current MySQL error text */
-	public function error() { return $this->error; }
+	public function error() {
+		return $this->error;
+	}
 
 
 	/** @return array Associative array */
@@ -292,54 +476,37 @@ class Database {
 
 
 	/**
-	 * Return next autoincrement for a table
-	 * @param string $tableName
-	 * @return integer
-	 */
+		Return next auto increment for a table
+		@param string $tableName
+		@return integer
+	*/
 	public function autoIncrementId($tableName) {
-		$res = $this->query('SHOW TABLE STATUS LIKE "'.$this->prefix.$tableName.'"');
+		$res = $this->query('SHOW TABLE STATUS LIKE "'.$tableName.'"');
 		$row = mysql_fetch_assoc($res);
 		return $row['Auto_increment'];
 	}
 
 
-	/**
-	 * Encode a password in order to save it in the database
-	 * @param string $password
-	 * @return string Encoded password
-	 */
-	public function encodePasswordDB($password) {
-		return crypt( $password, md5($password) );
+	protected function connect() {
+		$this->conn = @mysql_connect($this->server, $this->user, $this->pass)
+			or $this->mydie("Could not connect to database server $this->server for $this->user!");
+		@mysql_select_db($this->dbName, $this->conn)
+			or $this->mydie("Could not select database $this->dbName!");
+		@mysql_query("SET CHARACTER SET $this->charset")
+			or $this->mydie("Could not set character set to '$this->charset':");
+		@mysql_query("SET SESSION collation_connection ='$this->collationConn'")
+			or $this->mydie("Could not set collation_connection to '$this->collationConn':");
 	}
 
 
-	/**
-	 * Encode a database password in order to save it in a cookie
-	 * @param string $dbPassword
-	 * @return string Encoded password
-	 */
-	public function encodePasswordCookie($dbPassword) { return md5($dbPassword); }
-
-
-	protected function connect() {
-		$this->conn = @mysql_connect($this->server, $this->user, $this->pass)
-			or die( 'Could not connect to database server '. $this->server .
-			' for '. $this->user .'! '. mysql_error() );
-		@mysql_select_db($this->dbName, $this->conn)
-			or die( 'Could not select database '. $this->dbName .'! '.
-			mysql_error() );
-		@mysql_query("SET CHARACTER SET $this->charset")
-			or die("Could not set character set to '$this->charset': " . mysql_error());
-		@mysql_query("SET SESSION collation_connection ='$this->collationConn'")
-			or die("Could not set collation_connection to '$this->collationConn': " .
-			mysql_error());
+	protected function mydie($msg) {
+		die($msg .' '. mysql_error());
 	}
 
 
 	protected function log($msg, $isError = true) {
 		file_put_contents($isError ? $this->errLogFile : $this->logFile,
-			'/*['.date('Y-m-d H:i:s').']*/ '. $msg."\n", FILE_APPEND);
+			'/*'.date('Y-m-d H:i:s').'*/ '. $msg."\n", FILE_APPEND);
 	}
 
 }
-

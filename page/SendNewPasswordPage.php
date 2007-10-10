@@ -13,26 +13,23 @@ class SendNewPasswordPage extends MailPage {
 
 	protected function processSubmission() {
 		$key = array('username' => $this->username);
-		$res = $this->db->select(User::MAIN_DB_TABLE, $key, 'email');
+		$res = $this->db->select(User::DB_TABLE, $key, 'email');
 		$data = $this->db->fetchAssoc($res);
 		if ( empty($data) ) {
-			$this->addMessage("Не съществува потребител с име
-				<strong>$this->username</strong>.", true);
+			$this->addMessage("Не съществува потребител с име <strong>$this->username</strong>.", true);
 			return $this->buildContent();
 		}
 		extract($data);
 		if ( empty($email) ) {
-			$this->addMessage("За потребителя <strong>$this->username</strong>
-				не е посочена електронна поща.", true);
+			$this->addMessage("За потребителя <strong>$this->username</strong> не е посочена електронна поща.", true);
 			return $this->buildContent();
 		}
 		$this->mailTo = header_encode($this->username) ." <$email>";
 		$this->newPassword = User::randomPassword();
 		User::saveNewPassword($this->username, $this->newPassword);
 		$this->mailSubject = "Нова парола за $this->sitename";
-		$this->mailSuccessMessage = "Нова парола беше изпратена на електронната поща на
-			<strong>$this->username</strong>. Моля,
-			<a href='$this->root/login'>влезте отново</a>, след като я получите.";
+		$loginurl = $this->out->internLink('влезте отново', 'login');
+		$this->mailSuccessMessage = "Нова парола беше изпратена на електронната поща на <strong>$this->username</strong>. Моля, $loginurl, след като я получите.";
 		$this->mailFailureMessage = 'Изпращането на новата парола не сполучи.';
 		return parent::processSubmission();
 	}
@@ -43,10 +40,8 @@ class SendNewPasswordPage extends MailPage {
 		$submit = $this->out->submitButton('Изпращане на нова парола', '', 2);
 		return <<<EOS
 
-<p>Чрез долния формуляр можете да поискате нова парола за влизане в
-<em>$this->sitename</em>, ако сте забравили сегашната си. Такава обаче може да ви бъде
-изпратена само ако сте посочили валидна електронна поща в потребителските си данни.</p>
-<p>&nbsp;</p>
+<p>Чрез долния формуляр можете да поискате нова парола за влизане в <em>$this->sitename</em>, ако сте забравили сегашната си. Такава обаче може да ви бъде изпратена само ако сте посочили валидна електронна поща в потребителските си данни.</p>
+
 <form action="{FACTION}" method="post">
 <fieldset>
 	<legend>Нова парола</legend>
@@ -55,7 +50,6 @@ class SendNewPasswordPage extends MailPage {
 	$submit
 </fieldset>
 </form>
-
 EOS;
 	}
 
@@ -73,7 +67,7 @@ EOS;
 „{$this->newPassword}“ (без кавичките).
 След като влезете с нея в $this->sitename, е препоръчително да я
 смените с някоя по-лесно запомняща се, за да не се налага пак да
-прибягвате до функцията „Изпращане на нова парола“. ;)
+прибягвате до функцията „Изпращане на нова парола“. ;-)
 
 $this->sitename
 

@@ -56,11 +56,10 @@ $codeBordColor = '#C0C0C0';
 $errorFgColor = '#CC0000';
 $extraInfoFgColor = '#333333';
 $extLinkFgColor = '#006F4E';
-$insBgColor = '#BBFFBB';
-$delBgColor = '#FFBBBB';
+$insBgColor = '#DDFFDD';
+$delBgColor = '#FFCCCC';
 
 $oddFgColor = '#4C4C4C';
 $oddBgColor = '#F8F8FC';
 $evenFgColor = $oddFgColor;
 $evenBgColor = '#E6EEFA';
-?>

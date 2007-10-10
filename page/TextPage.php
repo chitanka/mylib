@@ -1,6 +1,7 @@
 <?php
 class TextPage extends Page {
 
+	const DB_TABLE = DBT_TEXT;
 	/** minimal text size for annotation */
 	protected $minTextSizeForAnno = 50000;
 
@@ -15,10 +16,12 @@ class TextPage extends Page {
 		}
 		parent::__construct();
 		$this->action = 'text';
-		$this->mainDbTable = 'text';
-		$this->textId = $this->request->value('textId', 0, 1);
-		$this->ttitle = $this->request->value('title', '', 1);
+		$this->ttitle = $this->textId = $this->request->value('textId', 0, 1);
+		if ( empty($this->textId) ) {
+			$this->ttitle = $this->request->value('title', '', 1);
+		}
 		$this->chunkId = $this->request->value('chunkId', 1, 2);
+		$this->enc = $this->request->value('enc', $this->outencoding, 3);
 		$this->isRead = false;
 		$this->hasAnno = $this->hasExtraInfo = false;
 	}
@@ -53,7 +56,7 @@ class TextPage extends Page {
 			? $this->makeEditTextLink($this->textId, $this->chunkId,
 				$this->user->canExecute('edit')) : '';
 		$this->initExtraLinks(ltrim($editLink, '| '));
-		$toc = $this->makeTOC();
+		$toc = $this->makeToc();
 		if ( $this->chunkId == 0 ) { $this->hasNext = false; }
 		if ( (int) $this->chunkId > 1 || $this->hasNext ) {
 			$this->title .= ' ('. $this->chunkId .')';
@@ -67,7 +70,7 @@ class TextPage extends Page {
 
 
 	protected function makeRandomContent() {
-		$res = $this->db->select($this->mainDbTable, array(), array('MIN(id)', 'MAX(id)'));
+		$res = $this->db->select(Work::DB_TABLE, array(), array('MIN(id)', 'MAX(id)'));
 		list($this->minTextId, $this->maxTextId) = $this->db->fetchRow($res);
 		$c = '';
 		while ( empty($c) ) {
@@ -80,12 +83,12 @@ class TextPage extends Page {
 
 
 	protected function makeRawContent() {
-		$file = $GLOBALS['contentDirs']['text'].$this->textId;
+		$file = getContentFilePath('text', $this->textId);
 		if ( !file_exists($file) ) {
 			$this->addMessage("Няма текст с номер $this->textId.", true);
 			return '';
 		}
-		$this->setOutEncoding($this->request->param(3));
+		$this->setOutEncoding($this->enc);
 		if ( !$this->isValidEncoding($this->outencoding) ) {
 			$this->addMessage("<strong>$this->outencoding</strong> не е валидно название на кодиране. Ето малко предложения: ".$this->makeEncodingSuggestions(), true);
 			$this->outencoding = $this->inencoding;
@@ -117,28 +120,31 @@ class TextPage extends Page {
 			$this->getExtraInfo($this->textId) .
 			"\n\n\tСвалено от „{$this->sitename}“ [$this->purl/text/$this->textId]";
 		$extra = preg_replace('/\n\n+/', "\n\n", $extra);
-		$this->encprint("\nI>\n$extra\nI$\n");
+		$this->encprint("\nI>$extra\nI$\n");
 		$this->outputDone = true;
 	}
 
 
 	protected function makeTextContent() {
-		global $contentDirs, $curImgDir;
-		$file = $contentDirs['text'].$this->textId;
+		global $curImgDir;
+		$file = getContentFilePath('text', $this->textId);
 		if ( file_exists($file) ) {
-			$parser = new Sfb2HTMLConverter($file, $this->rootd.'/content/img/'.$this->textId.'/');
+			$parser = new Sfb2HTMLConverter($file, $this->getImgDir());
 			$parser->startpos = $this->fpos;
 			$parser->maxlinecnt = $this->linecnt;
+			$parser->putLineId = true;
 			if ($this->work->type == 'playbook') {
 				// recognize section links
 				$parser->patterns['/#(\d+)/'] = '<a href="#h$1" title="Към част $1"><strong>$1</strong></a>';
 			}
 			$parser->parse();
+			$fn = empty($parser->footnotes) ? ''
+				: "\n<fieldset class='footnotes'><legend>Бележки</legend>\n$parser->footnotes</fieldset>";
 			return '<p id="textstart" style="clear:both"></p>'.
-				"\n<div class='{$this->work->type}'>\n".$parser->text."\n</div>";
+				"\n<div class='{$this->work->type}'>\n".$parser->text."\n</div>".$fn;
 		}
-		$this->addMessage("Текстът „<a href='$this->root/text/".
-			"$this->textId/$this->chunkId'>$this->ttitle</a>“ е празен.", true);
+		$tlink = $this->makeSimpleTextLink($this->ttitle, $this->textId, $this->chunkId);
+		$this->addMessage("Текстът „{$tlink}“ е празен.", true);
 		return '';
 	}
 
@@ -153,12 +159,12 @@ class TextPage extends Page {
 			if ($this->work->seriesType == 'collection') {
 				$start = $this->work->type == 'intro' ? 'Предговор към' : 'Включено в';
 				$ser = $start .' сборника „'.
-					$this->makeSeriesLink($this->work->series, true) .'“';
+					$this->makeSeriesLink($this->work->series) .'“';
 				if ( !empty($this->work->sernr) )
 					$ser .= ' ('.$this->work->sernr.')';
 			} elseif ($this->work->seriesType == 'book') {
 				$ser = 'Част от книгата „'.
-					$this->makeSeriesLink($this->work->series, true) .'“';
+					$this->makeSeriesLink($this->work->series) .'“';
 			} else {
 				$ser = 'Поредица: '. $this->makeSeriesLink($this->work->series);
 				if ( !empty($this->work->sernr) )
@@ -168,10 +174,14 @@ class TextPage extends Page {
 		}
 		if ( $this->work->orig_lang == $this->work->lang ) {
 			$extra .= "\n<li><span title='Година на написване или първа публикация'>Година</span>: ".
-				$this->makeCustomYearView('orig', $this->work->getYear()) .'</li>';
+				$this->makeCustomYearView('orig', $this->work->getYear()) .' '.
+				$this->makeLicenseView($this->work->lo_name, $this->work->lo_uri) .'</li>';
 		} else {
 			if ( empty($this->work->orig_title) ) {
-				$orig_title = "[не е въведено; <a href='$this->root/suggestData/origTitle/$this->textId/$this->chunkId'>помогнете ми</a> да го добавя]";
+				$params = array(self::FF_ACTION=>'suggestData', 'sa'=>'origTitle',
+					'textId' => $this->textId, 'chunkId' => $this->chunkId);
+				$link = $this->out->internLink('помогнете ми', $params, 4);
+				$orig_title = "[не е въведено; $link да го добавя]";
 			} else {
 				$orig_title = $this->work->orig_title;
 				if ( !empty($this->work->orig_subtitle) ) {
@@ -180,14 +190,23 @@ class TextPage extends Page {
 			}
 			$extra .= "\n<li>Оригинално заглавие: <em>$orig_title</em>".
 				', <span title="Година на написване или първа публикация">'.
-				$this->makeCustomYearView('orig', $this->work->getYear()) .'</span></li>';
+				$this->makeCustomYearView('orig', $this->work->getYear()) .'</span> '.
+				$this->makeLicenseView($this->work->lo_name, $this->work->lo_uri) .
+				'</li>';
 			$lang = langName($this->work->orig_lang, false);
 			if ( !empty($lang) ) $lang = ' от '.$lang;
 			$extra .= "\n<li>Превод$lang: ";
-			$extra .= empty($this->work->translator_name)
-				? "[Няма данни за преводача; <a href='$this->root/suggestData/translator/$this->textId/$this->chunkId'>помогнете ми</a> да го добавя]"
-				: $this->makeTranslatorLink($this->work->translator_name, 'first');
-			$extra .= ', '.$this->makeCustomYearView('trans', $this->work->getTransYear()).'</li>';
+			if ( empty($this->work->translator_name) ) {
+				$params = array(self::FF_ACTION=>'suggestData', 'sa'=>'translator',
+					'textId' => $this->textId, 'chunkId' => $this->chunkId);
+				$link = $this->out->internLink('помогнете ми', $params, 4);
+				$extra .= "[Няма данни за преводача; $link да го добавя]";
+			} else {
+				$extra .= $this->makeTranslatorLink($this->work->translator_name, 'first');
+			}
+			$extra .= ', '.$this->makeCustomYearView('trans', $this->work->getTransYear()).' '.
+				$this->makeLicenseView($this->work->lt_name, $this->work->lt_uri) .
+				'</li>';
 		}
 		$extra .= "\n<li>Етикети: ". $this->makeLabelInfo() .'</li>';
 		if ($this->work->isRead) {
@@ -197,7 +216,10 @@ class TextPage extends Page {
 		$extra .= "\n<li>";
 		$extra .= $commCnt > 0 ? "Има <strong>$commCnt</strong>" : 'Няма';
 		$readCmnts = $commCnt == 1 ? 'читателско мнение' : 'читателски мнения';
-		$extra .= " <a href='$this->root/comment/$this->textId' title='Мнения от читатели на произведението'>$readCmnts за произведението</a>.</li>";
+		$params = array(self::FF_ACTION=>'comment', 'textId'=>$this->textId);
+		$clink = $this->out->internLink("$readCmnts за произведението", $params,
+			2, 'Мнения от читатели на произведението');
+		$extra .= " $clink.</li>";
 		if ( !empty($extra) ) {
 			$extra = <<<EOS
 
@@ -215,11 +237,21 @@ EOS;
 
 
 	protected function makeLabelInfo() {
-		$edit = !$this->user->canExecute('editTextLabels') ? ''
-			: " &nbsp; [<a href='$this->root/editTextLabels/$this->textId/$this->chunkId' title='Възможност за промяна на етикетите на произведението'>промяна</a>]";
-		$res = $this->db->query("SELECT name FROM /*p*/text_label h
-			LEFT JOIN /*p*/label l ON (h.label = l.id)
-			WHERE h.text=$this->textId");
+		$edit = '';
+		if ( $this->user->canExecute('editTextLabels') ) {
+			$params = array(self::FF_ACTION => 'editTextLabels',
+				'textId' => $this->textId, 'chunkId' => $this->chunkId);
+			$link = $this->out->internLink('промяна', $params, 3,
+				'Възможност за промяна на етикетите на произведението');
+			$edit = " &nbsp; [$link]";
+		}
+		$qa = array(
+			'SELECT' => 'name',
+			'FROM' => DBT_TEXT_LABEL .' h',
+			'LEFT JOIN' => array(DBT_LABEL .' l' => 'h.label = l.id'),
+			'WHERE' => array('h.text' => $this->textId),
+		);
+		$res = $this->db->extselect($qa);
 		if ( $this->db->numRows($res) == 0 ) { return 'Няма'.$edit; }
 		$o = '';
 		while ( $row = $this->db->fetchRow($res) ) {
@@ -230,13 +262,16 @@ EOS;
 
 
 	protected function makeAnnotation() {
-		global $contentDirs;
-		$file = $contentDirs['text-anno'] . $this->textId;
+		$file = getContentFilePath('text-anno', $this->textId);
 		if ( $this->chunkId > 1 || !file_exists($file) ) {
 			if ($this->work->size < $this->minTextSizeForAnno) {
 				return '';
 			}
-			$anno = "<p style='text-align:center; margin-top:1em'><a href='$this->root/suggestData/annotation/$this->textId'>Предложете анотация на произведението!</a></p>";
+			$params = array(self::FF_ACTION => 'suggestData',
+				'sa' => 'annotation', 'textId' => $this->textId);
+			$link = $this->out->internLink('Предложете анотация на произведението!',
+				$params, 3);
+			$anno = "<p style='text-align:center; margin-top:1em'>$link</p>";
 		} else {
 			$this->hasAnno = true;
 			$parser = new Sfb2HTMLConverter($file, $this->getImgDir());
@@ -255,7 +290,7 @@ EOS;
 
 	protected function makeExtraInfo() {
 		if ( isset($this->extraInfo) ) return $this->extraInfo;
-		$file = $GLOBALS['contentDirs']['text-info'] . $this->textId;
+		$file = getContentFilePath('text-info', $this->textId);
 		if ( !file_exists($file) ) { return ''; }
 		$this->hasExtraInfo = true;
 		$parser = new Sfb2HTMLConverter($file, $this->getImgDir());
@@ -286,82 +321,97 @@ EOS;
 
 	protected function makeCoverImageView($file) {
 		$covurl = $this->rootd .'/'. $file;
-		return "<a href='$covurl'>".$this->out->image($covurl, 'Корица', '', 'width="200"').'</a>';
+		$img = $this->out->image($covurl, 'Корица', '', array('width'=>'200'));
+		return $this->out->link($covurl, $img);
 	}
 
 
-	protected function makeTOC() {
+	protected function makeToc() {
 		$this->hasNext = false;
 		$this->nextChunkId = 1;
 		$this->prevlev = 0;
 		$sel = array('name', 'nr', 'level');
 		$key = array('text' => $this->textId);
-		$q = $this->db->selectQ('header', $key, $sel, 'nr');
-		$toc = $this->db->iterateOverResult($q, 'makeTOCItem', $this);
+		$q = $this->db->selectQ(DBT_HEADER, $key, $sel, 'nr');
+		$toc = $this->db->iterateOverResult($q, 'makeTocItem', $this);
 		if ( substr_count($toc, '<li>') < 2 ) { return ''; }
 		$toc .= '</li>'.str_repeat("\n</ul>\n</li>", $this->prevlev-1)."\n</ul>";
+		$fulllink = $this->makeSimpleTextLink($this->work->title, $this->textId,
+			0, 'Показване на цялото произведение');
 		return <<<EOS
-<div id="fulltext-link"><a href="$this->root/$this->action/$this->textId/0">Показване на цялото произведение</a></div>
+<div id="fulltext-link">$fulllink</div>
 <div id="toc">
 <div id="toctitle"><h2>Съдържание</h2> <a href="#after-toc" class="non-graphic">(Прескачане на съдържанието)</a></div>
 $toc
 </div>
-<script type="text/javascript">
+$this->scriptStart
 if (window.showTocToggle) {
 	var tocShowText = "показване";
 	var tocHideText = "скриване";
 	showTocToggle();
 	toggleToc();
 }
-</script>
+$this->scriptEnd
 <p id="after-toc" class="non-graphic"><a name="after-toc"> </a></p>
 
 EOS;
 	}
 
 
-	public function makeTOCItem($dbrow) {
+	public function makeTocItem($dbrow) {
 		extract($dbrow);
 		if ( !$this->hasNext && $this->chunkId < $nr ) {
 			$this->nextChunkId = $nr;
 			$this->hasNext = true;
 		}
 		$toci = '';
-		$title = $this->chunkId == $nr
-			? "<strong>$name</strong>"
-			: "<a href='$this->root/text/$this->textId/$nr#textstart'>$name</a>";
 		if ($this->prevlev < $level) {
 			$toci .= "\n<ul>";
 		} elseif ($this->prevlev > $level) {
 			$toci .= '</li>'.str_repeat("\n</ul>\n</li>", $this->prevlev - $level);
 		} else $toci .= '</li>';
-		$toci .= "\n<li>$title";
+		$toci .= "\n<li>";
+		if ($this->chunkId == $nr) {
+			$toci .= "<strong>$name</strong>";
+		} else {
+			$p = array(self::FF_ACTION=>$this->action, 'textId'=>$this->textId,
+				'chunkId'=>$nr);
+			$toci .= $this->out->internLink($name, $p, 3, '', array(), 'textstart');
+		}
 		$this->prevlev = $level;
 		return $toci;
 	}
 
 
 	protected function makeEndMessage() {
-		$markRead = $this->user->canExecute('markRead')
-			? $this->makeMarkReadLink() : '';
-		$endMsg = $this->hasNext && $this->chunkId > 0
-			? "Към <a href=\"$this->root/text/$this->textId/".
-				$this->nextChunkId.'#textstart">следващата част</a> &rarr;'
-			: 'Край &nbsp; '. $markRead;
+		if ($this->hasNext && $this->chunkId > 0) {
+			$p = array(self::FF_ACTION=>$this->action, 'textId'=>$this->textId,
+				'chunkId' => $this->nextChunkId);
+			$link = $this->out->internLink('следващата част', $p, 3, '', array(), 'textstart');
+			$endMsg = 'Към '. $link .' &rarr;';
+		} else {
+			$endMsg = 'Край &nbsp; '. ($this->user->canExecute('markRead')
+				? $this->makeMarkReadLink() : '');
+		}
 		return "\n".'<p id="text-end-msg">'.$endMsg.'</p>';
 	}
 
 
 	protected function makeMarkReadLink() {
-		if ($this->work->isRead) return '';
-		return "<a class='ok' href='$this->root/markRead/$this->textId'
-			title='Отбелязване като прочетено'>Прочетено</a>";
+		if ($this->work->isRead) {
+			return '';
+		}
+		$params = array(self::FF_ACTION=>'markRead', 'textId'=>$this->textId);
+		return $this->out->internLink('Прочетено', $params, 2,
+			'Отбелязване като прочетено', array('class' => 'ok'));
 	}
 
 
 	protected function makeCopyright() {
 		$o = $this->work->getCopyright($this);
-		if ( empty($o) ) return '';
+		if ( empty($o) ) {
+			return '';
+		}
 		$o = str_replace('li>,', 'li>', $o); // rm comma separators
 		return <<<EOS
 
@@ -398,7 +448,7 @@ EOS;
 		$opts = array('' => '(Избор)');
 		foreach ($sizes as $size) { $opts[$size] = $size .' пиксела'; }
 		$fontsize = $this->out->selectBox('fontsize', '', $opts, '', 0,
-			'onchange="javascript:setFontSize(this.value)"');
+			array('onchange'=>'javascript:setFontSize(this.value)'));
 		$rawLink = $this->makeRawTextLink($this->textId);
 		$rawLinkCp1251 = $this->makeRawTextLink($this->textId, 'Суров текст (win)', 'Преглед на суровия текст в кодиране „Windows-1251“', 'cp1251');
 		$rawLinkCp866 = $this->makeRawTextLink($this->textId, 'Суров текст (dos)', 'Преглед на суровия текст в кодиране „IBM866“ — руска досовска кирилица', 'cp866');
@@ -437,7 +487,7 @@ EOS;
 		$this->textId = $this->work->id;
 		$sel = array('fpos', 'linecnt');
 		$key = array('text' => $this->textId, 'nr' => $this->chunkId);
-		$res = $this->db->select('header', $key, $sel);
+		$res = $this->db->select(DBT_HEADER, $key, $sel);
 		$data = $this->db->fetchAssoc($res);
 		if ( !empty($data) ) {
 			extract2object($data, $this);
@@ -452,14 +502,14 @@ EOS;
 
 
 	protected function getAnnotation($textId) {
-		$file = $GLOBALS['contentDirs']['text-anno'] . $textId;
+		$file = getContentFilePath('text-anno', $textId);
 		if ( !file_exists($file) ) { return ''; }
 		return file_get_contents($file);
 	}
 
 
 	protected function getExtraInfo($textId) {
-		$file = $GLOBALS['contentDirs']['text-info'] . $textId;
+		$file = getContentFilePath('text-info', $textId);
 		if ( !file_exists($file) ) { return ''; }
 		return file_get_contents($file);
 	}
@@ -471,14 +521,14 @@ EOS;
 
 
 	protected function getReaderCommentCount($textId = NULL) {
-		if ( empty($textId) ) $textId = $this->textId;
+		fillOnEmpty($textId, $this->textId);
 		$key = array('text' => $textId, '`show`' => 'true');
-		return $this->db->getCount('comment', $key);
+		return $this->db->getCount(DBT_COMMENT, $key);
 	}
 
 
 	protected function getImgDir() {
-		return $this->rootd.'/'.$GLOBALS['contentDirs']['img'].$this->textId.'/';
+		return $this->rootd.'/'. getContentFilePath('img', $this->textId) .'/';
 	}
 
 
@@ -487,7 +537,9 @@ EOS;
 			'koi8-r', 'iso-ir-111', 'mik', 'utf-8');
 		$l = '';
 		foreach ($encs as $enc) {
-			$l .= "\n<li><a href='$this->root/text/$this->textId/raw/$enc' title='Преглед на текста в кодиране „{$enc}“'>$enc</a></li>";
+			$link = $this->makeRawTextLink($this->textId, $enc,
+				"Преглед на текста в кодиране „{$enc}“", $enc);
+			$l .= "\n<li>$link</li>";
 		}
 		return "<ul>$l\n</ul>";
 	}
@@ -500,10 +552,19 @@ EOS;
 		);
 		$yearview = $this->makeYearView($year, $yearAlt, $year2);
 		if ($yearview{0} == '?') {
-			return "<a href='$this->root/suggestData/{$actions[$type][0]}/$this->textId/$this->chunkId' title='Даване на информация за година на {$actions[$type][1]}'>$yearview</a>";
+			$params = array(self::FF_ACTION=>'suggestData', 'sa'=>$actions[$type][0],
+				'textId' => $this->textId, 'chunkId' => $this->chunkId);
+			return $this->out->internLink($yearview, $params, 4,
+				'Даване на информация за година на '. $actions[$type][1]);
 		}
 		return $yearview;
 	}
 
-}
 
+	protected function makeLicenseView($name, $uri = '') {
+		if ( empty($uri) ) {
+			return "($name)";
+		}
+		return "(<a href='$uri'>$name</a>)";
+	}
+}

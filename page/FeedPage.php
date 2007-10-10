@@ -3,12 +3,12 @@
 class FeedPage extends Page {
 
 	protected
-		$appname = 'mylib', // Application name
 		$validObjs = array('new', 'edit', 'comment', 'liternews', 'news', 'work'),
 		$validFeedTypes = array('rss'),
 		$maphist = array('new' => 'entrydate', 'edit' => 'lastmod'),
 		$defObj = 'new', $defFeedType = 'rss', $defListLimit = 25,
-		$maxListLimit = 200;
+		$maxListLimit = 200,
+		$imgName = 'mylib-mandor.gif', $imgWitdh = 88;
 
 
 	public function __construct() {
@@ -41,6 +41,7 @@ class FeedPage extends Page {
 			$pagename = 'history';
 			$this->dbfield = $this->maphist[$this->obj];
 			$myfields['getby'] = $this->dbfield;
+			$myfields['date'] = -1;
 			break;
 		case 'comment': case 'liternews': case 'news': case 'work':
 			$makeItemFunc = 'make'. $ftPref . ucfirst($this->obj) .'Item';
@@ -71,7 +72,8 @@ class FeedPage extends Page {
 			$this->makeXmlElement('description', $this->feedDescription) .
 			$this->makeXmlElement('language', $this->langCode) .
 			$this->makeXmlElement('lastBuildDate', $this->makeRssDate()) .
-			$this->makeXmlElement('generator', $this->appname) .
+			$this->makeXmlElement('generator', APP_NAME) .
+			$this->makeRssImage() .
 			$this->db->iterateOverResult($query, $makeItemFunc, $this, $bufferq);
 		return <<<EOS
 $xmlpi
@@ -88,7 +90,9 @@ EOS;
 	public function makeRssHistoryItem($dbrow) {
 		extract($dbrow);
 		$author = $collection == 'true' ? '' : trim($author, ',');
-		$ttitle = $title;
+		$tlink = $this->makeSimpleTextLink($title, $textId);
+		$rlink = $this->makeRawTextLink($textId, 'суров текст');
+		$dlink = $this->makeDlLink($textId, $zsize, 'архивиран суров текст');
 		$sauthor = $stranslator = $sseries = '';
 		if ( !empty($series) ) {
 			$sseries = '<li>Поредица: '. $this->makeSeriesLink($series) ."</li>\n";
@@ -102,15 +106,16 @@ EOS;
 				: $this->makeTranslatorLink($translator)) ."</li>\n";
 		}
 		$comment = empty($edit_comment) ? '' : "<li>Коментар: $edit_comment</li>";
+		$stype = workType($type);
 		$description = <<<EOS
 <ul>
 $comment
-<li>Произведение: <a href="$this->root/text/$textId"><em>$ttitle</em></a> (<a href="$this->root/text/$textId/raw">суров текст</a>, <a href="$this->root/download/$textId">архивиран суров текст</a>)</li>
-$sseries$sauthor$stranslator<li>Форма: {$GLOBALS['types'][$type]}</li>
+<li>Произведение: $tlink ($rlink, $dlink)</li>
+$sseries$sauthor$stranslator<li>Форма: $stype</li>
 </ul>
 EOS;
 		$time = $this->makeRssDate($dbrow[$this->dbfield]);
-		$link = "$this->root/text/$textId";
+		$link = $this->out->internUrl(array(self::FF_ACTION=>'text', 'textId'=>$textId), 2);
 		$guid = $link .'#'. $this->formatDateForGuid($dbrow[$this->dbfield]);
 		$data = compact('title', 'link', 'time', 'guid', 'description');
 		return $this->makeRssItem($data);
@@ -122,7 +127,7 @@ EOS;
 		$title = "$rname за „{$textTitle}“". $this->makeFromAuthorSuffix($dbrow);
 		$dbrow['showtitle'] = $dbrow['showtime'] = false;
 		$description = $this->basepage->makeComment($dbrow);
-		$link = "$this->root/comment/$textId#e$id";
+		$link = $this->out->internUrl(array(self::FF_ACTION=>'comment', 'textId'=>$textId), 2, "e$id");
 		$creator = $rname;
 		$data = compact('title', 'link', 'time', 'description', 'creator');
 		return $this->makeRssItem($data);
@@ -133,7 +138,7 @@ EOS;
 		extract($dbrow);
 		$dbrow['showtitle'] = $dbrow['showtime'] = false;
 		$description = $this->basepage->makeNewsEntry($dbrow);
-		$link = "$this->root/liternews#e$id";
+		$link = $this->out->internUrl(array(self::FF_ACTION=>'liternews'), 1, "e$id");
 		$creator = $username;
 		$source = $src;
 		$data = compact('title', 'link', 'time', 'description', 'creator', 'source');
@@ -145,7 +150,7 @@ EOS;
 		extract($dbrow);
 		$dbrow['showtime'] = false;
 		$description = $this->basepage->makeNewsEntry($dbrow);
-		$link = "$this->root/news#e$id";
+		$link = $this->out->internUrl(array(self::FF_ACTION=>'news'), 1, "e$id");
 		$creator = $username;
 		$data = compact('link', 'time', 'description', 'creator');
 		return $this->makeRssItem($data);
@@ -158,9 +163,9 @@ EOS;
 		$dbrow['expandinfo'] = $dbrow['showeditors'] = true;
 		$description = $this->basepage->makeWorkListItem($dbrow, false);
 		$time = $date;
-		$link = "$this->root/work#e$id";
+		$link = $this->out->internUrl(array(self::FF_ACTION=>'work'), 1, "e$id");
 		$guid = "$link-$status-$progress";
-		if ( $type == 1 && $status >= $this->basepage->maxScanStatus ) {
+		if ( $type == 1 && $status >= WorkPage::MAX_SCAN_STATUS ) {
 			$guid .= '-'. $this->formatDateForGuid($date);
 		}
 		$creator = $username;
@@ -172,8 +177,10 @@ EOS;
 	public function makeRssItem($data) {
 		extract($data);
 		if ( empty($title) ) $title = strtr($time, array(' 00:00:00' => ''));
-		if ( empty($creator) ) $creator = $this->sitename;
-		if ( empty($guid) ) $guid = $link;
+		fillOnEmpty($creator, $this->sitename);
+		// unescape escaped ampersands to prevent double escaping them later
+		$link = strtr($link, array('&amp;' => '&'));
+		fillOnEmpty($guid, $link);
 		$src = empty($source) ? '' : $source;
 		$lvl = 2;
 		return "\n\t<item>".
@@ -188,14 +195,23 @@ EOS;
 	}
 
 
-	protected function makeXmlElement($name, $content, $level = 1, $attribs = array()) {
-		if ( empty($content) ) return '';
-		$attrs = '';
-		foreach ((array)$attribs as $attrname => $attrval) {
-			$attrs .= ' '.$attrname .'="'. htmlspecialchars($attrval) .'"';
+	protected function makeRssImage() {
+		$lvl = 2;
+		return "\n\t<image>".
+			$this->makeXmlElement('title', '{SITENAME}', $lvl) .
+			$this->makeXmlElement('url', $this->skin->bannerDir().$this->imgName, $lvl) .
+			$this->makeXmlElement('link', $this->root, $lvl) .
+			$this->makeXmlElement('width', $this->imgWitdh, $lvl) .
+			"\n\t</image>";
+	}
+
+	protected function makeXmlElement($name, $content, $level = 1, $attrs = array()) {
+		if ( empty($content) ) {
+			return '';
 		}
 		$content = htmlspecialchars($content);
-		return "\n". str_repeat("\t", $level) ."<$name$attrs>$content</$name>";
+		$elem = $this->out->xmlElement($name, $content, $attrs);
+		return "\n". str_repeat("\t", $level) . $elem;
 	}
 
 

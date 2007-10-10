@@ -5,13 +5,10 @@ class EditTextLabelsPage extends Page {
 		parent::__construct();
 		$this->action = 'editTextLabels';
 		$this->title = 'Редактиране на текстови етикети';
-		$this->mainDbTable = 'label';
-		$this->suplDbTable = 'text_label';
 		$this->textId = $this->request->value('textId', 0, 1);
 		$this->chunkId = $this->request->value('chunkId', 1, 2);
 		$this->subaction = $this->request->value('subaction');
-		$this->textTitle = $this->request->value('title', '');
-		$this->author = $this->request->value('author', '');
+		$this->work = Work::newFromId($this->textId);
 	}
 
 
@@ -21,19 +18,18 @@ class EditTextLabelsPage extends Page {
 		$cur = (array) $this->request->value('cur');
 		$del = array_diff($old, $cur);
 		if ( !empty($del) ) {
-			$dels = implode(',', $del);
-			$key = array('text'=>$this->textId, "label IN ($dels)");
-			$this->db->delete($this->suplDbTable, $key);
-			$this->log('-', $dels);
+			$key = array('text' => $this->textId, 'label' => array('IN', $del));
+			$this->db->delete(DBT_TEXT_LABEL, $key);
+			$this->log('-', implode(',', $del));
 			$changed = true;
 		}
 		$new = (array) $this->request->value('new');
 		if ( !empty($new) ) {
-			$q = "INSERT /*p*/$this->suplDbTable (text, label) VALUES";
+			$data = array();
 			foreach ($new as $label) {
-				$q .= " ($this->textId, $label),";
+				$data[] = array($this->textId, $label);
 			}
-			$this->db->query( rtrim($q, ',') );
+			$this->db->multiinsert(DBT_TEXT_LABEL, $data, array('text', 'label'));
 			$this->log('+', implode(',', $new));
 			$changed = true;
 		}
@@ -41,29 +37,32 @@ class EditTextLabelsPage extends Page {
 		$hasExtra = $this->request->checkbox('newExtraLabelCh');
 		$extraLabel = $this->request->value('newExtraLabel');
 		if ( $hasExtra && !empty($extraLabel) ) {
-			$res = $this->db->select($this->mainDbTable, array('name'=>$extraLabel), 'id');
-			if ( $this->db->numRows($res) > 0 ) {
+			$res = $this->db->select(DBT_LABEL, array('name'=>$extraLabel), 'id');
+			if ( $this->db->numRows($res) > 0 ) { // съществуващ етикет
 				list($newId) = $this->db->fetchRow($res);
-			} else {
-				$newId = $this->db->autoIncrementId($this->mainDbTable);
+				$act = '+';
+			} else { // нов етикет
+				$newId = $this->db->autoIncrementId(DBT_LABEL);
+				$set = array('id' => $newId, 'name' => $extraLabel);
+				$this->db->insert(DBT_LABEL, $set);
+				$act = '*';
 			}
-			$set = array('id' => $newId, 'name' => $extraLabel);
-			$this->db->replace($this->mainDbTable, $set);
 			$set = array('text' => $this->textId, 'label' => $newId);
-			$this->db->insert($this->suplDbTable, $set);
-			$this->log('*', $newId);
+			$this->db->insert(DBT_TEXT_LABEL, $set);
+			$this->log($act, $newId);
 			$changed = true;
 		}
 		if ($changed) {
 			$this->addMessage('Промените бяха съхранени.');
-			$this->addMessage("Обратно към <a href='$this->root/text/$this->textId/$this->chunkId'>текста</a>");
+			$link = $this->makeSimpleTextLink('текста', $this->textId, $this->chunkId);
+			$this->addMessage('Обратно към '. $link);
 		}
 		return $this->buildContent();
 	}
 
 
 	protected function buildContent() {
-		if ( !$this->initTitleData() ) {
+		if ( is_null($this->work) ) {
 			$this->addMessage("Не съществува текст с номер <strong>$this->textId</strong>.", true);
 			return '';
 		}
@@ -78,17 +77,14 @@ class EditTextLabelsPage extends Page {
 
 	protected function makeForm() {
 		list($curLabels, $otherLabels) = $this->makeLabelInput();
-		if ( empty($curLabels) ) $curLabels = 'Няма';
-		$text = $this->makeSimpleTextLink($this->textTitle, $this->textId, $this->chunkId);
-		$authorV = $this->makeAuthorLink($this->author);
-		if ( !empty($authorV) ) { $authorV = ' от '.$authorV; }
+		fillOnEmpty($curLabels, 'Няма');
+		$text = $this->makeSimpleTextLink($this->work->title, $this->textId, $this->chunkId);
+		$authorV = $this->makeFromAuthorSuffix($this->work->author_name);
 		$textId = $this->out->hiddenField('textId', $this->textId);
 		$chunkId = $this->out->hiddenField('chunkId', $this->chunkId);
-		$title = $this->out->hiddenField('title', $this->textTitle);
-		$author = $this->out->hiddenField('author', $this->author);
 		$extraLabelCh = $this->out->checkbox('newExtraLabelCh', 'l0');
-		$extraLabel = $this->out->textField('newExtraLabel', '', '', 25, 255, 0,
-			'', 'onchange="if (this.value!=\'\') this.form.newExtraLabelCh.checked=true;"');
+		$extraLabel = $this->out->textField('newExtraLabel', '', '', 25, 255, null,
+			'', array('onblur'=>'if (this.value!=\'\') { this.form.newExtraLabelCh.checked=true; }'));
 		$submit = $this->out->submitButton('Съхраняване на промените');
 		return <<<EOS
 
@@ -105,8 +101,6 @@ class EditTextLabelsPage extends Page {
 <form action="{FACTION}" method="post">
 	$textId
 	$chunkId
-	$title
-	$author
 
 	<fieldset>
 	<legend>Присвоени етикети:</legend>
@@ -128,7 +122,7 @@ EOS;
 
 	protected function makeLabelInput() {
 		$cur = $other = '';
-		foreach ($this->db->getObjects('label') as $id => $name) {
+		foreach ($this->db->getObjects(DBT_LABEL) as $id => $name) {
 			if ( isset($this->labels[$id]) ) {
 				$oldL = $this->out->hiddenField('old[]', $id);
 				$l = $this->out->checkbox('cur[]', "l$id", true, $name, $id);
@@ -144,30 +138,17 @@ EOS;
 
 	protected function initData() {
 		$this->labels = array();
-		$res = $this->db->select($this->suplDbTable, array('text'=>$this->textId), 'label');
+		$res = $this->db->select(DBT_TEXT_LABEL, array('text'=>$this->textId), 'label');
 		while ( $row = $this->db->fetchRow($res) ) {
 			$this->labels[$row[0]] = $row[0];
 		}
 	}
 
 
-	protected function initTitleData() {
-		$sql = "SELECT t.title textTitle, GROUP_CONCAT(DISTINCT a.name) author
-			FROM /*p*/text t
-			LEFT JOIN /*p*/author_of aof ON t.id = aof.text
-			LEFT JOIN /*p*/person a ON aof.author = a.id
-			WHERE t.id = '$this->textId'
-			GROUP BY t.id LIMIT 1";
-		$data = $this->db->fetchAssoc( $this->db->query($sql) );
-		if ( empty($data) ) { return false; }
-		extract2object($data, $this);
-		return true;
-	}
-
-
 	protected function log($action, $labels) {
-		$set = array('action'=>$action, 'labels'=>$labels, 'text'=>$this->textId,
-			'title'=>$this->textTitle, 'author'=>$this->author, 'user'=>$this->user->id);
-		$this->db->insert('label_log', $set);
+		$set = array(self::FF_ACTION=>$action, 'labels'=>$labels, 'text'=>$this->textId,
+			'title'=>$this->work->title, 'author'=>$this->work->author_name,
+			'user'=>$this->user->id);
+		$this->db->insert(DBT_LABEL_LOG, $set);
 	}
 }

@@ -7,7 +7,7 @@ class EmailUserPage extends MailPage {
 		parent::__construct();
 		$this->action = 'emailUser';
 		$this->title = 'Пращане на писмо на потребител';
-		$this->username = $this->request->value('username');
+		$this->username = $this->request->value('username', '', 1);
 		$this->mailTo = ADMIN_EMAIL_ENC;
 		$this->mailFrom = SITE_EMAIL_ENC;
 		$this->mailSubject = $this->request->value('subject', 'Писмо чрез {SITENAME}');
@@ -51,7 +51,7 @@ class EmailUserPage extends MailPage {
 			return 'Необходимо е да се регистрирате и да посочите валидна електронна поща, за да можете да пращате писма на други потребители.';
 		}
 		if ( empty($this->user->email) ) {
-			$settingslink = $this->out->link('настройките си', 'settings');
+			$settingslink = $this->out->internLink('настройките си', 'settings');
 			return "Необходимо е да посочите валидна електронна поща в $settingslink, за да можете да пращате писма на други потребители.";
 		}
 		return '';
@@ -80,11 +80,10 @@ class EmailUserPage extends MailPage {
 
 
 	protected function makeForm() {
-		$ownsettingslink = $this->out->link('настройките ви', 'settings');
+		$ownsettingslink = $this->out->internLink('настройките ви', 'settings');
 		$fromuserlink = $this->makeUserLink($this->user->username);
 		$username = $this->out->textField('username', '', $this->username, 30, 30);
-		$subject = $this->out->textField('subject', '',
-			$this->mailSubject, 60, 200);
+		$subject = $this->out->textField('subject', '', $this->mailSubject, 60, 200);
 		$message = $this->out->textarea('message', '', $this->mailMessage, 20, 80);
 		$submit = $this->out->submitButton('Изпращане на писмото');
 		return <<<EOS

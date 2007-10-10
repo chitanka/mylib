@@ -1,17 +1,12 @@
 <?php
 /** @file
- * The main entry point of the application
- */
+The main entry point of the application.
+*/
+define('MYLIB', 1);
 
 /** @mainpage
- * Software for an on-line digital library.
- */
-
-/**
- * Load a class file
- * @param $class Class name
- */
-function __autoload($class) { require_once $class .'.php'; }
+Software for an on-line digital library.
+*/
 
 ini_set('error_log', './log/error');
 ini_set('display_errors', 1);
@@ -28,7 +23,9 @@ $request = Setup::request();
 $action = $request->action();
 Setup::startSession($action);
 $user = Setup::user(); // session must be already started
-if ( !$user->canExecute($action) ) { $action = PageManager::defaultPage(); }
+if ( !$user->canExecute($action) ) {
+	$action = PageManager::defaultPage();
+}
 
 $useCache = (bool) $request->value('cache', 1);
 $page = PageManager::executePage($action, $useCache, $request->hash());

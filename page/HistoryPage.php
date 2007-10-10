@@ -2,24 +2,37 @@
 
 class HistoryPage extends Page {
 
-	public $extQS = '', $extQF = '', $extQW = '';
-	protected $validGetbys = array('entrydate', 'lastmod');
-	protected $defGetby = 'entrydate';
-	protected $headerExts = array('entrydate' => 'нови текстове',
-		'lastmod' => 'редактирани текстове');
+	public $extQS = '', $extQF = array(), $extQW = array();
+	protected
+		$allowViewAll = false,
+		$validGetbys = array('entrydate', 'lastmod'),
+		$defGetby = 'entrydate',
+		$headerExts = array(
+			'entrydate' => 'нови текстове',
+			'lastmod' => 'редактирани текстове'),
+		$viewTypes = array('plain', 'table'),
+		$defViewType = 'plain'
+	;
 
 
 	public function __construct() {
 		parent::__construct();
 		$this->action = 'history';
 		$this->title = 'История';
-		$this->date = $this->request->value('date', date('Y-n'));
-		if ( preg_match('/[^\d-]/', $this->date) ) { $this->date = '0'; }
+		$this->defDate = date('Y-n');
+		$this->date = $this->request->value('date', $this->defDate);
+		if ( preg_match('/[^\d-]/', $this->date) ) {
+			$this->date = $this->defDate;
+		}
 		$this->getby = $this->request->value('getby', $this->defGetby);
 		if ( !in_array($this->getby, $this->validGetbys) ) {
 			$this->getby = $this->defGetby;
 		}
 		$this->orderby = $this->request->value('orderby', 'date');
+		$this->viewType = normVal(
+			$this->request->value('vt', $this->defViewType),
+			$this->viewTypes,
+			$this->defViewType);
 		$this->media = $this->request->value('media', 'screen');
 	}
 
@@ -47,6 +60,7 @@ class HistoryPage extends Page {
 <p class="non-graphic">Към <a href="#before-lists">списъка на произведенията</a></p>
 <form action="{FACTION}" method="get">
 <div style="text-align:center; margin:1em auto;">
+	{HIDDEN_ACTION}
 $inputContent
 	$submit
 </div>
@@ -85,21 +99,22 @@ EOS;
 				extract($textData);
 				$readClass = empty($reader) ? 'unread' : 'read';
 				$sauthor = $collection == 'true' ? ''
-					: $this->makeAuthorLink($author, 'first', '', '', '');
+					: $this->makeAuthorLink($author, 'first');
 				if ( $lang != $orig_lang ) {
 					$stranslator = (!empty($sauthor) ? ', ' : '').'превод: ';
 					$stranslator .= empty($translator)
-						? "<a href='$this->root/suggestData/translator/$textId'>неизвестен</a>"
-						: $this->makeTranslatorLink($translator, 'first', '', '', '');
+						? $this->out->internLink('неизвестен', array(self::FF_ACTION=>'suggestData', 'sa'=>'translator', 'textId'=>$textId), 3)
+						: $this->makeTranslatorLink($translator, 'first');
 				} else { $stranslator = ''; }
 				$vdate = $textData[$this->getby];
 				if ($this->isEditMode()) {
 					$vdate .= $entrydate >= substr($lastmod, 0, 10) ? $mark : ' &nbsp;';
 				}
 				$seriesLink = empty($series) ? ''
-					: '<span class="extra">'.$this->makeSeriesLink($series, true) .':</span> ';
+					: '<span class="extra">'.$this->makeSeriesLink($series) .':</span> ';
 				$o .= $this->media == 'screen'
-					? "\n\t<li class='$type'><tt title='$edit_comment'>$vdate</tt> $seriesLink<a class='$readClass' href='$this->root/text/$textId'><em>$title</em></a>".
+					? "\n\t<li class='$type'><tt title='$edit_comment'>$vdate</tt> $seriesLink".
+						$this->makeSimpleTextLink($title, $textId, 1, '', array('class'=>$readClass)).
 					' — <span class="extra">'. $this->makeDlLink($textId, $zsize) .'</span>'
 					: "\n\t<li>$seriesLink$title [$this->purl/text/$textId]";
 				if ( !empty($sauthor) || !empty($stranslator) ) {
@@ -121,7 +136,7 @@ EOS;
 		$ext = array('new' => 'добавени', 'edit' => 'редактирани');
 		foreach ($limits as $limit) {
 			$title = "RSS зоб за новинарски четци с последните $limit $ext[$type] произведения";
-			$l .= ", <a href='$this->root/feed/$type/$limit' title='$title'>$limit</a>";
+			$l .= ', '.$this->out->internLink($limit, array(self::FF_ACTION=>'feed', 'obj'=>$type, 'limit'=>$limit), 3);
 		}
 		return ltrim($l, ', ');
 	}
@@ -146,7 +161,7 @@ EOS;
 			$monthName = monthName($month);
 			$o .= "\n<h2>$monthName $year</h2>\n<ul>";
 			foreach ($dtexts as $author => $atexts) {
-				$author = $this->makeAuthorLink($author, 'first', '', '', '');
+				$author = $this->makeAuthorLink($author, 'first');
 				$o .= "\n<li>$author\n<ul>";
 				ksort($atexts);
 				foreach ($atexts as $atext) {
@@ -154,15 +169,16 @@ EOS;
 					if ( $lang != $orig_lang ) {
 						$stranslator = ', превод: ';
 						$stranslator .= empty($translator)
-							? "<a href='$this->root/suggestData/translator/$textId'>неизвестен</a>"
-							: $this->makeTranslatorLink($translator, 'first', '', '', '');
+							? $this->out->internLink('неизвестен', array(self::FF_ACTION=>'suggestData', 'sa'=>'translator', 'textId'=>$textId), 3)
+							: $this->makeTranslatorLink($translator, 'first');
 					} else { $stranslator = ''; }
 					$readClass = empty($reader) ? 'unread' : 'read';
 					$dl = $this->makeDlLink($textId, $zsize);
 					$seriesLink = empty($series) ? ''
-						: '<span class="extra">'.$this->makeSeriesLink($series, true) .':</span> ';
+						: '<span class="extra">'.$this->makeSeriesLink($series) .':</span> ';
 					$o .= $this->media == 'screen'
-						? "\n\t<li class='$type'>$seriesLink<a class='$readClass' href='$this->root/text/$textId'><em>$title</em></a>".
+						? "\n\t<li class='$type'>$seriesLink".
+						$this->makeSimpleTextLink($title, $textId, 1, '', array('class'=>$readClass)).
 						' — <span class="extra">'. $this->makeDlLink($textId, $zsize) .'</span>'.$stranslator
 						: "\n\t<li>$seriesLink$title [$this->purl/text/$textId]</li>";
 				}
@@ -203,7 +219,9 @@ EOS;
 				$opts["$year-$month"] = monthName($month) .' '. $year;
 			}
 		}
-		$opts[0] = '(Всички месеци)';
+		if ($this->allowViewAll) {
+			$opts[0] = '(Всички месеци)';
+		}
 		$date = $this->out->selectBox('date', '', $opts, $this->date);
 		return '<label for="date">През:</label>&nbsp;'. $date;
 	}
@@ -224,46 +242,52 @@ EOS;
 
 
 	public function makeSqlQuery($limit = 0, $offset = 0, $order = null) {
-		if ($this->getby == 'lastmod') {
-			$this->extQS .= ', h.user editor, h.date lastmod, h.comment edit_comment';
-			$this->extQF .= ' LEFT JOIN /*p*/edit_history h ON t.lastedit = h.id';
-		}
-		$qSelect = "SELECT GROUP_CONCAT(DISTINCT a.name ORDER BY aof.pos) author,
-			t.id textId, t.title, t.lang, t.orig_lang, t.type, t.collection,
-			t.entrydate, t.size, t.zsize,
-			GROUP_CONCAT(DISTINCT tr.name ORDER BY tof.pos) translator,
-			s.name series, s.orig_name orig_series
-			$this->extQS";
-		$qFrom = " FROM /*p*/text t
-			LEFT JOIN /*p*/author_of aof ON t.id = aof.text
-			LEFT JOIN /*p*/person a ON aof.author = a.id
-			LEFT JOIN /*p*/translator_of tof ON t.id = tof.text
-			LEFT JOIN /*p*/person tr ON tof.translator = tr.id
-			LEFT JOIN /*p*/series s ON t.series = s.id
-			$this->extQF";
-		$qGroup = ' GROUP BY t.id';
-		if ($this->user->id > 0) {
-			$qSelect .= ', r.user reader';
-			$qFrom .= " LEFT JOIN /*p*/reader_of r ON t.id = r.text AND r.user = {$this->user->id}";
-		}
-		$qW = array();
 		$col = $this->getby == 'entrydate' ? 't.entrydate' : 'h.date';
-		if ($this->date != -1) {
-			$qW[] = $this->date === '0' ? "$col != '0000-00-00'"
-				: "$col >= '$this->date-1' AND $col < '".$this->nextMonthDate()."-1'";
+		$qa = array(
+			'SELECT' => 'GROUP_CONCAT(DISTINCT a.name ORDER BY aof.pos) author,
+				t.id textId, t.title, t.lang, t.orig_lang, t.type, t.collection,
+				t.entrydate, t.size, t.zsize,
+				GROUP_CONCAT(DISTINCT tr.name ORDER BY tof.pos) translator,
+				s.name series, s.orig_name orig_series' . $this->extQS,
+			'FROM' => DBT_TEXT .' t',
+			'LEFT JOIN' => array(
+				DBT_AUTHOR_OF .' aof' => 't.id = aof.text',
+				DBT_PERSON .' a' => 'aof.author = a.id',
+				DBT_TRANSLATOR_OF .' tof' => 't.id = tof.text',
+				DBT_PERSON .' tr' => 'tof.translator = tr.id',
+				DBT_SERIES .' s' => 't.series = s.id',
+			) + $this->extQF,
+			'WHERE' => array(),
+			'GROUP BY' => 't.id',
+			'ORDER BY' => "$col DESC, t.id DESC",
+			'LIMIT' => array($offset, $limit)
+		);
+		if ($this->getby == 'lastmod') {
+			$qa['SELECT'] .= ', h.user editor, h.date lastmod, h.comment edit_comment';
+			$qa['LEFT JOIN'][DBT_EDIT_HISTORY .' h'] = 't.lastedit = h.id';
 		}
-		if ( !empty($this->extQW) ) $qW[] = $this->extQW;
-		$q = $qSelect.$qFrom.(empty($qW) ? '' :
-		' WHERE '.implode(' AND ', $qW));
-		$q .= $qGroup ." ORDER BY $col DESC, t.id DESC";
-		if ($limit > 0) $q .= " LIMIT $limit";
-		return $q;
+		if ($this->user->id > 0) {
+			$qa['SELECT'] .= ', r.user reader';
+			$qa['LEFT JOIN'][DBT_READER_OF .' r'] =
+				't.id = r.text AND r.user = '. $this->user->id;
+		}
+		if ($this->date === '0' && $this->allowViewAll) {
+			$qa['WHERE'][$col] = array('!=', '0000-00-00');
+		} else if ($this->date !== -1) {
+			if ( strpos($this->date, '-') === false ) {
+				$this->date = $this->defDate;
+			}
+			$end = $this->monthEndDate();
+			$qa['WHERE'][] = "$col BETWEEN '$this->date-1' AND '$end'";
+		}
+		if ( !empty($this->extQW) ) $qa['WHERE'] += $this->extQW;
+		return $this->db->extselectQ($qa);
 	}
 
 
 	protected function getStartDate() {
 		$key = array('`entrydate`' => array('!=', '0000-00-00'));
-		$res = $this->db->select('text', $key, 'MIN(entrydate)');
+		$res = $this->db->select(DBT_TEXT, $key, 'MIN(entrydate)');
 		list($minDate) = $this->db->fetchRow($res);
 		if ( is_null($minDate) ) {
 			// no matching entries: the DBMS returns NULL
@@ -287,7 +311,7 @@ EOS;
 		$date .= $m == 2
 			? ($y % 4 ? 28 : ($y % 100 ? 29 : ($y % 400 ? 28 : 29)))
 			: (($m - 1) % 7 % 2 ? 30 : 31);
-		return $date;
+		return $date . ' 23:59:59';
 	}
 
 

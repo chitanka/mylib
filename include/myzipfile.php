@@ -172,5 +172,4 @@ class myzipfile {
 			"\x00\x00"; // .zip file comment length
 	}
 
-} // end of the 'zipfile' class
-
+}

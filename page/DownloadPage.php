@@ -25,17 +25,19 @@ class DownloadPage extends Page {
 				$fileCount--; continue; // invalid text ID
 			}
 			$this->user->markTextAsDl($textId);
-			$cacheFile = CacheManager::SFBZIP_FILE .$textId;
-			if ( CacheManager::cacheExists($cacheFile) ) {
-				$fEntry = CacheManager::getCache($cacheFile, false);
+			if ( CacheManager::cacheExists(CacheManager::SFBZIP_DIR, $textId) ) {
+				$fEntry = CacheManager::getCache(CacheManager::SFBZIP_DIR, $textId, false);
 				$fEntry = unserialize($fEntry);
 				$this->zf->addFileEntry($fEntry);
 				$this->filename = $this->rmFEntrySuffix($fEntry['name']);
 			} else {
 				$mainFileData = $this->makeMainFileData($textId);
-				if (!$mainFileData) { $fileCount--; continue; }
+				if (!$mainFileData) {
+					$fileCount--;
+					continue;
+				}
 				list($this->filename, $this->fPrefix, $this->fSuffix) = $mainFileData;
-				$this->addTextFileEntry($textId, $cacheFile);
+				$this->addTextFileEntry($textId);
 			}
 			if ($setZipFileName) { $this->zipFileName = $this->filename; }
 			$this->addBinaryFileEntries($textId, $this->filename);
@@ -56,11 +58,11 @@ class DownloadPage extends Page {
 	}
 
 
-	protected function addTextFileEntry($textId, $cacheFile) {
+	protected function addTextFileEntry($textId) {
 		$fEntry = $this->zf->newFileEntry($this->fPrefix .
 			$this->makeContentData($textId) ."\n\n\tКРАЙ".
 			$this->fSuffix, $this->filename .'.txt');
-		CacheManager::setCache($cacheFile, serialize($fEntry), false);
+		CacheManager::setCache(CacheManager::SFBZIP_DIR, $textId, serialize($fEntry), false);
 		$this->zf->addFileEntry($fEntry);
 	}
 
@@ -91,7 +93,7 @@ class DownloadPage extends Page {
 
 
 	protected function makeContentData($textId) {
-		$fname = $GLOBALS['contentDirs']['text'] . $textId;
+		$fname = getContentFilePath('text', $textId);
 		if ( file_exists($fname) ) {
 			return file_get_contents($fname);
 		}
@@ -127,18 +129,19 @@ class DownloadPage extends Page {
 
 
 	protected function makeAnnotation($textId) {
-		$file = $GLOBALS['contentDirs']['text-anno'] . $textId;
+		$file = getContentFilePath('text-anno', $textId);
 		if ( !file_exists($file) ) { return ''; }
 		return file_get_contents($file);
 	}
 
 
 	protected function makeExtraInfo($textId) {
-		$file = $GLOBALS['contentDirs']['text-info'] . $textId;
-		if ( !file_exists($file) ) { return ''; }
+		$file = getContentFilePath('text-info', $textId);
+		if ( !file_exists($file) ) {
+			return '';
+		}
 		$con = file_get_contents($file);
-		if ( empty($con) ) { return ''; }
-		return "\n\n". rtrim($con);
+		return empty($con) ? '' : "\n\n". rtrim($con);
 	}
 
 

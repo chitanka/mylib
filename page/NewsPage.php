@@ -2,14 +2,15 @@
 
 class NewsPage extends Page {
 
-	protected $defListLimit = 50, $maxListLimit = 150;
+	const DB_TABLE = DBT_NEWS;
+	protected
+		$defListLimit = 50, $maxListLimit = 150;
 
 
 	public function __construct() {
 		parent::__construct();
 		$this->action = 'news';
 		$this->title = 'Новини';
-		$this->mainDbTable = 'news';
 		$this->objId = $this->request->value('objId', 0, 1);
 		$this->initPaginationFields();
 		$this->dbkey = array();
@@ -32,7 +33,7 @@ class NewsPage extends Page {
 		while ($row = $this->db->fetchAssoc($res)) {
 			$c .= $this->makeNewsEntry($row);
 		}
-		$count = $this->db->getCount($this->mainDbTable, $this->dbkey);
+		$count = $this->db->getCount(self::DB_TABLE, $this->dbkey);
 		$pagelinks = $showPageLinks
 			? $this->makePageLinks($count, $this->llimit, $this->loffset) : '';
 		return $pagelinks . $c . $pagelinks;
@@ -52,16 +53,20 @@ class NewsPage extends Page {
 
 
 	public function makeSqlQuery($limit = 0, $offset = 0, $order = null) {
-		if (empty($limit)) $limit = $this->llimit;
-		if (empty($offset)) $offset = $this->loffset;
-		if ( is_null($order) ) $order = 'DESC';
+		fillOnEmpty($limit, $this->llimit);
+		fillOnEmpty($offset, $this->loffset);
+		fillOnEmpty($order, 'DESC');
 		if ( !empty($this->objId) && is_numeric($this->objId) ) {
 			$this->dbkey = array('id' => $this->objId);
 		}
-		$wh = $this->db->makeWhereClause($this->dbkey);
-		return "SELECT m.*, u.username FROM /*p*/$this->mainDbTable m
-			LEFT JOIN /*p*/user u ON m.user = u.id
-			$wh
-			ORDER BY `time` $order, id $order LIMIT $offset, $limit";
+		$qa = array(
+			'SELECT' => 'm.*, u.username',
+			'FROM' => self::DB_TABLE .' m',
+			'LEFT JOIN' => array(User::DB_TABLE .' u' => 'm.user = u.id'),
+			'WHERE' => $this->dbkey,
+			'ORDER BY' => "`time` $order, id $order",
+			'LIMIT' => array($offset, $limit)
+		);
+		return $this->db->extselectQ($qa);
 	}
 }

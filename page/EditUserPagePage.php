@@ -37,22 +37,24 @@ class EditUserPagePage extends UserPage {
 		$this->title .= ' — Редактиране';
 		$username = $this->out->hiddenField('username', $this->username);
 		$userpage = $this->out->textarea('userpage', '', $this->userpage, 20, 80,
-			0, 'style="width:95%"');
+			0, array('style'=>'width:95%'));
 		$submit1 = $this->out->submitButton('Предварителен преглед', '', 0, 'preview');
 		$submit2 = $this->out->submitButton('Съхраняване', '', 0, 'send');
+		$edithelp = $this->out->internLink('Съвети за редактирането',
+			array(self::FF_ACTION=>'help', 'topic'=>'edit'), 2);
+		$sfblink = $this->out->internLink('форматът SFB',
+			array(self::FF_ACTION=>'help', 'topic'=>'sfb'), 2);
 		return <<<EOS
 
-<!--p style="text-align:right"><a href="$this->root/help/edit">Съвети за редактирането</a></p-->
-<p>За въвеждане на съдържанието се ползва форматът SFB — същият формат, в който са съхранени текстовете на библиотеката. В скоро време ще се появи и неговото описание. Дотогава се учете от свалените текстове. ;-)</p>
-<form action="{FACTION}" method="post">
-<div>
+<!--p style="text-align:right">$edithelp</p-->
+<p>За въвеждане на съдържанието се ползва $sfblink — същият формат, в който са съхранени текстовете на библиотеката.</p>
+<form action="{FACTION}" method="post"><div>
 	$username
 	<label for="userpage">Съдържание:</label><br />
 	$userpage<br />
 	<!--$submit1-->
 	$submit2
-</div>
-</form>
+</div></form>
 EOS;
 	}
 

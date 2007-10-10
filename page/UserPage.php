@@ -2,27 +2,29 @@
 
 class UserPage extends Page {
 
-	protected $contribLimit = 20, $defListLimit = 100, $maxListLimit = 400,
+	const DB_TABLE = User::DB_TABLE;
+	protected
+		$contribLimit = 50, $defListLimit = 100, $maxListLimit = 400,
 		$colCount = 4;
 
 	public function __construct() {
 		parent::__construct();
 		$this->action = 'user';
 		$this->contentDir = $GLOBALS['contentDirs']['user'];
-		$this->mainDbTable = User::MAIN_DB_TABLE;
-		$this->username = $this->request->value('username', NULL, 1);
+		$this->username = $this->request->value('username', null, 1);
 		$this->setDefaultTitle();
 		$this->userpage = $this->request->value('userpage');
-		$this->q = $this->request->value($this->FF_QUERY, '');
+		$this->climit = $this->request->value('climit', 1);
+		$this->q = $this->request->value(self::FF_QUERY, '');
 		$this->initPaginationFields();
 	}
 
 
 	protected function buildContent() {
-		if ( is_null($this->username) ) {
+		if ( empty($this->username) ) {
 			$this->title = 'Списък на потребителите';
-			$maxlimit = $this->db->getCount($this->mainDbTable, $this->getListDbKey());
-			$qfields = empty($this->q) ? array() : array($this->FF_QUERY => $this->q);
+			$maxlimit = $this->db->getCount(self::DB_TABLE, $this->getListDbKey());
+			$qfields = empty($this->q) ? array() : array(self::FF_QUERY => $this->q);
 			$pagelinks = $this->makePrevNextPageLinks($maxlimit, 0, $qfields);
 			return $this->makeSearchForm() . $pagelinks . $this->makeList() . $pagelinks;
 		}
@@ -38,7 +40,7 @@ class UserPage extends Page {
 	protected function userExists() {
 		$key = array('username' => $this->username);
 		$sel = array('id userId', 'username', 'realname');
-		$res = $this->db->select($this->mainDbTable, $key, $sel);
+		$res = $this->db->select(self::DB_TABLE, $key, $sel);
 		$data = $this->db->fetchAssoc($res);
 		if ( empty($data) ) {
 			$this->addMessage("Няма потребител с име <strong>$this->username</strong>.", true);
@@ -53,11 +55,6 @@ class UserPage extends Page {
 
 
 	protected function makeHTML() {
-		$c = '';
-// 		if ( !empty($this->realname) ) {
-// 			$nameEnc = urlencode($this->realname);
-// 			$c .= "\n<p style='margin-bottom:1em'>Истинско име: <a href='$this->root/author/$nameEnc' title='Списък на публикуваните произведения на $this->realname'>$this->realname</a></p>";
-// 		}
 		if ( !file_exists($this->filename) ) {
 			return '';
 		}
@@ -73,33 +70,46 @@ class UserPage extends Page {
 		$page = PageManager::buildPage('history');
 		$page->date = -1;
 		$page->extQS = ', u.username';
-		$page->extQF = "LEFT JOIN /*p*/user_text ut ON t.id = ut.text
-			LEFT JOIN /*p*/$this->mainDbTable u ON ut.user = u.id";
-		$page->extQW = 'ut.user = '.$this->userId;
-		$list = $page->makeListByDate(0, false);
+		$page->extQF = array(
+			DBT_USER_TEXT .' ut' => 't.id = ut.text',
+			self::DB_TABLE .' u' => 'ut.user = u.id');
+		$page->extQW = array('ut.user' => $this->userId);
+		$limit = $this->climit == 0 ? 0 : $this->contribLimit;
+		$list = $page->makeListByDate($limit, false);
+		$showAllLink = '';
+		if ($this->climit != 0 && $contribCnt > $this->contribLimit) {
+			$p = array(self::FF_ACTION=>$this->action, 'username'=>$this->username, 'climit'=> 0);
+			$showAllLink = '<div class="pagelinks">'.$this->out->internLink("Показване на всичките $contribCnt произведения", $p, 2).'</div>';
+		}
 		return <<<EOS
 
 <h2>Сканирани или обработени текстове</h2>
 $list
+$showAllLink
 EOS;
 	}
 
 
 	protected function getContribCount() {
 		$key = array('user' => $this->userId);
-		return $this->db->getCount('user_text', $key);
+		return $this->db->getCount(DBT_USER_TEXT, $key);
 	}
 
 
 	protected function makeEditLink() {
-		return $this->username == $this->user->username
-			? "<p style='font-size:small; text-align:right' title='Редактиране на личната страница'>[<a href='$this->root/editOwnPage'>редактиране</a>]</p>"
-			: '';
+		if ($this->username != $this->user->username) {
+			return '';
+		}
+		$link = $this->out->internLink('редактиране', 'editOwnPage', 1,
+			'Редактиране на личната страница');
+		return "<p style='font-size:small; text-align:right'>[$link]</p>";
 	}
 
 
 	protected function makeAllUsersLink() {
-		return "<p style='font-size:small; text-align:right' title='Преглед на всички потребители'><a href='{FACTION}'>Всички потребители</a></p>";
+		$link = $this->out->link('{FACTION}', 'Всички потребители',
+			'Преглед на всички потребители');
+		return "<p style='font-size:small; text-align:right'>$link</p>";
 	}
 
 
@@ -110,7 +120,7 @@ EOS;
 
 	protected function makeList() {
 		$sel = array('username', 'email', 'allowemail', '`group`');
-		$q = $this->db->selectQ($this->mainDbTable, $this->getListDbKey(), $sel,
+		$q = $this->db->selectQ(self::DB_TABLE, $this->getListDbKey(), $sel,
 			'username ASC', $this->loffset, $this->llimit);
 		$this->items = array();
 		$this->db->iterateOverResult($q, 'addListItem', $this);
@@ -134,12 +144,14 @@ EOS;
 
 
 	protected function makeSearchForm() {
-		$q = $this->out->textField($this->FF_QUERY, '', $this->q, 30, 30);
+		$q = $this->out->textField(self::FF_QUERY, '', $this->q, 30, 30);
+		$label = $this->out->label('Разлистване от:', self::FF_QUERY);
 		$submit = $this->out->submitButton('Показване', '', 0, false);
 		return <<<EOS
 <form action="{FACTION}" method="get">
 <div>
-	<label for="$this->FF_QUERY">Разлистване от:</label>
+	{HIDDEN_ACTION}
+	$label
 	$q
 	$submit
 </div>

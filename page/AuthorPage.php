@@ -2,20 +2,19 @@
 
 class AuthorPage extends ViewPage {
 
-	protected $FF_SORTBY = 'sortby';
-	protected $titles = array(
-		'simple' => 'Автори — ',
-		'extended' => 'Автори и заглавия — ',
-	);
-	protected $altTypes = array('p' => 'псевдоним', 'r' => 'истинско име',
-		'a' => 'алтернативно изписване');
+	const
+		DB_TABLE = DBT_PERSON, FF_SORTBY = 'sortby';
+	protected
+		$titles = array('simple' => 'Автори — ',
+			'extended' => 'Автори и заглавия — '),
+		$altTypes = array('p' => 'псевдоним', 'r' => 'истинско име',
+			'a' => 'алтернативно изписване');
 
 
 	public function __construct() {
 		parent::__construct();
 		$this->action = 'author';
-		$this->mainDbTable = 'person';
-		$this->sortby = $this->request->value($this->FF_SORTBY, 'first');
+		$this->sortby = $this->request->value(self::FF_SORTBY, 'first');
 		$this->dbsortby = $this->sortby == 'last' ? 'last_name' : 'name';
 		$this->uCanEditObj = $this->user->canExecute('editPerson');
 
@@ -46,28 +45,29 @@ class AuthorPage extends ViewPage {
 
 
 	protected function makeSimpleListQuery() {
-		$q1 = "SELECT id, name, orig_name, last_name, 'tp', country, name aname
-			FROM /*p*/$this->mainDbTable";
-		$q2 = "SELECT al.id, al.name, al.orig_name, al.last_name, al.type, a.country, a.name
-			FROM /*p*/person_alt al
-			LEFT JOIN /*p*/$this->mainDbTable a ON al.person = a.id";
-		$where1 = $where2 = array('role & 1'); // author’s bit
+		$qa1 = array(
+			'SELECT' => 'id, name, orig_name, last_name, "tp", country, name aname',
+			'FROM' => self::DB_TABLE,
+			'WHERE' => array('role & 1') // author’s bit,
+		);
+		$qa2 = array(
+			'SELECT' => 'al.id, al.name, al.orig_name, al.last_name, al.type,
+				a.country, a.name',
+			'FROM' => DBT_PERSON_ALT .' al',
+			'LEFT JOIN' => array(self::DB_TABLE .' a' => 'al.person = a.id'),
+			'WHERE' => array('role & 1') // author’s bit,
+		);
 		if ( !empty($this->country) ) {
-			$dbcountry = $this->db->escape($this->country);
-			$where1[] = "country='$dbcountry'";
-			$where2[] = "a.country='$dbcountry'";
+			$qa1['WHERE']['country'] =
+			$qa2['WHERE']['a.country'] = $this->country;
 		}
 		if ( !empty($this->startwith) ) {
-			$dbstartwith = strtr($this->startwith, '.', '%');
-			$dbstartwith = $this->db->escape($dbstartwith);
-			$where1[] = "$this->dbsortby LIKE '$dbstartwith%'";
-				#OR orig_name LIKE '$dbstartwith%'";
-			$where2[] = "al.$this->dbsortby LIKE '$dbstartwith%'";
+			$qa1['WHERE'][$this->dbsortby] =
+			$qa2['WHERE']['al.'.$this->dbsortby] =
+				array('LIKE', strtr($this->startwith, '.', '%') .'%');
 		}
-		if ( !empty($where1) ) {
-			$q1 .= ' WHERE '. implode(' AND ', $where1);
-			$q2 .= ' WHERE '. implode(' AND ', $where2);
-		}
+		$q1 = $this->db->extselectQ($qa1);
+		$q2 = $this->db->extselectQ($qa2);
 		return "$q1 UNION $q2 ORDER BY $this->dbsortby, name";
 	}
 
@@ -82,13 +82,14 @@ class AuthorPage extends ViewPage {
 		}
 		$orig_name = !empty($orig_name) && $orig_name != $name
 			? $this->formatPersonName($orig_name, $this->sortby) .' ' : '';
-		$query = $this->showDlForm ? "/$this->FF_DLMODE=$this->dlMode" : '';
-		$query .= $this->order == 'time' ? "/$this->FF_ORDER=$this->order" : '';
+		$query = array();
+		if ($this->showDlForm) $query[self::FF_DLMODE] = $this->dlMode;
+		if ($this->order == 'time') $query[self::FF_ORDER] = $this->order;
 		if ($tp != 'tp') {
 			$author = $this->formatPersonName($name, $this->sortby);
 			$this->ext = ' — '. $this->altTypes[$tp] . ', вижте '.
 				$this->makeAuthorLink($aname, $this->sortby, '', '', $query);
-			$editLink = $this->uCanEditObj ? $this->makeEditAltAuthorLink($id) : '';
+			$editLink = $this->uCanEditObj ? ' '.$this->makeEditAltAuthorLink($id) : '';
 		} else {
 			$author = $this->makeAuthorLink($name, $this->sortby, '', '', $query);
 			$editLink = $this->uCanEditObj ? $this->makeEditAuthorLink($id) : '';
@@ -117,36 +118,37 @@ class AuthorPage extends ViewPage {
 		$userCanEdit = $this->user->canExecute('edit');
 		foreach ($this->authorsData as $authorId => $data) {
 			extract($data);
-			$authorEnc = $this->urlencode($author);
-			$anchor = strtr($authorEnc, '%+', '__');
+			$anchor = md5($author);
 			$showName = $this->formatPersonName($author, $this->sortby);
-			$toc .= "\n\t<li><a href=\"#$anchor\">$showName</a></li>";
+			$toc .= "\n\t<li><a href='#$anchor'>$showName</a></li>";
 			$editLink = $this->uCanEditObj
 				? $this->makeEditAuthorLink($authorId) : '';
 			$origAuthorName = !empty($origAuthorName) && $author != $origAuthorName
 				? '('.$this->formatPersonName($origAuthorName, $this->sortby).')'
 				: '';
-			$infoLink = empty($info) ? $this->makeInfoLink($author)
-				: $this->makeMwLink($author, $info);
-			$translatorLink = $is_t
-				? "<a href='$this->root/translator/$authorEnc' title='Преглед на преводните текстове на $author'>Преводни заглавия</a>, "
-				: '';
 			$img = $this->makeCountryImage($country);
+			$ainfo = array();
 			if ( !empty($real_name) && $author != $real_name ) {
-				$real_name = "Пълно (истинско) име: $real_name";
+				$real_name = 'Пълно (истинско) име: '. $real_name;
 				if ( !empty($oreal_name) ) {
 					$real_name .= " ($oreal_name)";
 				}
-				$real_name .= ', ';
-			} else {
-				$real_name = '';
+				$ainfo[] = $real_name;
 			}
+			if ($is_t) {
+				$params = array(self::FF_ACTION=>'translator', 'q'=>$author);
+				$ainfo[] = $this->out->internLink('Преводни заглавия',
+					$params, 2, 'Преглед на преводните текстове на '.$author);
+			}
+			$ainfo[] = empty($info) ? $this->makeInfoLink($author)
+				: $this->makeMwLink($author, $info);
+			$ainfo = implode(', ', $ainfo);
 			$o .= <<<EOS
 
 <h2 id="$anchor">$showName $origAuthorName
 	$img $editLink
 </h2>
-<p class="info">$real_name $translatorLink $infoLink</p>
+<p class="info">$ainfo</p>
 
 EOS;
 			$series = $this->authors_titles[$authorId];
@@ -170,7 +172,7 @@ EOS;
 					extract( $this->textsData[$textId] );
 					$tids[] = $textId;
 					if ( $sernr > 0 ) { $title = "$sernr. $title"; }
-					$textLink = $this->makeTextLink(compact('textId', 'type', 'size', 'zsize', 'title', 'date', 'reader'));
+					$textLink = $this->makeTextLink(compact('textId', 'type', 'size', 'zsize', 'title', 'date', 'datestamp', 'reader'));
 					$extras = array();
 					if ( !empty($orig_title) && $orig_lang != $lang ) {
 						$extras[] = "<em>$orig_title</em>";
@@ -187,9 +189,10 @@ EOS;
 					$dlCheckbox = $this->makeDlCheckbox($textId);
 					$dlLink = $this->makeDlLink($textId, $zsize);
 					$editLink = $userCanEdit ? $this->makeEditTextLink($textId) : '';
+					$title = workType($type);
 					$o .= <<<EOS
 
-<li class="$type" title="{$GLOBALS['types'][$type]}">
+<li class="$type" title="$title">
 	$dlCheckbox
 	$titleView
 	<span class="extra">
@@ -211,7 +214,7 @@ EOS;
 		$toc .= "</ul>\n</div>\n<p style='clear:both'></p>\n";
 		if (count($this->authorsData) < 2) { $toc = ''; }
 		if ($this->showDlForm) {
-			$action = $this->out->hiddenField('action', 'download');
+			$action = $this->out->hiddenField(self::FF_ACTION, 'download');
 			$o = <<<EOS
 
 <form action="$this->root" method="post"><div>
@@ -226,41 +229,35 @@ EOS;
 
 
 	protected function makeExtendedListQuery() {
-		$qSelect = "SELECT a.name author, a.orig_name origAuthorName,
-		a.id authorId, a.real_name, a.oreal_name,
-		a.country, (a.role & 2) is_t, a.info, at.year ayear,
-		t.id textId, t.title, t.lang, t.orig_title,
-		t.orig_lang, t.year, t.year2, t.type, t.sernr, t.size, t.zsize,
-		UNIX_TIMESTAMP(t.entrydate) date,
-		s.name series, s.orig_name orig_series, s.type seriesType";
-		$qFrom = " FROM /*p*/author_of at
-		LEFT JOIN /*p*/text t ON at.text = t.id
-		LEFT JOIN /*p*/$this->mainDbTable a ON at.author = a.id
-		LEFT JOIN /*p*/series s ON t.series = s.id";
+		$qa = array(
+			'SELECT' => 'a.name author, a.orig_name origAuthorName,
+				a.id authorId, a.real_name, a.oreal_name,
+				a.country, (a.role & 2) is_t, a.info, at.year ayear,
+				t.id textId, t.title, t.lang, t.orig_title,
+				t.orig_lang, t.year, t.year2, t.type, t.sernr, t.size, t.zsize,
+				t.entrydate date, UNIX_TIMESTAMP(t.entrydate) datestamp,
+				s.name series, s.orig_name orig_series, s.type seriesType',
+			'FROM' => DBT_AUTHOR_OF .' at',
+			'LEFT JOIN' => array(
+				DBT_TEXT .' t' => 'at.text = t.id',
+				self::DB_TABLE .' a' => 'at.author = a.id',
+				DBT_SERIES .' s' => 't.series = s.id',
+			),
+			'ORDER BY' => "a.$this->dbsortby, a.name"
+		);
 		if ($this->user->id > 0) {
-			$qSelect .= ', r.user reader';
-			$qFrom .= "
-			LEFT JOIN /*p*/reader_of r ON t.id = r.text AND r.user = {$this->user->id}";
+			$qa['SELECT'] .= ', r.user reader';
+			$qa['LEFT JOIN'][DBT_READER_OF .' r'] =
+				't.id = r.text AND r.user = '. $this->user->id;
 		}
-		$q = $qSelect . $qFrom;
-
-		$qWheres = array();
 		if ( !empty($this->country) ) {
-			$dbcountry = $this->db->escape($this->country);
-			$qWheres[] = "country='$dbcountry'";
+			$qa['WHERE']['country'] = $this->country;
 		}
 		if ( !empty($this->startwith) ) {
-			$dbstartwith = strtr($this->startwith, '.', '%');
-			$dbstartwith = $this->db->escape($dbstartwith);
-			$qWheres[] = "a.$this->dbsortby LIKE '$dbstartwith%'";
-				#OR a.orig_name LIKE '$dbstartwith%'";
+			$qa['WHERE']["a.$this->dbsortby"] =
+				array('LIKE', strtr($this->startwith, '.', '%') .'%');
 		}
-		if ( !empty($qWheres) ) {
-			$q .= ' WHERE '. implode(' AND ', $qWheres);
-		}
-
-		$q .= " ORDER BY a.$this->dbsortby, a.name";
-		return $q;
+		return $this->db->extselectQ($qa);
 	}
 
 
@@ -274,7 +271,7 @@ EOS;
 				'real_name', 'oreal_name', 'country', 'is_t', 'info');
 		}
 		$this->textsData[$textId] = $dbrow;
-		$series = empty($series) ? $GLOBALS['typesPl'][$type] : ' '.$series;
+		$series = empty($series) ? workType($type, false) : ' '.$series;
 		$this->authorsData[$authorId]['ser'][$series] = array($orig_series, $seriesType);
 		$key = '';
 		if ($this->order == 'time') {
@@ -287,9 +284,10 @@ EOS;
 
 
 	protected function makeNavElements() {
-		$extra = array($this->FF_SORTBY => '!first',
-			$this->FF_ORDER => '', $this->FF_COUNTRY => '',
-			$this->FF_DLMODE => 'one');
+		$extra = array(self::FF_SORTBY => '!first',
+			self::FF_ORDER => $this->defOrder,
+			self::FF_COUNTRY => $this->defCountry,
+			self::FF_DLMODE => $this->defDlMode);
 		$tocFirst = $this->makeNavButtons($extra, $this->sortby == 'first');
 		$extra['sortby'] = '!last';
 		$tocLast = $this->makeNavButtons($extra, $this->sortby == 'last');
@@ -298,7 +296,7 @@ EOS;
 		$countryInput = $this->makeCountryInput();
 		$dlModeInput = $this->makeDlModeInput();
 		$inputFields = $this->request->makeInputFieldsForGetVars(
-			array($this->FF_MODE, $this->FF_ORDER, $this->FF_DLMODE, $this->FF_COUNTRY));
+			array(self::FF_MODE, self::FF_ORDER, self::FF_DLMODE, self::FF_COUNTRY));
 		$submit = $this->out->submitButton('Обновяване');
 		return <<<EOS
 <p>Преглед на авторите по:</p>
@@ -326,9 +324,7 @@ EOS;
 		$countryExpl = $this->makeCountryExplanation();
 		$dlModeExpl = $this->makeDlModeExplanation();
 		return <<<EOS
-<p>Горните връзки водят към списъци на авторите$extra
-чиито имена (първо име или фамилия) започват със съответната буква.
-Чрез препратките „Всички“ можете да разгледате всички автори наведнъж.</p>
+<p>Горните връзки водят към списъци на авторите$extra чиито имена (първо име или фамилия) започват със съответната буква. Чрез препратките „Всички“ можете да разгледате всички автори наведнъж.</p>
 $modeExpl
 $countryExpl
 $dlModeExpl

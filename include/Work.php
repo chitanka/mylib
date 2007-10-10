@@ -2,6 +2,7 @@
 
 class Work {
 
+	const DB_TABLE = DBT_TEXT;
 	protected static $exts = array('.jpg', '.png');
 
 
@@ -50,7 +51,7 @@ class Work {
 		}
 		$orig_title .= ', '. $this->getYear();
 		$orig_title = rtrim($orig_title, ', ');
-		return "\t$authors\n\t$orig_title";
+		return rtrim("\t$authors\n\t$orig_title");
 	}
 
 
@@ -92,9 +93,10 @@ class Work {
 
 
 	public static function getCovers($id, $defCover = null) {
-		$covdir = $GLOBALS['contentDirs']['cover'];
-		$bases = array($covdir . $id);
-		if ( !empty($defCover) ) $bases[] = $covdir . $defCover;
+		$bases = array( getContentFilePath('cover', $id) );
+		if ( !empty($defCover) ) {
+			$bases[] = getContentFilePath('cover', $defCover);
+		}
 		$coverFiles = cartesian_product($bases, self::$exts);
 		$covers = array();
 		foreach ($coverFiles as $file) {
@@ -102,7 +104,7 @@ class Work {
 				$covers[] = $file;
 				// search for more images of the form “ID-DIGIT.EXT”
 				for ($i = 2; /* infinite */; $i++) {
-					$efile = strtr($file, array('.'=>"-$i."));
+					$efile = strtr($file, array('.' => "-$i."));
 					if ( file_exists( $efile ) ) {
 						$covers[] = $efile;
 					} else {
@@ -132,40 +134,48 @@ class Work {
 
 
 	public static function incReadCounter($id) {
-		Setup::db()->update('text', array('read_count=read_count+1'), compact('id'));
+		Setup::db()->update(DBT_TEXT, array('read_count=read_count+1'), compact('id'));
 	}
 
 	public static function incDlCounter($id) {
-		Setup::db()->update('text', array('dl_count=dl_count+1'), compact('id'));
+		Setup::db()->update(DBT_TEXT, array('dl_count=dl_count+1'), compact('id'));
 	}
 
 	protected static function newFromDB($dbkey, $reader = 0) {
 		$db = Setup::db();
-		$q = "SELECT t.*,
+		$qa = array(
+			'SELECT' => 't.*,
 				s.name series, s.orig_name seriesOrigName, s.type seriesType,
-				lo.code lo_code, lo.name lo_name, lo.copyright lo_copyright,
-				lt.code lt_code, lt.name lt_name, lt.copyright lt_copyright,
-				r.user isRead
-			FROM /*p*/text t
-			LEFT JOIN /*p*/series s ON t.series = s.id
-			LEFT JOIN /*p*/license lo ON t.license_orig = lo.id
-			LEFT JOIN /*p*/license lt ON t.license_trans = lt.id
-			LEFT JOIN /*p*/reader_of r ON (t.id = r.text AND r.user = $reader)";
-		$q .= $db->makeWhereClause($dbkey);
-		$fields = $db->fetchAssoc( $db->query($q) );
-		if ( empty($fields) ) return null;
+				lo.code lo_code, lo.name lo_name, lo.copyright lo_copyright, lo.uri lo_uri,
+				lt.code lt_code, lt.name lt_name, lt.copyright lt_copyright, lt.uri lt_uri,
+				r.user isRead',
+			'FROM' => self::DB_TABLE .' t',
+			'LEFT JOIN' => array(
+				DBT_SERIES .' s' => 't.series = s.id',
+				DBT_LICENSE .' lo' => 't.license_orig = lo.id',
+				DBT_LICENSE .' lt' => 't.license_trans = lt.id',
+				DBT_READER_OF .' r' => "t.id = r.text AND r.user = $reader",
+			),
+			'WHERE' => $dbkey,
+		);
+		$fields = $db->fetchAssoc( $db->extselect($qa) );
+		if ( empty($fields) ) {
+			return null;
+		}
 		$fields['collection'] = $db->s2b($fields['collection']);
 		$fields['lo_copyright'] = $db->s2b($fields['lo_copyright']);
 		$fields['lt_copyright'] = $db->s2b($fields['lt_copyright']);
 
-		$roles = array('author', 'translator');
-		foreach ($roles as $role) {
-			$pl = $role .'s';
-			$query = "SELECT p.*, of.year FROM /*p*/{$role}_of of
-				LEFT JOIN /*p*/person p ON of.{$role} = p.id
-				WHERE of.text = $fields[id]
-				ORDER BY of.pos ASC";
-			$res = $db->query($query);
+		$tables = array('author' => DBT_AUTHOR_OF, 'translator' => DBT_TRANSLATOR_OF);
+		foreach ($tables as $role => $table) {
+			$qa = array(
+				'SELECT' => 'p.*, of.year',
+				'FROM' => $table .' of',
+				'LEFT JOIN' => array(DBT_PERSON .' p' => "of.$role = p.id"),
+				'WHERE' => array('of.text' => $fields['id']),
+				'ORDER BY' => 'of.pos ASC',
+			);
+			$res = $db->extselect($qa);
 			$persons = array();
 			$string_name = $string_year = '';
 			while ( $data = $db->fetchAssoc($res) ) {
@@ -173,7 +183,7 @@ class Work {
 				$string_name .= ', '. $data['name'];
 				$string_year .= ', '. $data['year'];
 			}
-			$fields[$pl] = $persons;
+			$fields[$role.'s'] = $persons;
 			$fields[$role.'_name'] = ltrim($string_name, ', ');
 			$fields[$role.'_year'] = ltrim($string_year, ', 0');
 		}

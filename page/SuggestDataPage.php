@@ -2,14 +2,16 @@
 
 class SuggestDataPage extends MailPage {
 
-	protected $subactions = array(
-		'origTitle' => '+оригинално заглавие',
-		'year' => '+година на написване или първа публикация',
-		'translator' => '+преводач',
-		'transYear' => '+година на превод',
-		'annotation' => 'Предложение за анотация'
-	);
-	protected $defSubaction = 'annotation';
+	protected
+		$subactions = array(
+			'origTitle' => '+оригинално заглавие',
+			'year' => '+година на написване или първа публикация',
+			'translator' => '+преводач',
+			'transYear' => '+година на превод',
+			'annotation' => 'Предложение за анотация'
+		),
+		$defSubaction = 'annotation',
+		$work = null;
 
 	public function __construct() {
 		parent::__construct();
@@ -46,16 +48,20 @@ class SuggestDataPage extends MailPage {
 
 
 	protected function makeSubmissionReturn() {
-		return "<p>Обратно към „<a href='$this->root/text/$this->textId/".
-			"$this->chunkId'>$this->textTitle</a>“</p>";
+		return '<p>Обратно към „'.
+			$this->makeSimpleTextLink($this->work->title, $this->textId, $this->chunkId)
+			.'“</p>';
 	}
 
 
 	protected function makeForm() {
-		if ( empty($this->textTitle) ) return '';
+		if ( empty($this->work) ) {
+			return '';
+		}
 		$intro = $this->makeIntro();
 		$textId = $this->out->hiddenField('textId', $this->textId);
 		$chunkId = $this->out->hiddenField('chunkId', $this->chunkId);
+		$subaction = $this->out->hiddenField('subaction', $this->subaction);
 		$info = $this->out->textarea('info', '', $this->info, 15, 80);
 		$name = $this->out->textField('name', '', $this->name, 50);
 		$email = $this->out->textField('email', '', $this->email, 50);
@@ -67,6 +73,7 @@ $intro
 <fieldset style="margin-top:1em; width:30em">
 	$textId
 	$chunkId
+	$subaction
 	<table summary="table for the layout"><tr>
 		<td class="fieldname-left"><label for="name">Име:</label></td>
 		<td>$name</td>
@@ -84,8 +91,8 @@ EOS;
 
 
 	protected function makeIntro() {
-		$author = $this->makeAuthorLink($this->author);
-		$ta = "„<a href='$this->root/text/$this->textId'>$this->textTitle</a>“ от $author";
+		$ta = '„'. $this->makeSimpleTextLink($this->work->title, $this->textId, $this->chunkId) .'“'.
+			$this->makeFromAuthorSuffix($this->work->author_name);
 		switch ($this->subaction) {
 		case 'origTitle':
 			$img = $this->out->image($this->skin->image('wink'), ';-)', 'Намигане');
@@ -93,7 +100,7 @@ EOS;
 		case 'translator':
 			return "<p>Ако знаете кой е превел $ta и желаете да ми помогнете да добавя преводача, можете да ми пратите набързо едно съобщение чрез долния формуляр.</p>";
 		case 'annotation':
-			$params = array('action'=>'comment', 'textId'=>$this->textId);
+			$params = array(self::FF_ACTION=>'comment', 'textId'=>$this->textId);
 			$commentlink = $this->out->internLink('страницата за читателски мнения', $params, 2);
 			return <<<EOS
 <p>Чрез долния формуляр можете да предложите анотация на $ta. Ако просто искате да оставите коментар към произведението, ползвайте $commentlink.</p>
@@ -109,7 +116,7 @@ EOS;
 
 	protected function makeMailMessage() {
 		return <<<EOS
-„{$this->textTitle}“ от $this->author
+„{$this->work->title}“ от {$this->work->author_name}
 
 $this->info
 
@@ -120,19 +127,9 @@ EOS;
 
 
 	protected function initData() {
-		$sql = "SELECT t.title textTitle, t.orig_title,
-			GROUP_CONCAT(DISTINCT a.name) author
-			FROM /*p*/text t
-			LEFT JOIN /*p*/author_of aof ON t.id = aof.text
-			LEFT JOIN /*p*/person a ON aof.author = a.id
-			WHERE t.id = '$this->textId'
-			GROUP BY t.id LIMIT 1";
-		$data = $this->db->fetchAssoc( $this->db->query($sql) );
-		if ( empty($data) ) {
+		$this->work = Work::newFromId($this->textId);
+		if ( is_null($this->work) ) {
 			$this->addMessage("Не съществува текст с номер <strong>$this->textId</strong>.", true);
-			$this->textTitle = $this->orig_title = $this->author = '';
-			return;
 		}
-		extract2object($data, $this);
 	}
 }

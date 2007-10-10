@@ -1,19 +1,19 @@
 <?php
 class LabelLogPage extends Page {
 
+	const DB_TABLE = DBT_LABEL_LOG;
+
 	public function __construct() {
 		parent::__construct();
 		$this->action = 'labelLog';
 		$this->title = 'Преглед на промените, свързани с етикетите';
-		$this->mainDbTable = 'label_log';
 	}
 
 
 	protected function processSubmission() {
 		$del = array_keys((array) $this->request->value('ch'));
 		if ( !empty($del) ) {
-			$key = array('id IN ('.implode(',', $del).')');
-			if ( $this->db->delete($this->mainDbTable, $key) ) {
+			if ( $this->db->delete(self::DB_TABLE, array('id'=>array('IN', $del))) ) {
 				$this->addMessage('Избраните записи бяха изтрити.');
 			}
 		}
@@ -34,12 +34,18 @@ EOS;
 
 
 	protected function makeLogList() {
-		$q = "SELECT ll.*, u.username FROM /*p*/$this->mainDbTable ll
-		LEFT JOIN /*p*/user u ON ll.user = u.id
-		ORDER BY text, time";
+		$qa = array(
+			'SELECT' => 'll.*, u.username',
+			'FROM' => self::DB_TABLE .' ll',
+			'LEFT JOIN' => array(User::DB_TABLE .' u' => 'll.user = u.id'),
+			'ORDER BY' => 'text, time',
+		);
+		$q = $this->db->extselectQ($qa);
 		$this->classes = array('-'=>'delLab', '+'=>'addLab', '*'=>'newLab');
 		$l = $this->db->iterateOverResult($q, 'makeLogListItem', $this);
-		if ( empty($l) ) return '<p>Няма записи.</p>';
+		if ( empty($l) ) {
+			return '<p>Няма записи.</p>';
+		}
 		$submit = $this->out->submitButton('Изтриване на избраните записи');
 		return <<<EOS
 
@@ -47,7 +53,9 @@ EOS;
 	function checkAll() {
 		for (var i=0; i < document.forms[0].elements.length; i++) {
 			var el = document.forms[0].elements[i];
-			if ( !el.name.match(/^ch/) ) { continue; }
+			if ( !el.name.match(/^ch/) ) {
+				continue;
+			}
 			el.checked = true;
 		}
 	}
@@ -75,23 +83,23 @@ EOS;
 		$labelstr = rtrim($labelstr, ', ');
 		$revert = $this->makeRevertLink($text, $action, $labels);
 		$ch = $this->out->checkbox("ch[$id]", "ch$id", false, "<tt>$time</tt>");
-		$userlink = $this->makeuserLink($username);
+		$userlink = $this->makeUserLink($username);
 		return "\n<li class='{$this->classes[$action]}'>$ch $tlink ($alink) $action $labelstr &nbsp; ($userlink) [$revert]</li>";
 	}
 
 
 	protected function makeRevertLink($text, $action, $labels) {
 		$reqvar = $action == '-' ? 'new' : 'old';
-		$q = '';
+		$params = array(self::FF_ACTION=>'editTextLabels', 'textId'=>$text, 'subaction'=>'revert');
 		foreach ($labels as $label) {
-			$q .= '&amp;'.$reqvar.'[]='.$label;
+			$params[$reqvar.'[]'] = $label;
 		}
-		return "<a href='$this->root?action=editTextLabels&amp;textId=$text&amp;subaction=revert$q'>връщане</a>";
+		return $this->out->internLink('връщане', $params);
 	}
 
 
 	protected function initData() {
-		$this->labels = $this->db->getObjects('label');
+		$this->labels = $this->db->getObjects(DBT_LABEL);
 	}
 
 }

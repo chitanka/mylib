@@ -1,0 +1,158 @@
+<?php
+if ( !defined('MYLIB') ) { die('This is not a valid entry point.'); }
+
+$cfg = array();
+
+// име на библиотеката
+$cfg['sitename']  = 'Моята библиотека';
+$cfg['webroot']   = '/mylib/index.php';
+$cfg['docroot']   = '/mylib';
+$cfg['server']    = 'http://chitanka.info';
+$cfg['purl']      = 'http://purl.org/NET/mylib';
+$cfg['lang_code'] = 'bg';
+// връзка към външен форум, който може да се ползва като форум за библиотеката
+$cfg['forum_root'] = 'http://localhost/phpBB2/';
+
+// Следните три променливи се ползват при пращането на електронна поща
+$cfg['admin']       = 'Администратор';
+$cfg['admin_email'] = 'admin@bib.com';
+$cfg['site_email']  = 'bib@bib.com';
+
+// This must be a valid timezone constant
+// See “List of Supported Timezones” [http://php.net/manual/en/timezones.php]
+$cfg['default_timezone'] = 'Europe/Sofia';
+
+// Определя дали определени страници могат да се складират (в директорията
+// cache/). Това обаче се прави само за страниците в
+// PageManager::$cachedPagesServer
+// Разрешени стойности: false|true. По подразбиране false.
+$cfg['use_cache'] = false;
+
+// Разрешени стойности: false|true. По подразбиране false.
+$cfg['has_path_info'] = false;
+
+// Свързване с базата от данни
+$cfg['db'] = array(
+	// сървър (хост), потребител, парола и име на базата от данни
+	'server' => 'localhost',
+	'user'   => 'mylib-user',
+	'pass'   => 'mylib-userpass',
+	'name'   => 'mylib',
+	// Евентуална представка на таблиците, например „ml“, което значи
+	// ml_author, ml_text и т.н.
+	'prefix' => '',
+);
+
+// Параметри, свързани с пращането на електронна поща
+$cfg['mail'] = array(
+	// backend = mail|smtp
+	'backend' => 'mail',
+	// Долните параметри са необходими, ако backend = smtp
+	'host'    => '',
+	'port'    => '',
+	'user'    => '',
+	'pass'    => '',
+	// false|true, по подразбиране true
+	'auth'    => true,
+	// false|true, по подразбиране true
+	'persist' => true,
+);
+
+// Права на потребителските групи
+$cfg['rights'] = array(
+	// anonymous users
+	'anon' => array(
+		'about',
+		'author',
+		'authors',
+		'blacklist',
+		'comment',
+		'css',
+		'download',
+		'dynMain',
+		'emailUser',
+		'feed',
+		'feedback',
+		'help',
+		'history',
+		'info',
+		'label',
+		'label',
+		'links',
+		'liternews',
+		'login',
+		'logout',
+		'main',
+		'news',
+		'register',
+		'sendNewPassword',
+		'sendUsername',
+		'series',
+		'settings',
+		'sitemap',
+		'sitemapPurl',
+		'staticMain',
+		'statistics',
+		'suggestData',
+		'text',
+		'texts',
+		'title',
+		'titles',
+		'titleWoAnno',
+		'translator',
+		'translators',
+		'user',
+		'whitelist',
+		'work',
+	),
+
+	// normal users
+	'nu' => array(
+		'markRead',
+		'editOwnPage',
+		'editTextLabels',
+	),
+
+	// contributors
+	'c0' => array(
+		'editText',
+	),
+	'c' => array(
+		'add',
+		'edit',
+		'editPerson',
+		'editAltPerson',
+		'editSeries',
+		'editComment',
+	),
+
+	// administrators, allmighty
+	'a' => array('*'),
+);
+
+// Облици
+$cfg['skins'] = array(
+	'blackwhite' => 'Белчо',
+	'purple'     => 'Люляк',
+	'olive'      => 'Маслинова нощ',
+	'neg'        => 'Негортокал',
+	'orange'     => 'Портокал',
+	'pink'       => 'Роза',
+	'blue'       => 'Синева',
+);
+
+// Позиция на навигационното меню
+$cfg['navpos'] = array(
+	'right' => 'Вдясно',
+	'left'  => 'Вляво',
+);
+
+$cfg['info'] = array(
+	// Wikipedia base URL
+	'w_name' => 'Уикипедия',
+	'w'      => 'http://bg.wikipedia.org/wiki/$1',
+
+	// BG-Fantastique base URL
+	'f_name' => 'БГ-Фантастика',
+	'f'      => 'http://bgf.zavinagi.org/index.php/$1',
+);

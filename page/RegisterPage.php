@@ -2,16 +2,17 @@
 
 class RegisterPage extends Page {
 
+	const DB_TABLE = User::DB_TABLE;
 	private $invalidReferers = array('login', 'logout', 'register', 'sendNewPassword');
-	protected $nonEmptyFields = array('username', 'password', 'passwordRe');
-	protected $mainFields = array('username', 'password', 'passwordRe', 'realname', 'email');
+	protected
+		$nonEmptyFields = array('username', 'password', 'passwordRe'),
+		$mainFields = array('username', 'password', 'passwordRe', 'realname', 'email');
 
 
 	public function __construct() {
 		parent::__construct();
 		$this->action = 'register';
 		$this->title = 'Регистрация';
-		$this->mainDbTable = User::MAIN_DB_TABLE;
 		$this->attempt = (int) $this->request->value('attempt', 1);
 		$this->mainFields = $this->nonEmptyFields + $this->mainFields;
 		foreach ($this->mainFields as $field) {
@@ -40,10 +41,10 @@ class RegisterPage extends Page {
 		$now = date('Y-m-d H:i:s');
 		$set = array('username' => $this->username, 'realname' => $this->realname,
 			'lastname' => ltrim(strrchr($this->realname, ' ')),
-			'password' => $this->db->encodePasswordDB($this->password),
+			'password' => User::encodePasswordDB($this->password),
 			'email' => $this->email, 'allowemail' => true,
 			'news' => $this->news, 'touched' => $now, 'registration' => $now);
-		if ( $this->db->insert($this->mainDbTable, $set) !== false ) {
+		if ( $this->db->insert(self::DB_TABLE, $set) !== false ) {
 			$this->addMessage("Регистрирахте се в <em>$this->sitename</em> като $this->username.");
 			return $this->redirect('login');
 		}
@@ -83,7 +84,7 @@ class RegisterPage extends Page {
 
 	protected function userExists() {
 		$key = array('username' => $this->username);
-		if ( $this->db->exists($this->mainDbTable, $key) ) {
+		if ( $this->db->exists(self::DB_TABLE, $key) ) {
 			$this->addMessage("Името <strong>$this->username</strong> вече е заето.", true);
 			return true;
 		}
@@ -92,13 +93,17 @@ class RegisterPage extends Page {
 
 
 	protected function emailExists($notUsername = null) {
+		if ( empty($this->email) ) {
+			return false;
+		}
 		$emailKey = array('email' => $this->email);
 		if ( !is_null($notUsername) ) {
 			$emailKey['username'] = array('!=', $notUsername);
 		}
-		if ( $this->db->exists($this->mainDbTable, $emailKey) ) {
+		if ( $this->db->exists(self::DB_TABLE, $emailKey) ) {
 			$this->addMessage("Пощенският адрес <strong>{$this->email}</strong> вече се ползва от друг потребител.", true);
-			$this->addMessage("Ако сте забравили потребителското си име, можете <a href='$this->root/sendUsername'>да поискате напомняне за него</a>.");
+			$sendname = $this->out->internLink('да поискате напомняне за него', 'sendUsername');
+			$this->addMessage("Ако сте забравили потребителското си име, можете $sendname.");
 			return true;
 		}
 		return false;
@@ -106,6 +111,7 @@ class RegisterPage extends Page {
 
 
 	protected function buildContent() {
+		$login = $this->out->internLink('влезете', 'login');
 		$attempt = $this->out->hiddenField('attempt', $this->attempt);
 		$returnto = $this->out->hiddenField('returnto', $this->returnto);
 		$username = $this->out->textField('username', '', $this->username, 25, 50, 1);
@@ -114,11 +120,15 @@ class RegisterPage extends Page {
 		$realname = $this->out->textField('realname', '', $this->realname, 25, 50, 4);
 		$email = $this->out->textField('email', '', $this->email, 25, 60, 5);
 		$news = $this->out->checkbox('news', '', false,
-			'Получаване на месечно новинарско писмо', '', 6);
+			'Получаване на месечно новинарско писмо', null, 6);
 		$submit = $this->out->submitButton('Регистриране', '', 7);
+		$worklink = $this->out->internLink('списъка с подготвящите се', 'work', 1,
+			'Списък на произведения, подготвящи се за добавяне в библиотеката');
+		$labellink = $this->out->internLink('етикетите', 'label', 1,
+			'Преглед на произведенията по етикет');
 		return <<<EOS
 <p>Чрез <a href="#registerform" title="Към регистрационния формуляр">долния формуляр</a> можете да се регистрирате в <em>$this->sitename</em>. <a href="#why-register" title="Разяснения относно нуждата от регистрация">По-долу</a> можете да се осведомите дали въобще ви е нужно това.</p>
-<p>Ако вече сте се регистрирали, няма нужда да го правите още веднъж. Можете направо да <a href="$this->root/login">влезете</a>.</p>
+<p>Ако вече сте се регистрирали, няма нужда да го правите още веднъж. Можете направо да $login.</p>
 <p><strong>Внимание:</strong> Регистрацията в библиотеката няма нищо общо с регистрацията във <a href="$this->forum_root" title="Сайтовия форум">форума</a>.</p>
 <p>Можете да ползвате кирилица, когато въвеждате потребителското си име.</p>
 <p>Като парола се опитайте да изберете нещо, което за вас да е лесно запомнящо се, а за останалите — невъзможно за разгадаване.</p>
@@ -163,10 +173,10 @@ class RegisterPage extends Page {
 Текстовете в <em>$this->sitename</em> могат да се четат и свалят и без регистрация. Евентуална регистрация ще ви позволи да ползвате следните функции:</p>
 <ul>
 	<li>oтбелязване на текстовете като прочетени;</li>
-	<li>добавяне на нови произведения в <a href="$this->root/work" title="Списък на произведения, подготвящи се за добавяне в библиотеката">списъка с подготвящите се</a>;</li>
+	<li>добавяне на нови произведения в $worklink;</li>
 	<li>получаване на месечно новинарско писмо — може да се избере в настройките,
 	като освен това е нужно да посочите и правилна е-поща;</li>
-	<li>редактиране на <a href="$this->root/label" title="Преглед на произведенията по етикет">етикетите</a> на произведенията.</li>
+	<li>редактиране на $labellink на произведенията.</li>
 </ul>
 
 <p>Някои регистрирани потребители също така имат право да правят промени на данните в <em>$this->sitename</em>, например поправка на грешки в текстовете, добавяне или редактиране на произведения, автори, преводачи, поредици.</p>

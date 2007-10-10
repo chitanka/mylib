@@ -13,11 +13,11 @@ class DeletePage extends Page {
 	protected function processSubmission() {
 		$qs = array();
 		$key = array('text' => $this->textId);
-		$qs[] = $this->db->deleteQ('text', array('id'=>$this->textId), 1);
-		$qs[] = $this->db->deleteQ('author_of', $key);
-		$qs[] = $this->db->deleteQ('translator_of', $key);
-		$qs[] = $this->db->deleteQ('reader_of', $key);
-		$qs[] = $this->db->deleteQ('header', $key);
+		$qs[] = $this->db->deleteQ(DBT_TEXT, array('id'=>$this->textId), 1);
+		$qs[] = $this->db->deleteQ(DBT_AUTHOR_OF, $key);
+		$qs[] = $this->db->deleteQ(DBT_TRANSLATOR_OF, $key);
+		$qs[] = $this->db->deleteQ(DBT_READER_OF, $key);
+		$qs[] = $this->db->deleteQ(DBT_HEADER, $key);
 		if ( $this->db->transaction($qs) ) {
 			$this->addMessage("Текстът с номер $this->textId и всички данни, свързани с него — автор(и), преводач(и), читатели, бяха безвъзвратно изтрити.");
 		} else {
