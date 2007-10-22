@@ -108,8 +108,10 @@ function ts_resortTable(lnk) {
 		sortfn = ts_sort_date;
 	if (itm.match(/^[\u00a3$\u20ac]/)) // pound dollar euro
 		sortfn = ts_sort_currency;
-	if (itm.match(/^[\d.,]+\%?$/))
+	// Borislav: expanded regexp — \%? -> (\%|.[KiBMTGk]+)?
+	if (itm.match(/^[\d.,]+(\%|.[KiBMTGk]+)?$/)) {
 		sortfn = ts_sort_numeric;
+	}
 
 	var reverse = (span.getAttribute("sortdir") == 'down');
 

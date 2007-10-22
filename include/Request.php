@@ -90,23 +90,25 @@ class Request {
 
 
 	/**
-	Fetch a field value from the request.
-
-	@param string $name
-	@param string $default Return this if $name isn’t set in the request
-	@return mixed
+		Fetch a field value from the request.
+		Return default value if $name isn’t set in the request, or if $allowed
+		is an array and does not contain $name as a key.
+		@param $name
+		@param $default
+		@param $paramno
+		@param $allowed Associative array
 	*/
-	public function value($name, $default = NULL, $paramno = NULL) {
+	public function value($name, $default = null, $paramno = null, $allowed = null) {
 		if ( isset($_REQUEST[$name]) ) {
-			return $_REQUEST[$name];
-		}
-		if ( empty($paramno) ) {
+			$val = $_REQUEST[$name];
+		} else if ( empty($paramno) ) {
+			return $default;
+		} else if ( isset($this->params[$paramno]) ) {
+			$val = $_REQUEST[$name] = $_GET[$name] = $this->params[$paramno];
+		} else {
 			return $default;
 		}
-		if ( isset($this->params[$paramno]) ) {
-			return $_REQUEST[$name] = $_GET[$name] = $this->params[$paramno];
-		}
-		return $default;
+		return is_array($allowed) ? normKey($val, $allowed, $default) : $val;
 	}
 
 	public function setValue($name, $value) {
@@ -114,7 +116,7 @@ class Request {
 	}
 
 
-	public function checkbox($name, $dims = NULL) {
+	public function checkbox($name, $dims = null) {
 		if ( !isset($_REQUEST[$name]) ) {
 			return false;
 		}
@@ -142,10 +144,10 @@ class Request {
 	}
 
 	/**
-	Tests whether a given set of parameters corresponds to the GET request.
+		Tests whether a given set of parameters corresponds to the GET request.
 
-	@param $reqData Associative array
-	@return bool
+		@param $reqData Associative array
+		@return bool
 	*/
 	public function isCurrentRequest($reqData) {
 		if (	!is_array($reqData) ||
@@ -206,7 +208,7 @@ class Request {
 
 
 	public function isCompleteSubmission() {
-		return $this->value('submitButton') !== NULL;
+		return $this->value('submitButton') !== null;
 	}
 
 
@@ -219,7 +221,7 @@ class Request {
 	}
 
 	/**
-	Remove slashes from some global arrays if magic_quotes_gpc option is on.
+		Remove slashes from some global arrays if magic_quotes_gpc option is on.
 	*/
 	protected function unescapeGlobals() {
 		if ( get_magic_quotes_gpc() ) {
@@ -240,10 +242,10 @@ class Request {
 
 
 	/**
-	Recursively strips slashes from a given array.
+		Recursively strips slashes from a given array.
 
-	@param array $arr
-	@return array The modified array
+		@param array $arr
+		@return array The modified array
 	*/
 	protected function unescapeArray($arr) {
 		$narr = array();
@@ -259,10 +261,10 @@ class Request {
 
 
 	/**
-	Changes the array encoding to the global master encoding.
+		Changes the array encoding to the global master encoding.
 
-	@param array $arr
-	@return array The modified array
+		@param array $arr
+		@return array The modified array
 	*/
 	protected function changeArrayEncoding($arr) {
 		$narr = array();

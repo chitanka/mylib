@@ -370,7 +370,9 @@ EOS;
 		$ss = '';
 		foreach (Setup::setting('skins') as $skin => $_) {
 			foreach (Setup::setting('navpos') as $nav => $_) {
-				$ss .= "\n\t<link rel='alternate stylesheet' type='text/css' href='$this->root/css/main?$skin-$nav' title='$skin-$nav' />";
+				$cssArgs = array(self::FF_ACTION=>'css', 'f' => 'main', 'o' => "$skin-$nav");
+				$url = htmlspecialchars($this->out->internUrl($cssArgs, 2));
+				$ss .= "\n\t<link rel='alternate stylesheet' type='text/css' href='$url' title='$skin-$nav' />";
 			}
 		}
 		$this->addHeadContent($ss);

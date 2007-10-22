@@ -185,6 +185,9 @@ $o
 EOS;
 		}
 		$o .= $this->makeColorLegend();
+		unset($this->translatorsData);
+		unset($this->translators_titles);
+		unset($this->textsData);
 		return $toc . $o;
 	}
 

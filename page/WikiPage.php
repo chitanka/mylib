@@ -18,7 +18,7 @@ class WikiPage extends Page {
 		$this->parser = new Sfb2HTMLConverter($file);
 		$this->customizeParser();
 		$this->parser->parse();
-		return explainAcronyms( $this->parser->text );
+		return explainAcronyms( $this->parser->content(true, false) );
 	}
 
 

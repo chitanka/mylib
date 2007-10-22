@@ -4,10 +4,16 @@ class ViewPage extends Page {
 
 	const
 		FF_MODE = 'mode', FF_ORDER = 'order', FF_COUNTRY = 'country',
-		FF_DLMODE = 'dlMode';
+		FF_DLMODE = 'dlMode', FF_VIEW_TYPE = 'vt';
 	protected
 		$titles = array('simple' => '', 'extended' => ''),
+		$modes = array(
+			'simple' => '', 'simple-toc' => '',
+			'extended' => '', 'extended-toc' => '',
+		),
 		$showHeaders = true,
+		$viewTypes = array('plain' => 'Списък', 'table' => 'Таблица'),
+		$defViewType = 'plain',
 		$defOrder = 'alpha', $defDlMode = 'one', $defMode = 'simple-toc',
 		$defCountry = '';
 
@@ -16,7 +22,7 @@ class ViewPage extends Page {
 		$this->action = 'view';
 
 		$this->startwith = $this->request->value(self::FF_QUERY, '', 1);
-		$this->mode = $this->request->value(self::FF_MODE);
+		$this->mode = $this->request->value(self::FF_MODE, '', 2, $this->modes);
 		if ( empty($this->mode) ) {
 			$this->mode = empty($this->startwith) ? $this->defMode : 'extended';
 		}
@@ -32,6 +38,10 @@ class ViewPage extends Page {
 		$this->country = $this->request->value(self::FF_COUNTRY, $this->defCountry);
 		$this->dlMode = $this->request->value(self::FF_DLMODE, $this->defDlMode);
 		$this->showDlForm = $this->dlMode == 'both';
+		$this->viewType = normVal(
+			$this->request->value(self::FF_VIEW_TYPE, $this->defViewType),
+			$this->viewTypes,
+			$this->defViewType);
 
 		$modes = explode('-', $this->mode);
 		$this->mode1 = isset($this->titles[ $modes[0] ]) ? $modes[0] : '';

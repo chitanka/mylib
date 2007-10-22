@@ -152,8 +152,10 @@ class Page {
 	public function addRssLink($title = null, $action = null) {
 		fillOnEmpty($title, $this->title());
 		fillOnEmpty($action, $this->action);
+		$params = array(self::FF_ACTION=>'feed', 'obj' => $action);
+		$url = $this->out->internUrl($params, 2);
 		$feedlink = <<<EOS
-	<link rel="alternate" type="application/rss+xml" title="RSS 2.0 — $title" href="$this->root/feed/$action" />
+	<link rel="alternate" type="application/rss+xml" title="RSS 2.0 — $title" href="$url" />
 EOS;
 		$this->addHeadContent($feedlink);
 	}
@@ -218,6 +220,12 @@ EOS;
 		$nav = $this->makeNavigationBar();
 		$pageTitle = strtr($this->title(), array('<br />'=>' — '));
 		$pageTitle = strip_tags($pageTitle);
+		$cssArgs = array(self::FF_ACTION=>'css');
+		$cssMainArgs = $cssArgs + array('f' => 'main',
+			'o' => $this->user->option('skin').'-'.$this->user->option('nav'));
+		$cssMain = htmlspecialchars($this->out->internUrl($cssMainArgs, 2));
+		$cssPrint = htmlspecialchars($this->out->internUrl($cssArgs + array('f' => 'print'), 2));
+		$cssNonav = htmlspecialchars($this->out->internUrl($cssArgs + array('f' => 'nonav'), 2));
 		$cacheLink = $this->makeCacheLink();
 		$elapsedTimeMsg = !empty($elapsedTime)
 			? "<!-- Страницата беше създадена за $elapsedTime секунди. -->"
@@ -228,7 +236,6 @@ EOS;
 			? "\t$this->scriptStart\n$this->jsContent\n\t$this->scriptEnd" : '';
 		$this->messages = !empty($this->messages)
 			? '<div id="messages">'.$this->messages.'</div>' : '';
-		$opts = $this->user->option('skin').'-'.$this->user->option('nav');
 		$xmlPI = '<?xml version="1.0" encoding="'.$this->outencoding.'"?>';
 		$req = strtr($this->request->requestUri(), array($this->root => ''));
 		$req = preg_replace('/&submitButton=[^&]+/', '', $req);
@@ -253,10 +260,10 @@ $xmlPI
 
 	<title>$pageTitle — $this->sitename</title>
 
-	<link rel="stylesheet" type="text/css" href="$this->root/css/main?$opts" title="Основен изглед" />
-	<link rel="stylesheet" type="text/css" media="print" href="$this->root/css/print" />
-	<link rel="alternate stylesheet" type="text/css" href="$this->root/css/main?$opts" title="Без навигация" />
-	<link rel="alternate stylesheet" type="text/css" href="$this->root/css/nonav" title="Без навигация" />
+	<link rel="stylesheet" type="text/css" href="$cssMain" title="Основен изглед" />
+	<link rel="stylesheet" type="text/css" media="print" href="$cssPrint" />
+	<link rel="alternate stylesheet" type="text/css" href="$cssMain" title="Без навигация" />
+	<link rel="alternate stylesheet" type="text/css" href="$cssNonav" title="Без навигация" />
 	<link rel="home" href="$this->root" title="Начална страница" />
 	<link rel="icon" href="$this->rootd/img/favicon.png" type="image/png" />
 	<link rel="shortcut icon" href="$this->rootd/img/favicon.png" type="image/png" />
@@ -400,6 +407,10 @@ EOS;
 		return <<<EOS
 <div id="navigation"><a name="navigation"> </a>
 <div id="logo"><a href="$this->root" title="Към началната страница">$this->sitename</a></div>
+
+<div class="propaganda" style="text-align:center">
+<a href="http://bg.wikipedia.org/wiki/WP:100000" style="margin-bottom:0.2ex"><img src="$this->rootd/img/wikipedia-banner-100000-138x115.jpg" alt="Уикипедия 100 000" width="138" title="Включете се в инициативата Уикипедия 100 000!" /></a>
+</div>
 
 $persTools
 

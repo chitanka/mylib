@@ -7,13 +7,6 @@ class TextPage extends Page {
 
 
 	public function __construct() {
-		// if "text/download/..." redirect to "download/..."
-		$requrl = @$_SERVER['REQUEST_URI'];
-		if ( strpos($requrl, '/download/') !== false ) {
-			$requrl = str_replace('text/', '', $requrl);
-			header("Location: $requrl");
-			exit;
-		}
 		parent::__construct();
 		$this->action = 'text';
 		$this->ttitle = $this->textId = $this->request->value('textId', 0, 1);

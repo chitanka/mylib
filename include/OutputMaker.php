@@ -5,7 +5,7 @@ class OutputMaker {
 	public
 		$inencoding = Setup::IN_ENCODING, $outencoding = Setup::IN_ENCODING;
 	protected
-		$argSeparator = '&',
+		$defArgSeparator = '&', $argSeparator = '&',
 		$queryStart = '?',
 		$hasPathInfo = false;
 
@@ -286,8 +286,9 @@ EOS;
 			$url .= $this->queryStart;
 		}
 		foreach ((array) $args as $key => $val) {
-			$url = preg_replace("!$this->argSeparator$key=[^$this->argSeparator]*!", '', $url);
-			$url .= $this->argSeparator . $key .'='. $this->urlencode($val);
+			$sep = $this->getArgSeparator($url);
+			$url = preg_replace("!$sep$key=[^$sep]*!", '', $url);
+			$url .= $sep . $key .'='. $this->urlencode($val);
 		}
 		return $url;
 	}
@@ -297,6 +298,13 @@ EOS;
 		if ($this->hasPathInfo) {
 			$this->argSeparator = $this->queryStart = '/';
 		}
+	}
+
+	public function getArgSeparator($url = '') {
+		if ( empty($url) || strpos($url, $this->defArgSeparator) === false ) {
+			return $this->argSeparator;
+		}
+		return $this->defArgSeparator;
 	}
 
 	public function hasPathInfo() {

@@ -2,16 +2,26 @@
 
 class HistoryPage extends Page {
 
-	public $extQS = '', $extQF = array(), $extQW = array();
+	const
+		FF_DATE = 'date', FF_GETBY = 'getby', FF_ORDERBY = 'orderby',
+		FF_VIEW_TYPE = 'vt', FF_MEDIA = 'media';
+	public
+		$extQS = '', $extQF = array(), $extQW = array();
 	protected
 		$allowViewAll = false,
-		$validGetbys = array('entrydate', 'lastmod'),
-		$defGetby = 'entrydate',
 		$headerExts = array(
 			'entrydate' => 'нови текстове',
 			'lastmod' => 'редактирани текстове'),
-		$viewTypes = array('plain', 'table'),
-		$defViewType = 'plain'
+		$getbys = array(
+			'entrydate' => 'Дата на добавяне',
+			'lastmod' => 'Дата на посл. редакция'),
+		$defGetby = 'entrydate',
+		$orderbys = array('date' => 'Дата', 'author' => 'Автор'),
+		$defOrderby = 'date',
+		$medias = array('screen' => 'Екран', 'print' => 'Печат'),
+		$defMedia = 'screen',
+		$viewTypes = array('plain' => 'Списък', 'table' => 'Таблица'),
+		$defViewType = 'table'
 	;
 
 
@@ -20,20 +30,18 @@ class HistoryPage extends Page {
 		$this->action = 'history';
 		$this->title = 'История';
 		$this->defDate = date('Y-n');
-		$this->date = $this->request->value('date', $this->defDate);
+		$this->date = $this->request->value(self::FF_DATE, $this->defDate);
 		if ( preg_match('/[^\d-]/', $this->date) ) {
 			$this->date = $this->defDate;
 		}
-		$this->getby = $this->request->value('getby', $this->defGetby);
-		if ( !in_array($this->getby, $this->validGetbys) ) {
-			$this->getby = $this->defGetby;
-		}
-		$this->orderby = $this->request->value('orderby', 'date');
-		$this->viewType = normVal(
-			$this->request->value('vt', $this->defViewType),
-			$this->viewTypes,
-			$this->defViewType);
-		$this->media = $this->request->value('media', 'screen');
+		$this->getby = $this->request->value(self::FF_GETBY,
+			$this->defGetby, null, $this->getbys);
+		$this->orderby = $this->request->value(self::FF_ORDERBY, 'date');
+		$this->viewType = $this->request->value(self::FF_VIEW_TYPE,
+			$this->defViewType, null, $this->viewTypes);
+		$this->media = $this->request->value(self::FF_MEDIA, $this->defMedia,
+			null, $this->medias);
+		$this->rowclass = null;
 	}
 
 
@@ -43,8 +51,14 @@ class HistoryPage extends Page {
 
 
 	protected function buildContent() {
-		$inputContent = $this->makeMonthInput() .' &nbsp; '.
-			$this->makeGetbyInput() .' &nbsp; '. $this->makeOrderInput();
+		if ($this->viewType == 'table') {
+			$this->addScript('table-sortable.js');
+			$this->addJs("\n".'addOnloadHook(sortables_init);');
+		}
+		$inputContent = $this->makeMonthInput() .
+			' '. $this->makeGetbyInput() .
+			' '. $this->makeOrderInput() .
+			' '. $this->makeViewTypeInput();
 		$submit = $this->out->submitButton('Обновяване', 'Обновяване на страницата', 0, false);
 		$limits = array(10, 25, 50);
 		$feednew = $this->makeFeedLinks($limits, 'new');
@@ -80,6 +94,18 @@ EOS;
 	}
 
 
+	protected function makeFeedLinks($limits = array(), $type = 'new', $ftype = 'rss') {
+		$l = '';
+		$ext = array('new' => 'добавени', 'edit' => 'редактирани');
+		foreach ($limits as $limit) {
+			$title = "RSS зоб за новинарски четци с последните $limit $ext[$type] произведения";
+			$params = array(self::FF_ACTION=>'feed', 'obj'=>$type, 'limit'=>$limit);
+			$l .= ', '.$this->out->internLink($limit, $params, 3);
+		}
+		return ltrim($l, ', ');
+	}
+
+
 	public function makeListByDate($limit = 0, $showHeader = true) {
 		$this->texts = array();
 		$query = $this->makeSqlQuery($limit);
@@ -89,62 +115,50 @@ EOS;
 		if ($this->isEditMode()) {
 			$o .= "\n<p><em>Легенда:</em> $mark — новодобавен текст (първа редакция)</p>";
 		}
+		$ucvt = ucfirst($this->viewType);
+		$makeStartFunc = 'makeListStart'. $ucvt;
+		$makeEndFunc = 'makeListEnd'. $ucvt;
+		$makeItemFunc = 'makeListItem'. $ucvt;
 		foreach ($this->texts as $datekey => $textsForDate) {
 			if ($showHeader) {
 				list($year, $month) = explode('-', $datekey);
 				$monthName = monthName($month);
-				$o .= "\n<h2>$monthName $year</h2>\n<ul>";
+				$o .= "\n<h2>$monthName $year</h2>\n" . $this->$makeStartFunc();
 			}
 			foreach ($textsForDate as $textId => $textData) {
 				extract($textData);
 				$readClass = empty($reader) ? 'unread' : 'read';
-				$sauthor = $collection == 'true' ? ''
+				$from = $collection == 'true' ? ''
 					: $this->makeAuthorLink($author, 'first');
 				if ( $lang != $orig_lang ) {
-					$stranslator = (!empty($sauthor) ? ', ' : '').'превод: ';
-					$stranslator .= empty($translator)
+					$from .= ', превод: ';
+					$from .= empty($translator)
 						? $this->out->internLink('неизвестен', array(self::FF_ACTION=>'suggestData', 'sa'=>'translator', 'textId'=>$textId), 3)
 						: $this->makeTranslatorLink($translator, 'first');
-				} else { $stranslator = ''; }
+				}
 				$vdate = $textData[$this->getby];
 				if ($this->isEditMode()) {
 					$vdate .= $entrydate >= substr($lastmod, 0, 10) ? $mark : ' &nbsp;';
 				}
+				$from = ltrim($from, ', ');
 				$seriesLink = empty($series) ? ''
 					: '<span class="extra">'.$this->makeSeriesLink($series) .':</span> ';
-				$o .= $this->media == 'screen'
-					? "\n\t<li class='$type'><tt title='$edit_comment'>$vdate</tt> $seriesLink".
-						$this->makeSimpleTextLink($title, $textId, 1, '', array('class'=>$readClass)).
-					' — <span class="extra">'. $this->makeDlLink($textId, $zsize) .'</span>'
-					: "\n\t<li>$seriesLink$title [$this->purl/text/$textId]";
-				if ( !empty($sauthor) || !empty($stranslator) ) {
-					$o .= ' — '. $sauthor . $stranslator;
-				}
-				$o .= '</li>';
+				$data = compact('readClass', 'from', 'vdate', 'seriesLink');
+				$o .= $this->$makeItemFunc($textData + $data);
 			}
 			if ($showHeader) {
-				$o .= '</ul>';
+				$o .= $this->$makeEndFunc();
 			}
 		}
-		if (!$showHeader && !empty($o)) { $o = "<ul>$o</ul>"; }
-		return $o;
-	}
-
-
-	protected function makeFeedLinks($limits = array(), $type = 'new', $ftype = 'rss') {
-		$l = '';
-		$ext = array('new' => 'добавени', 'edit' => 'редактирани');
-		foreach ($limits as $limit) {
-			$title = "RSS зоб за новинарски четци с последните $limit $ext[$type] произведения";
-			$l .= ', '.$this->out->internLink($limit, array(self::FF_ACTION=>'feed', 'obj'=>$type, 'limit'=>$limit), 3);
+		if (!$showHeader && !empty($o)) {
+			$o = $this->$makeStartFunc() . $o . $this->$makeEndFunc();
 		}
-		return ltrim($l, ', ');
+		return $o;
 	}
 
 
 	public function addTextForListByDate($dbrow) {
 		extract($dbrow);
-		unset($dbrow['textId']);
 		$this->texts[ substr($dbrow[$this->getby], 0, 7) ][$textId] = $dbrow;
 	}
 
@@ -155,6 +169,11 @@ EOS;
 		$this->db->iterateOverResult($query, 'addTextForListByAuthor', $this);
 		$o = '';
 		$translator = '';
+		$mark = ' <span class="newmark">Н</span>';
+		$ucvt = ucfirst($this->viewType);
+		$makeStartFunc = 'makeListStart'. $ucvt;
+		$makeEndFunc = 'makeListEnd'. $ucvt;
+		$makeItemFunc = 'makeListItem'. $ucvt;
 		foreach ($this->texts as $date => $dtexts) {
 			ksort($dtexts);
 			list($year, $month) = explode('-', $date);
@@ -162,27 +181,31 @@ EOS;
 			$o .= "\n<h2>$monthName $year</h2>\n<ul>";
 			foreach ($dtexts as $author => $atexts) {
 				$author = $this->makeAuthorLink($author, 'first');
-				$o .= "\n<li>$author\n<ul>";
+				$o .= "\n<li>$author\n" . $this->$makeStartFunc();
 				ksort($atexts);
 				foreach ($atexts as $atext) {
 					extract($atext);
+					$readClass = empty($reader) ? 'unread' : 'read';
+					$from = $collection == 'true' ? ''
+						: $this->makeAuthorLink($author, 'first');
 					if ( $lang != $orig_lang ) {
-						$stranslator = ', превод: ';
-						$stranslator .= empty($translator)
+						$from .= ', превод: ';
+						$from .= empty($translator)
 							? $this->out->internLink('неизвестен', array(self::FF_ACTION=>'suggestData', 'sa'=>'translator', 'textId'=>$textId), 3)
 							: $this->makeTranslatorLink($translator, 'first');
-					} else { $stranslator = ''; }
-					$readClass = empty($reader) ? 'unread' : 'read';
+					}
+					$from = ltrim($from, ', ');
 					$dl = $this->makeDlLink($textId, $zsize);
 					$seriesLink = empty($series) ? ''
 						: '<span class="extra">'.$this->makeSeriesLink($series) .':</span> ';
-					$o .= $this->media == 'screen'
-						? "\n\t<li class='$type'>$seriesLink".
-						$this->makeSimpleTextLink($title, $textId, 1, '', array('class'=>$readClass)).
-						' — <span class="extra">'. $this->makeDlLink($textId, $zsize) .'</span>'.$stranslator
-						: "\n\t<li>$seriesLink$title [$this->purl/text/$textId]</li>";
+					$vdate = $atext[$this->getby];
+					if ($this->isEditMode()) {
+						$vdate .= $entrydate >= substr($lastmod, 0, 10) ? $mark : ' &nbsp;';
+					}
+					$data = compact('readClass', 'from', 'vdate', 'seriesLink');
+					$o .= $this->$makeItemFunc($atext + $data);
 				}
-				$o .= '</ul></li>';
+				$o .= $this->$makeEndFunc() . '</li>';
 			}
 			$o .= '</ul>';
 		}
@@ -197,6 +220,63 @@ EOS;
 		foreach (explode(',', $author) as $lauthor) {
 			$this->texts[$date][$lauthor][$title.$textId] = $dbrow;
 		}
+	}
+
+
+	protected function makeListStartPlain() {
+		return '<ul>';
+	}
+
+	protected function makeListEndPlain() {
+		return '</ul>';
+	}
+
+	protected function makeListItemPlain($data) {
+		extract($data);
+		fillOnEmpty($edit_comment, '');
+		$i = $this->media == 'screen'
+			? "\n\t<li class='$type'><tt title='$edit_comment'>$vdate</tt> $seriesLink".
+				$this->makeSimpleTextLink($title, $textId, 1, '', array('class'=>$readClass)).
+			' — <span class="extra">'. $this->makeDlLink($textId, $zsize) .'</span>'
+			: "\n\t<li>$seriesLink$title [$this->purl/text/$textId]";
+		if ( !empty($from) ) {
+			$i .= ' — '. $from;
+		}
+		$i .= '</li>';
+		return $i;
+	}
+
+	protected function makeListStartTable() {
+		return <<<EOS
+	<table class="content sortable" style="width:100%">
+		<tr>
+			<th>Дата</th>
+			<th>Заглавие</th>
+			<th title="Големина на файла за сваляне">Голем.</th>
+			<th>Автор</th>
+		</tr>
+EOS;
+	}
+
+	protected function makeListEndTable() {
+		return '</table>';
+	}
+
+	protected function makeListItemTable($data) {
+		extract($data);
+		fillOnEmpty($edit_comment, '');
+		$this->rowclass = $this->out->nextRowClass($this->rowclass);
+		$tl = $this->makeSimpleTextLink($title, $textId, 1, '', array('class'=>$readClass));
+		$dl = $this->makeDlLink($textId, $zsize);
+		$i = <<<EOS
+	<tr class="$this->rowclass">
+		<td class="date"><tt title="$edit_comment">$vdate</tt></td>
+		<td>$seriesLink <span class="$type">$tl</span></td>
+		<td class="extra">$dl</td>
+		<td>$from</td>
+	</tr>
+EOS;
+		return $i;
 	}
 
 
@@ -222,22 +302,30 @@ EOS;
 		if ($this->allowViewAll) {
 			$opts[0] = '(Всички месеци)';
 		}
-		$date = $this->out->selectBox('date', '', $opts, $this->date);
-		return '<label for="date">През:</label>&nbsp;'. $date;
+		$box = $this->out->selectBox(self::FF_DATE, '', $opts, $this->date);
+		$label = $this->out->label('През:', self::FF_DATE);
+		return $label .'&nbsp;'. $box;
 	}
 
 
 	protected function makeGetbyInput() {
-		$opts = array('entrydate'=>'Дата на добавяне', 'lastmod'=>'Дата на посл. редакция');
-		$box = $this->out->selectBox('getby', '', $opts, $this->getby);
-		return '<label for="getby">Търсене по:</label>&nbsp;'. $box;
+		$box = $this->out->selectBox(self::FF_GETBY, '', $this->getbys, $this->getby);
+		$label = $this->out->label('Търсене по:', self::FF_GETBY);
+		return $label .'&nbsp;'. $box;
 	}
 
 
 	protected function makeOrderInput() {
-		$opts = array('date'=>'Дата', 'author'=>'Автор');
-		$box = $this->out->selectBox('orderby', '', $opts, $this->orderby);
-		return '<label for="orderby">Подредба по:</label>&nbsp;'. $box;
+		$box = $this->out->selectBox(self::FF_ORDERBY, '', $this->orderbys, $this->orderby);
+		$label = $this->out->label('Подредба по:', self::FF_ORDERBY);
+		return $label .'&nbsp;'. $box;
+	}
+
+
+	protected function makeViewTypeInput() {
+		$box = $this->out->selectBox(self::FF_VIEW_TYPE, '', $this->viewTypes, $this->viewType);
+		$label = $this->out->label('Изглед:', self::FF_VIEW_TYPE);
+		return $label .'&nbsp;'. $box;
 	}
 
 

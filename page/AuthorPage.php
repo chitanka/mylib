@@ -96,7 +96,7 @@ class AuthorPage extends ViewPage {
 			$this->ext = '';
 		}
 		$img = $this->makeCountryImage($country);
-		$o .= "\n<li>$author <span class='extra'>($orig_name$img$editLink)</span>$this->ext</li>";
+		$o .= "\n<li>$author <span class='extra'>($img $orig_name$editLink)</span>$this->ext</li>";
 		return $o;
 	}
 
@@ -113,12 +113,16 @@ class AuthorPage extends ViewPage {
 			}
 			return false;
 		}
+		$ucvt = ucfirst($this->viewType);
+		$makeStartFunc = 'makeExtendedListStart'. $ucvt;
+		$makeEndFunc = 'makeExtendedListEnd'. $ucvt;
+		$makeItemFunc = 'makeExtendedListItem'. $ucvt;
 		$o = '';
 		$toc = '<div id="toc"><h2>Съдържание</h2><ul>';
 		$userCanEdit = $this->user->canExecute('edit');
 		foreach ($this->authorsData as $authorId => $data) {
 			extract($data);
-			$anchor = md5($author);
+			$anchor = 'a-'. md5($author);
 			$showName = $this->formatPersonName($author, $this->sortby);
 			$toc .= "\n\t<li><a href='#$anchor'>$showName</a></li>";
 			$editLink = $this->uCanEditObj
@@ -164,8 +168,8 @@ EOS;
 				$o .= <<<EOS
 <fieldset class="titles">
 	<legend>$serLink $orig</legend>
-	<ul>
 EOS;
+				$o .= $this->$makeStartFunc();
 				ksort($titles);
 				$tids = array();
 				foreach ($titles as $textId) {
@@ -202,7 +206,7 @@ EOS;
 </li>
 EOS;
 				}
-				$o .= "\n</ul>";
+				$o .= "\n" . $this->$makeEndFunc();
 				if (!$this->showDlForm && count($tids) > 1) {
 					$o .= $this->makeDlSeriesForm($tids, "$author - $serName",
 						$isTrueSeries ? '' : "всички от „{$serName}“");
@@ -223,8 +227,65 @@ $o
 </div></form>
 EOS;
 		}
+		unset($this->authorsData);
+		unset($this->authors_titles);
+		unset($this->textsData);
 		$o .= $this->makeColorLegend();
 		return $toc . $o;
+	}
+
+	protected function makeExtendedListStartPlain() {
+		return '<ul>';
+	}
+
+	protected function makeExtendedListEndPlain() {
+		return '</ul>';
+	}
+
+	protected function makeExtendedListItemPlain($data) {
+		extract($data);
+		return <<<EOS
+<li class="$type" title="$title">
+	$dlCheckbox
+	$titleView
+	<span class="extra">
+	$extras
+	— $dlLink $editLink
+	</span>
+</li>
+EOS;
+	}
+
+	protected function makeExtendedListStartTable() {
+		return <<<EOS
+	<table class="content sortable" style="width:100%">
+		<tr>
+			<th>Заглавие</th>
+			<th title="Големина на файла за сваляне">Голем.</th>
+			<th>Автор</th>
+		</tr>
+EOS;
+	}
+
+	protected function makeExtendedListEndTable() {
+		return '</table>';
+	}
+
+	protected function makeExtendedListItemTable($data) {
+		extract($data);
+		fillOnEmpty($edit_comment, '');
+		$this->rowclass = $this->out->nextRowClass($this->rowclass);
+		$tl = $this->makeSimpleTextLink($title, $textId, 1, '', array('class'=>$readClass));
+		$dl = $this->makeDlLink($textId, $zsize);
+		$i = <<<EOS
+	<tr class="$this->rowclass">
+		<td class="date"><tt title="$edit_comment">$vdate</tt></td>
+		<td>$seriesLink <span class="$type">$tl</span></td>
+		<td class="extra">$dl</td>
+		<td>$from</td>
+	</tr>
+EOS;
+		return $i;
 	}
 
 

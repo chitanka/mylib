@@ -51,7 +51,7 @@ class LinksPage extends MailPage {
 		$submit = $this->out->submitButton('Изпращане', '', 3);
 		return <<<EOS
 
-<hr />
+<hr style="margin: 2em auto; width: 80%; border-width: medium;" />
 <p>Чрез долния формуляр можете да предложите нова връзка за включване в
 списъка. Въвеждането на описание на сайта е <em>задължително</em>.</p>
 <p>Няма да бъдат приемани сайтове, които са достъпни само от България, напр.

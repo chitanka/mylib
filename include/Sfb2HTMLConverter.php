@@ -50,7 +50,8 @@ class Sfb2HTMLConverter {
 		$debug = false, $i=0;
 
 	public function __construct($file, $imgDir = 'img/') {
-		$this->handle = fopen($file, 'r');
+		$this->file = $file;
+		$this->handle = fopen($this->file, 'r');
 		$this->text = $this->footnotes = '';
 		$this->curCont = &$this->text;
 		$this->inFn = false; // in foot note state
@@ -78,12 +79,13 @@ class Sfb2HTMLConverter {
 		'/{img-thumb:([^}|]+)\|([^}]+)}/U' =>
 			"<div class='thumb'><a href='$this->imgDir$1' title='Щракнете за увеличен размер'><img src='{$this->imgDir}thumb/$1' alt='$2' /></a><p><a href='$this->imgDir$1' title='Щракнете за увеличен размер'><img src='{IMGDIR}viewmag.png' /></a> $2</p></div>",
 		// foot notes
-		'/(?<=\S)(\*+)(\d*)/e' => "\$this->makeRef('$1', '$2')",
+		'/(?<=[^\s(])(\*+)(\d*)/e' => "\$this->makeRef('$1', '$2')",
 		);
 		$this->replPairs = array(
 			"\t" => '        ', // eight nbspaces
 			'`' => '&#768;', // ударение
 		);
+		$this->lcmd = $this->ltext = '';
 	}
 
 
@@ -103,9 +105,19 @@ class Sfb2HTMLConverter {
 
 
 	public function output() {
-		echo $this->text .'<div id="footnotes">'. $this->footnotes .'</div>';
+		echo $this->text .'<div class="footnotes">'. $this->footnotes .'</div>';
 	}
 
+
+	public function content($withNotes = false, $plainNotes = true) {
+		return $this->text . ($withNotes ? $this->footnotes($plainNotes) : '');
+	}
+
+	public function footnotes($plain = true) {
+		return $plain || empty($this->footnotes)
+			? $this->footnotes
+			: "<fieldset class='footnotes'>\n<legend>Бележки</legend>\n$this->footnotes</fieldset>";
+	}
 
 	public function addPattern($pattern, $repl) {
 		$this->replPairs[$pattern] = $repl;
@@ -123,7 +135,13 @@ class Sfb2HTMLConverter {
 		unset($this->patterns[$pattern]);
 	}
 
+	// TODO catch infinite loops
 	protected function nextLine() {
+// 		if ($this->i++ > $this->maxlinecnt) {
+// 			echo "Грешка при $this->file\n";
+// 			dprbt();
+// 			exit(-1);
+// 		}
 		if ($this->hasNextLine) {
 			$this->hasNextLine = false;
 			return $this->line;
@@ -182,7 +200,7 @@ class Sfb2HTMLConverter {
 		do {
 			$this->nextLine();
 			$this->inBlock($end);
-		} while ( $this->lcmd != $end );
+		} while ( $this->lcmd != $end && !is_null($this->lcmd) );
 		$this->lcmd = '';
 		$this->simpleSave($this->blockEnd[$key] . "\n");
 		$this->acceptEmptyLine = false;
@@ -236,7 +254,7 @@ class Sfb2HTMLConverter {
 		do {
 			$this->nextLine();
 			$this->inPoem();
-		} while ( $this->lcmd != self::POEM_E );
+		} while ( $this->lcmd != self::POEM_E && !is_null($this->lcmd) );
 		$this->simpleSave($this->blockEnd['poem'] . "\n");
 		$this->acceptEmptyLine = false;
 	}
@@ -265,7 +283,7 @@ class Sfb2HTMLConverter {
 		do {
 			$this->nextLine();
 			$this->inCite();
-		} while ( $this->lcmd != self::CITE_E );
+		} while ( $this->lcmd != self::CITE_E && !is_null($this->lcmd) );
 		$this->lcmd = '';
 		$this->simpleSave($this->blockEnd['cite'] . "\n");
 		$this->acceptEmptyLine = false;
@@ -296,7 +314,7 @@ class Sfb2HTMLConverter {
 		do {
 			$this->nextLine();
 			$this->inPreformatted();
-		} while ( $this->lcmd != self::PREFORMATTED_E );
+		} while ( $this->lcmd != self::PREFORMATTED_E && !is_null($this->lcmd) );
 		$this->simpleSave("</pre>\n");
 		$this->acceptEmptyLine = false;
 	}
@@ -320,7 +338,7 @@ class Sfb2HTMLConverter {
 		do {
 			$this->nextLine();
 			$this->inTable();
-		} while ( $this->lcmd != self::TABLE_E );
+		} while ( $this->lcmd != self::TABLE_E && !is_null($this->lcmd) );
 		$this->simpleSave("</table>\n");
 		$this->acceptEmptyLine = false;
 	}

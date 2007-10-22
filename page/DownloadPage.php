@@ -49,7 +49,7 @@ class DownloadPage extends Page {
 		if ( !$setZipFileName && empty($this->zipFileName) ) {
 			$this->zipFileName = "Архив от $this->sitename - $fileCount файла_".time();
 		}
-		$this->zipFileName = cyr2lat($this->cleanFileName($this->zipFileName));
+		$this->zipFileName = $this->cleanFileName(cyr2lat($this->zipFileName));
 		$fullZipFileName = $this->zipFileName .'.zip';
 		CacheManager::setDlFile($fullZipFileName, $this->zf->file());
 		header('Location: '. $this->rootd .'/'. CacheManager::getDlFile($fullZipFileName));
@@ -146,8 +146,10 @@ class DownloadPage extends Page {
 
 
 	protected function cleanFileName($fname) {
-		$repl = array('"'=>'', '\''=>'', ':'=>' -', '\\'=>'', '/'=>'');
-		return strtr($fname, $repl);
+		$repl = array('"'=>'', '\''=>'', ':'=>' -', '\\'=>'', '/'=>'', '?'=>'');
+		$fname = strtr($fname, $repl);
+		$fname = preg_replace('/[^\w\d ,._-]/', '', $fname);
+		return $fname;
 	}
 
 

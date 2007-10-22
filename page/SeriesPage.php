@@ -179,6 +179,8 @@ $o
 EOS;
 		}
 		$o .= $this->makeColorLegend();
+		unset($this->data);
+		unset($this->serTitles);
 		return $toc . $o;
 	}
 

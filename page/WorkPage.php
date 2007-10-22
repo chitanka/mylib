@@ -48,8 +48,9 @@ class WorkPage extends Page {
 		$this->uplfile = $this->makeUploadedFileName();
 		$this->uplfile = $this->escapeBlackListedExt($this->uplfile);
 		$this->form = $this->request->value('form');
+		$this->bypassExisting = (int) $this->request->value('bypass', 0);
 		$this->date = date('Y-m-d H:i:s');
-		$this->rowclass = 'even';
+		$this->rowclass = null;
 		$this->showProgressbar = true;
 
 		$this->multidata = array();
@@ -89,6 +90,18 @@ class WorkPage extends Page {
 		require_once 'include/replace.php';
 		$this->btitle = my_replace($this->btitle);
 		$id = $this->entry == 0 ? $this->db->autoincrementId(self::DB_TABLE) : $this->entry;
+		if ($this->entry == 0) {
+			$work = Work::newFromTitle($this->btitle);
+			if ( !empty($work) && !$this->bypassExisting ) {
+				$wl = $this->makeSimpleTextLink($work->title, $work->id);
+				$this->addMessage('В библиотеката вече съществува произведение'.
+					$this->makeFromAuthorSuffix($work->author_name) .
+					" със същото заглавие — <div style='text-align:center; margin:0.5em'>$wl.</div>", true);
+				$this->addMessage('Повторното съхраняване ще добави вашия запис въпреки горното предупреждение.');
+				$this->bypassExisting = 1;
+				return $this->makeForm();
+			}
+		}
 		$set = array('id' => $id, 'type' => $this->workType,
 			'title'=>$this->btitle,
 			'author'=> strtr($this->author, array(';'=>',')),
@@ -213,7 +226,7 @@ class WorkPage extends Page {
 <!--thead-->
 	<tr>
 		<th>Дата</th>
-		<th></th>
+		<th class="unsortable"></th>
 		<th>Заглавие</th>
 		<th>Автор</th>
 		<th>Етап на работата</th>
@@ -292,7 +305,7 @@ EOS;
 			return <<<EOS
 
 	<tr class="$this->rowclass$extraclass" id="e$id">
-		<td title="$date">$ddate</td>
+		<td class="date" title="$date">$ddate</td>
 		<td>$img</td>
 		<td>$info $title</td>
 		<td>$author</td>
@@ -403,6 +416,7 @@ EOS;
 		$scanuser = $this->out->hiddenField('user', $this->scanuser);
 		$entry = $this->out->hiddenField('entry', $this->entry);
 		$workType = $this->out->hiddenField('workType', $this->workType);
+		$bypass = $this->out->hiddenField('bypass', $this->bypassExisting);
 		return <<<EOS
 
 $helpTop
@@ -414,6 +428,7 @@ $helpTop
 	$scanuser
 	$entry
 	$workType
+	$bypass
 	<table><tr>
 		<td style="width:6em"><label for="title">Заглавие:</label></td>
 		<td>$title</td>

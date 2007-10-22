@@ -1,15 +1,17 @@
 <?php
-$defSkinDir = 'main/';
 $defSkinName = 'orange';
 $defNavPos = 'right';
 $logoFontStyle = 'italic';
 $logoFontWeight = 'normal';
 $logoFontSize = '1.1em';
 
+$request = $GLOBALS['request'];
 $opts = array();
-if ( !empty($_SERVER['QUERY_STRING']) ) {
-	$opts = explode('-', $_SERVER['QUERY_STRING']);
+$ropts = $request->value('o');
+if ( !empty($ropts) ) {
+	$opts = explode('-', $ropts);
 }
+
 $skinName = empty($opts[0]) ? $defSkinName : $opts[0];
 $navPos = empty($opts[1]) ? $defNavPos : $opts[1];
 $colorFile = "style/$skinName.inc";
@@ -18,7 +20,7 @@ if ( !is_readable($colorFile) ) {
 }
 require_once $colorFile;
 
-$skin = new Skin( $skinName == 'neg' ? 'neg/' : $defSkinDir );
+$skin = Setup::skin();
 ?>
 /* цялата страница и тялото й */
 html, body {
@@ -265,6 +267,16 @@ li.othergenre, li.essay, li.article, li.play, li.screenplay, li.anecdote,
 li.playbook, li.science, li.intro, li.travelnotes, li.other, li.textbook {
 	list-style-image: url('<?php echo $skin->image('othergenre')?>');
 }
+span.novel:before { content: url('<?php echo $skin->image('novel')?>') ' '; vertical-align: bottom; }
+span.novella:before { content: url('<?php echo $skin->image('novella')?>') ' '; vertical-align: bottom; }
+span.shortstory:before, span.novelette:before { content: url('<?php echo $skin->image('shortstory')?>') ' '; vertical-align: bottom; }
+span.poetry:before, span.poem:before { content: url('<?php echo $skin->image('poetry')?>') ' '; vertical-align: bottom; }
+span.tale:before, span.fable:before { content: url('<?php echo $skin->image('tale')?>') ' '; vertical-align: bottom; }
+span.othergenre:before, span.essay:before, span.article:before, span.play:before,
+span.screenplay:before, span.anecdote:before, span.playbook:before, span.science:before,
+span.intro:before, span.travelnotes:before, span.other:before, span.textbook:before {
+	content: url('<?php echo $skin->image('othergenre')?>') ' '; vertical-align: bottom;
+}
 
 /* кутия за съдържание — появява се на доста страници */
 #toc {
@@ -423,7 +435,7 @@ dl#search {
 /* допълнителна информация */
 .extra, .extra a {
 	color: <?php echo $extraInfoFgColor?>;
-	background-color: <?php echo $mainBgColor?>;
+	background-color: inherit;
 }
 .frozen {
 	opacity: .40;
@@ -445,7 +457,7 @@ table.content {
 	border-collapse: collapse;
 }
 table.content th, table.content td {
-	padding: 0.15em 0.4em;
+	padding: 0.1em 0.4em;
 	border: thin solid <?php echo $headerBordColor?>;
 }
 table.content caption { font-weight: bold; margin: 1em auto 0 auto; }
@@ -586,3 +598,5 @@ div.tabbedpanebody {
 	padding: 1em;
 	border: medium dashed <?php echo $tocBordColor?>;
 }
+
+.date { white-space: nowrap; }

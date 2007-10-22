@@ -75,6 +75,7 @@ class Database {
 		while ( $row = mysql_fetch_assoc($result) ) {
 			$out .= is_null($obj) ? $func($row) : $obj->$func($row);
 		}
+		$this->freeResult($result);
 		return $out;
 	}
 
@@ -474,6 +475,9 @@ class Database {
 		return mysql_insert_id($this->conn);
 	}
 
+	public function freeResult($result) {
+		return mysql_free_result($result);
+	}
 
 	/**
 		Return next auto increment for a table

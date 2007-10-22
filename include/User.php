@@ -43,7 +43,7 @@ class User {
 
 
 	/**
-	@return User
+		@return User
 	*/
 	public static function initUser() {
 		if ( self::isSetSession() ) {
@@ -70,10 +70,10 @@ class User {
 
 
 	/**
-	Check a user name for invalid chars.
+		Check a user name for invalid chars.
 
-	@param string $username
-	@return mixed true if the user name is ok, or the invalid character
+		@param string $username
+		@return mixed true if the user name is ok, or the invalid character
 	*/
 	public static function isValidUsername($username) {
 		$forbidden = '/+#"{}[]';
@@ -88,10 +88,10 @@ class User {
 
 
 	/**
-	Encode a password in order to save it in the database.
+		Encode a password in order to save it in the database.
 
-	@param string $password
-	@return string Encoded password
+		@param string $password
+		@return string Encoded password
 	*/
 	public static function encodePasswordDB($password) {
 		return md5_loop($password, 1);
@@ -99,12 +99,12 @@ class User {
 
 
 	/**
-	Encode a password in order to save it in a cookie.
+		Encode a password in order to save it in a cookie.
 
-	@param string $password
-	@param bool $rawpass Is this a real password or one already stored
-		encoded in the database
-	@return string Encoded password
+		@param string $password
+		@param bool $rawpass Is this a real password or one already stored
+			encoded in the database
+		@return string Encoded password
 	*/
 	public static function encodePasswordCookie($password, $rawpass = true) {
 		if ($rawpass) {
@@ -115,12 +115,12 @@ class User {
 
 
 	/**
-	Validate an entered password.
-	Encodes an entered password and compares it to the password from the database.
+		Validate an entered password.
+		Encodes an entered password and compares it to the password from the database.
 
-	@param string $inputPass The password from the input
-	@param string $dbPass The password stored in the database
-	@return bool
+		@param string $inputPass The password from the input
+		@param string $dbPass The password stored in the database
+		@return bool
 	*/
 	public static function validatePassword($inputPass, $dbPass) {
 		return strcmp(self::encodePasswordDB($inputPass), $dbPass) === 0;
@@ -128,12 +128,12 @@ class User {
 
 
 	/**
-	Validate a token from a cookie.
-	Properly encodes the password from the database and compares it to the token.
+		Validate a token from a cookie.
+		Properly encodes the password from the database and compares it to the token.
 
-	@param string $cookieToken The token from the cookie
-	@param string $dbPass The password stored in the database
-	@return bool
+		@param string $cookieToken The token from the cookie
+		@param string $dbPass The password stored in the database
+		@return bool
 	*/
 	public static function validateToken($cookieToken, $dbPass) {
 		$enc = self::encodePasswordCookie($dbPass, false);
@@ -175,27 +175,35 @@ class User {
 
 
 	/**
-	Is the user anonymous?
+		Is the user anonymous?
 
-	@return bool
+		@return bool
 	*/
-	public function isAnon() { return empty($this->username); }
+	public function isAnon() {
+		return empty($this->username);
+	}
 
 	public function showName() {
 		return empty($this->realname) ? $this->username : $this->realname;
 	}
-	public function userName() { return $this->username; }
+	public function userName() {
+		return $this->username;
+	}
 
 	public function set($field, $val) {
 		if ( !isset($this->$field) ) return;
 		$this->$field = $val;
 	}
 
-	public function options() { return $this->options; }
+	public function options() {
+		return $this->options;
+	}
 	public function option($opt) {
 		return isset($this->options[$opt]) ? $this->options[$opt] : '';
 	}
-	public function setOption($name, $val) { $this->options[$name] = $val; }
+	public function setOption($name, $val) {
+		$this->options[$name] = $val;
+	}
 	public function setOptions($opts) {
 		$this->options = array_merge($this->options, (array) $opts);
 	}
