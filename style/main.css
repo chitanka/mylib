@@ -29,7 +29,7 @@ html, body {
 }
 /* тялото на страницата */
 body {
-	line-height: 1.3em;
+	line-height: 1.4em;
 	padding: 0.2em 0 0 0;
 	margin: 0;
 }
@@ -76,7 +76,7 @@ dt { font-weight: bold; }
 dd { margin-left: 1.5em; }
 /* абзаци */
 p {
-	text-indent: 2.5em;
+	text-indent: 3em;
 	text-align: justify;
 	margin: 0;
 }
@@ -111,7 +111,7 @@ code {
 
 /* картинки */
 img { border: none; vertical-align: middle; }
-p img { margin: 0.2em auto; }
+p.image { text-align: center; }
 img.float-left { float: left; margin: 0.5em 1em 1em 0; }
 img.float-right { float: right; margin: 0.5em 0 1em 1em; }
 
@@ -150,7 +150,7 @@ h1 a, h1 a:visited, h2 a, h2 a:visited {
 /* препратки за определени действия и състояния */
 a.edit:before { content: url('<?php echo $skin->image('edit')?>'); }
 a.delete:before { content: url('<?php echo $skin->image('delete')?>'); }
-a.new:before { content: url('<?php echo $skin->image('new')?>') ' '; }
+a.new:before { content: url('<?php echo $skin->image('new')?>') ' '; }
 a.ok:before { content: url('<?php echo $skin->image('ok')?>'); }
 
 /* елемент, обхващащ основното съдържание */
@@ -170,6 +170,8 @@ a.ok:before { content: url('<?php echo $skin->image('ok')?>'); }
 #messages {
 	font-size: 1.1em;
 	margin-bottom: 1em;
+	padding-bottom: 0.5em;
+	border-bottom: thick solid <?php echo $headerBordColor?>;
 }
 
 /* навигационното меню */
@@ -198,7 +200,7 @@ a.ok:before { content: url('<?php echo $skin->image('ok')?>'); }
 	margin-left: 0;
 	padding-left: .6em;
 }
-#navigation .selected, option[selected=selected] {
+#navigation .selected, option[selected=selected], .hilite {
 	font-weight: bold;
 	color: <?php echo $headerFgColor?>;
 	background-color: <?php echo $headerBgColor?>;
@@ -264,18 +266,20 @@ li.shortstory, li.novelette { list-style-image: url('<?php echo $skin->image('sh
 li.poetry, li.poem { list-style-image: url('<?php echo $skin->image('poetry')?>'); }
 li.tale, li.fable { list-style-image: url('<?php echo $skin->image('tale')?>'); }
 li.othergenre, li.essay, li.article, li.play, li.screenplay, li.anecdote,
-li.playbook, li.science, li.intro, li.travelnotes, li.other, li.textbook {
+li.playbook, li.science, li.intro, li.travelnotes, li.other, li.textbook,
+li.feuilleton, li.letter {
 	list-style-image: url('<?php echo $skin->image('othergenre')?>');
 }
-span.novel:before { content: url('<?php echo $skin->image('novel')?>') ' '; vertical-align: bottom; }
-span.novella:before { content: url('<?php echo $skin->image('novella')?>') ' '; vertical-align: bottom; }
-span.shortstory:before, span.novelette:before { content: url('<?php echo $skin->image('shortstory')?>') ' '; vertical-align: bottom; }
-span.poetry:before, span.poem:before { content: url('<?php echo $skin->image('poetry')?>') ' '; vertical-align: bottom; }
-span.tale:before, span.fable:before { content: url('<?php echo $skin->image('tale')?>') ' '; vertical-align: bottom; }
+span.novel:before { content: url('<?php echo $skin->image('novel')?>') ' '; vertical-align: bottom; }
+span.novella:before { content: url('<?php echo $skin->image('novella')?>') ' '; vertical-align: bottom; }
+span.shortstory:before, span.novelette:before { content: url('<?php echo $skin->image('shortstory')?>') ' '; vertical-align: bottom; }
+span.poetry:before, span.poem:before { content: url('<?php echo $skin->image('poetry')?>') ' '; vertical-align: bottom; }
+span.tale:before, span.fable:before { content: url('<?php echo $skin->image('tale')?>') ' '; vertical-align: bottom; }
 span.othergenre:before, span.essay:before, span.article:before, span.play:before,
 span.screenplay:before, span.anecdote:before, span.playbook:before, span.science:before,
-span.intro:before, span.travelnotes:before, span.other:before, span.textbook:before {
-	content: url('<?php echo $skin->image('othergenre')?>') ' '; vertical-align: bottom;
+span.intro:before, span.travelnotes:before, span.other:before, span.textbook:before,
+span.feuilleton:before, span.letter:before {
+	content: url('<?php echo $skin->image('othergenre')?>') ' '; vertical-align: bottom;
 }
 
 /* кутия за съдържание — появява се на доста страници */
@@ -358,7 +362,7 @@ dl#search {
 	clear: both;
 }
 /* читателските мнения */
-#readercomments ul { list-style-type: none; }
+#readercomments ul { list-style-type: none; padding-left: 1em; }
 /* first ul child of readercomments */
 #readercomments > ul { padding-left: 0; }
 
@@ -395,7 +399,7 @@ dl#search {
 	background-color: <?php echo $mainBgColor?>;
 	text-decoration: none;
 }
-#fulltext-link { float: right; }
+#fulltext-link { text-align: right; }
 
 /* препратките за прочетени текстове */
 .read, .read:visited {
@@ -431,7 +435,7 @@ dl#search {
 }
 /* съобщения за грешки */
 .error { color: <?php echo $errorFgColor?>; background-color: inherit; }
-.error:before { content: url('<?php echo $skin->image('stop')?>') ' '; }
+.error:before { content: url('<?php echo $skin->image('stop')?>') ' '; }
 /* допълнителна информация */
 .extra, .extra a {
 	color: <?php echo $extraInfoFgColor?>;
@@ -497,10 +501,15 @@ pre.example, div.example {
 .epigraph .author, .dedication .author {
 	margin-left: 10em; text-align: left;
 }
+.placeyear { font-size: small; }
 .letter, .cite { font-style: normal; }
-.subheader, .notice, .notice p {
+.subheader, .sign, .sign p {
 	font-weight: bold;
 	font-style: normal;
+	text-align: center;
+}
+.notice, .notice p {
+	font-size: 0.95em;
 	text-align: center;
 }
 .epigraph .subheader { text-align: left; }
@@ -509,12 +518,13 @@ pre.example, div.example {
 	text-align: left;
 	text-indent: 2.5em;
 }
-
-.post dt {
+.post {
+	margin: 1em 1em 0 1em;
+}
+.post dt, .firstrow {
 	color: <?php echo $toolbarFgColor?>;
 	background-color: <?php echo $toolbarBgColor?>;
 	padding: 0.3em 0.5em;
-	margin: 1em 1em 0 1em;
 	border: thin outset <?php echo $toolbarBgColor?>;
 }
 .post dt a { text-decoration: none; }
@@ -554,7 +564,7 @@ del {
 
 div.thumb {
 	float: left;
-	margin: 0 1em 1em 0;
+	margin: 0.5em 1em 1em 0;
 	background-color: <?php echo $tocBgColor?>;
 	border: thin solid <?php echo $tocBordColor?>;
 	padding: 0.4em;

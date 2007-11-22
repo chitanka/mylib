@@ -22,7 +22,7 @@ class ClearCachePage extends Page {
 					unset($this->texts[$key]);
 					continue;
 				}
-				CacheManager::clearCache(CacheManager::SFBZIP_DIR, $textId);
+				CacheManager::clearDlCache($textId);
 			}
 			$this->addMessage('Копията на следните текстове бяха изтрити: '.
 				implode(', ', $this->texts));
@@ -34,7 +34,7 @@ class ClearCachePage extends Page {
 				$this->end = $t;
 			}
 			for ($i = $this->start; $i <= $this->end; $i++) {
-				CacheManager::clearCache(CacheManager::SFBZIP_DIR, $i);
+				CacheManager::clearDlCache($i);
 			}
 			$this->addMessage("Копията на текстовете с номера от
 				$this->start до $this->end бяха изтрити.");

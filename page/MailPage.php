@@ -24,7 +24,7 @@ class MailPage extends Page {
 		$mailer = Setup::mailer();
 		$message = $this->makeMailMessage();
 		$headers = $this->makeMailHeaders();
-		$res = @$mailer->send($this->mailTo, $headers, $message);
+		$res = $mailer->send($this->mailTo, $headers, $message);
 		$this->logEmail($message, $headers);
 		if ( $res !== true ) {
 			$this->addMessage($this->mailFailureMessage .

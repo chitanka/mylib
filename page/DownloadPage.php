@@ -25,8 +25,8 @@ class DownloadPage extends Page {
 				$fileCount--; continue; // invalid text ID
 			}
 			$this->user->markTextAsDl($textId);
-			if ( CacheManager::cacheExists(CacheManager::SFBZIP_DIR, $textId) ) {
-				$fEntry = CacheManager::getCache(CacheManager::SFBZIP_DIR, $textId, false);
+			if ( CacheManager::dlCacheExists($textId) ) {
+				$fEntry = CacheManager::getDlCache($textId);
 				$fEntry = unserialize($fEntry);
 				$this->zf->addFileEntry($fEntry);
 				$this->filename = $this->rmFEntrySuffix($fEntry['name']);
@@ -62,7 +62,7 @@ class DownloadPage extends Page {
 		$fEntry = $this->zf->newFileEntry($this->fPrefix .
 			$this->makeContentData($textId) ."\n\n\tКРАЙ".
 			$this->fSuffix, $this->filename .'.txt');
-		CacheManager::setCache(CacheManager::SFBZIP_DIR, $textId, serialize($fEntry), false);
+		CacheManager::setDlCache($textId, serialize($fEntry));
 		$this->zf->addFileEntry($fEntry);
 	}
 
@@ -106,7 +106,7 @@ class DownloadPage extends Page {
 		$prefix = "\xEF\xBB\xBF". // Byte order mark for some windows software
 			"\t[Kodirane UTF-8]\n\n|\t$work->author_name\n".
 			$work->getTitleAsSfb() ."\n\n\n";
-		$anno = $this->makeAnnotation($textId);
+		$anno = $work->getAnnotation();
 		if ( !empty($anno) ) { $prefix .= "A>\n$anno\nA$\n\n\n"; }
 
 		$filename = (empty($work->author_name) ? '' : cyr2lat($work->author_name) .' - ').
@@ -120,28 +120,11 @@ class DownloadPage extends Page {
 			$this->fnameCount[$filename] = 1;
 		}
 		$suffix = "\nI>".$work->getCopyright() ."\n\n".
-			$work->getOrigTitleAsSfb() .
-			$this->makeExtraInfo($textId) .
+			$work->getOrigTitleAsSfb() . "\n\n" .
+			$work->getExtraInfo() .
 			"\n\n\tСвалено от „{$this->sitename}“ [$this->purl/text/$textId]\nI$\n";
 		$suffix = preg_replace('/\n\n+/', "\n\n", $suffix);
 		return array($filename, $prefix, $suffix);
-	}
-
-
-	protected function makeAnnotation($textId) {
-		$file = getContentFilePath('text-anno', $textId);
-		if ( !file_exists($file) ) { return ''; }
-		return file_get_contents($file);
-	}
-
-
-	protected function makeExtraInfo($textId) {
-		$file = getContentFilePath('text-info', $textId);
-		if ( !file_exists($file) ) {
-			return '';
-		}
-		$con = file_get_contents($file);
-		return empty($con) ? '' : "\n\n". rtrim($con);
 	}
 
 

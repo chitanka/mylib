@@ -2,9 +2,9 @@
 
 class CacheManager {
 
-	const SFBZIP_DIR = 'sfbzip';
 	private static $cacheDir = 'cache/';
 	private static $dlDir = 'cache/dl/';
+	private static $sfbzipDir = 'sfbzip/';
 	/** Time to Live for download cache (in hours) */
 	private static $dlTtl = 1;
 
@@ -30,6 +30,23 @@ class CacheManager {
 	}
 
 
+	public static function dlCacheExists($id) {
+		return file_exists( self::getDlCachePath($id) );
+	}
+
+	public static function getDlCache($id) {
+		return file_get_contents( self::getDlCachePath($id) );
+	}
+
+	public static function setDlCache($id, $content) {
+		return myfile_put_contents(self::getDlCachePath($id), $content);
+	}
+
+	public static function clearDlCache($id) {
+		$file = self::getDlCachePath($id);
+		return file_exists($file) ? unlink($file) : true;
+	}
+
 	public static function getDlFile($fname) {
 		return self::$dlDir . $fname;
 	}
@@ -44,7 +61,7 @@ class CacheManager {
 	}
 
 	/**
-	Deletes all download files older than the time to live.
+		Deletes all download files older than the time to live.
 	*/
 	public static function deleteOldDlFiles() {
 		$thresholdTime = time() - self::$dlTtl * 3600;
@@ -63,7 +80,11 @@ class CacheManager {
 	public static function getPath($action, $id) {
 		$subdir = $action . '/';
 		settype($id, 'string');
-		$subsubdir = $id{0} . '/';
+		$subsubdir = $id{0} . '/' . $id{1} . '/';
 		return self::$cacheDir . $subdir . $subsubdir . $id;
+	}
+
+	public static function getDlCachePath($id) {
+		return self::$cacheDir . self::$sfbzipDir . makeContentFilePath($id);
 	}
 }

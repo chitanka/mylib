@@ -5,6 +5,7 @@ class WorkPage extends Page {
 		DEF_TMPFILE = 'http://',
 		DB_TABLE = DBT_WORK, DB_TABLE2 = DBT_WORK_MULTI,
 		FF_COMMENT = 'comment', FF_EDIT_COMMENT = 'editComment',
+		FF_VIEW_LIST = 'vl',
 		MAX_SCAN_STATUS = 2;
 	protected
 		$tabs = array('Самостоятелна подготовка', 'Работа в екип'),
@@ -12,6 +13,10 @@ class WorkPage extends Page {
 		$tabImgAlts = array('сам', 'екип'),
 		$statuses = array('Планира се сканиране', 'Сканира се',
 			'Сканирано е', 'Редактира се', 'Готово е за добавяне'),
+		$viewLists = array(
+			'work' => 'списъка на подготвяните произведения',
+			'contrib' => 'списъка на помощниците'),
+		$defViewList = 'work',
 		$imgs = array('0', '25', '50', '75', '100'),
 		$progressBarWidth = '20',
 
@@ -52,6 +57,8 @@ class WorkPage extends Page {
 		$this->date = date('Y-m-d H:i:s');
 		$this->rowclass = null;
 		$this->showProgressbar = true;
+		$this->viewList = $this->request->value(self::FF_VIEW_LIST,
+			$this->defViewList, null, $this->viewLists);
 
 		$this->multidata = array();
 	}
@@ -89,8 +96,8 @@ class WorkPage extends Page {
 		}
 		require_once 'include/replace.php';
 		$this->btitle = my_replace($this->btitle);
-		$id = $this->entry == 0 ? $this->db->autoincrementId(self::DB_TABLE) : $this->entry;
-		if ($this->entry == 0) {
+
+		if ($this->entry == 0) { // check if there is such text in the library
 			$work = Work::newFromTitle($this->btitle);
 			if ( !empty($work) && !$this->bypassExisting ) {
 				$wl = $this->makeSimpleTextLink($work->title, $work->id);
@@ -102,6 +109,8 @@ class WorkPage extends Page {
 				return $this->makeForm();
 			}
 		}
+
+		$id = $this->entry == 0 ? $this->db->autoincrementId(self::DB_TABLE) : $this->entry;
 		$set = array('id' => $id, 'type' => $this->workType,
 			'title'=>$this->btitle,
 			'author'=> strtr($this->author, array(';'=>',')),
@@ -186,7 +195,7 @@ class WorkPage extends Page {
 
 
 	protected function makeUploadedFileName() {
-		$filename = @$_FILES['file']['name'];
+		$filename = $this->request->fileName('file');
 		if ( empty($filename) ) {
 			return '';
 		}
@@ -208,10 +217,27 @@ class WorkPage extends Page {
 
 
 	protected function makeLists() {
+		$listFunc = 'make' . ucfirst($this->viewList) . 'List';
 		return $this->makePageHelp() . $this->makeNewEntryLink() .
-			$this->makeWorkList() . $this->makeContribList();
+			$this->makeViewListSelector() . $this->$listFunc();
 	}
 
+
+	protected function makeViewListSelector() {
+		$label = $this->out->label('Показване на: ', self::FF_VIEW_LIST);
+		$box = $this->out->selectBox(self::FF_VIEW_LIST, '', $this->viewLists,
+			$this->viewList, null, array('onchange' => 'this.form.submit()'));
+		$submit = $this->out->submitButton('Обновяване');
+		return <<<EOS
+<form action="{FACTION}" style="text-align:center">
+<div>
+$label
+$box
+	<noscript><div style="display:inline">$submit</div></noscript>
+</div>
+</form>
+EOS;
+	}
 
 	public function makeWorkList($limit = 0) {
 		$this->tooltips = '';
@@ -259,13 +285,8 @@ EOS;
 		$author = strtr($author, array(', '=>','));
 		$author = $this->makeAuthorLink($author);
 		$userlink = $this->makeUserLinkWithEmail($username, $email, $allowemail);
-		$info = '';
-		if ( !empty($comment) ) {
-			$comment = strtr($comment, array("\n"=>'', "\r"=>''));
-			$info = isset($expandinfo) && $expandinfo
-				? $comment
-				: $this->out->image($this->skin->image('info'),  '', $comment);
-		}
+		$info = empty($comment) ? ''
+			: $this->makeExtraInfo($comment, isset($expandinfo) && $expandinfo);
 		$title = "<em>$title</em>";
 		if ( $this->userCanEditEntry($user, $type) ) {
 			$params = array(self::FF_ACTION=>$this->action, 'sa'=>'edit', 'entry'=>$id);
@@ -275,23 +296,29 @@ EOS;
 		$st = $progress > 0
 			? $this->makeProgressBar($progress)
 			: $this->makeStatus($status);
+		$extraclass = $this->user->id == $user ? ' hilite' : '';
 		if ( $this->db->s2b($frozen) ) {
 			$sfrozen = '<span title="Подготовката е замразена">(замразена)</span>';
-			$extraclass = ' frozen';
+			$extraclass .= ' frozen';
 		} else {
-			$sfrozen = $extraclass = '';
+			$sfrozen = '';
 		}
 		$img = $this->makeTabImg($type);
 		if ( $this->isMultiUser($type) ) {
 			$mdata = $this->getMultiEditData($id);
 			foreach ($mdata as $muser => $data) {
-				if ($muser == $user) continue;
-				$ulink = $this->makeUserLinkWithEmail($data['username'],
+				$uinfo = $this->makeExtraInfo($data['comment']);
+				if ($muser == $user) {
+					$userlink = $uinfo .'&nbsp;'. $userlink;
+					continue;
+				}
+				$ulink = $uinfo .'&nbsp;'. $this->makeUserLinkWithEmail($data['username'],
 					$data['email'], $data['allowemail']);
 				if ($data['frozen']) {
 					$ulink = "<span class='frozen'>$ulink</span>";
 				}
 				$userlink .= ', '. $ulink;
+				$extraclass .= $this->user->id == $muser ? ' hilite' : '';
 			}
 			if ( !empty($mdata) ) {
 				if ( isset($showeditors) && $showeditors ) {
@@ -343,6 +370,14 @@ EOS;
 	public function makeTabImg($type) {
 		return $this->out->image('{IMGDIR}'.$this->tabImgs[$type].'.png',
 			$this->tabImgAlts[$type], $this->tabs[$type]);
+	}
+
+
+	public function makeExtraInfo($info, $expand = false) {
+		$info = strtr($info, array("\n" => '', "\r" => ''));
+		return $expand
+			? $info
+			: $this->out->image($this->skin->image('info'),  '', $info);
 	}
 
 
@@ -738,10 +773,11 @@ EOS;
 	protected function makeSendFileHelp() {
 		$tmpDir = $this->out->link($this->rootd.'/'.$this->tmpDir);
 		$adminMail = $this->out->obfuscateEmail(ADMIN_EMAIL);
+		$maxUploadSizeInMiB = int_b2m( ini_bytes( ini_get('upload_max_filesize') ) );
 		return <<<EOS
 
 <p>Когато сте готови с текста, в полето „Файл“ изберете файла с произведението (като натиснете бутона до полето ще ви се отвори прозорче за избор).</p>
-<p>Има ограничение от <strong>2</strong> мебибайта за големината на файла, затова първо го компресирайте. Ако и това не помогне, опитайте да го разделите на части или пък ми го пратете по електронната поща — $adminMail.</p>
+<p>Има ограничение от <strong>$maxUploadSizeInMiB</strong> мебибайта за големината на файла, затова първо го компресирайте. Ако и това не помогне, опитайте да го разделите на части или пък ми го пратете по електронната поща — $adminMail.</p>
 <p><strong>Важно:</strong> Ако след съхранението не видите съобщението „Файлът беше качен“, значи е станал някакъв фал при качването на файла. В такъв случай опитайте да го пратите отново.</p>
 <p>Ще съм ви благодарен, ако включвате и всякаква допълнителна информация както за текста, така и за самия файл.</p>
 <p>За произведението е добре да има данни относно хартиеното издание и за преводача, ако е превод. За файла е хубаво да се знае кой го е сканирал и редактирал.</p>
@@ -925,6 +961,8 @@ EOS;
 				break;
 			}
 		}
+		// remove leading dots
+		$filename = ltrim($filename, '.');
 		return $filename;
 	}
 }

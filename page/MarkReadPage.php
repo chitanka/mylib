@@ -1,5 +1,5 @@
 <?php
-class MarkReadPage extends Page {
+class MarkReadPage extends TextPage {
 
 	const DB_TABLE = DBT_READER_OF;
 
@@ -19,10 +19,16 @@ class MarkReadPage extends Page {
 		}
 		$set = $key + array('date' => date('Y-m-d'));
 		$this->db->insert(self::DB_TABLE, $set);
-		$work = Work::newFromId($this->textId);
-		$link = $this->makeSimpleTextLink($work->title, $this->textId);
-		$author = $this->makeFromAuthorSuffix($work->author_name);
+		$this->work = Work::newFromId($this->textId);
+		if ( !is_object($this->work) ) {
+			$this->addMessage('Няма такова произведение.', true);
+			return '';
+		}
+		$link = $this->makeSimpleTextLink($this->work->title, $this->textId);
+		$author = $this->makeFromAuthorSuffix($this->work->author_name);
 		$this->addMessage("Произведението <strong>„{$link}“</strong>$author беше отбелязано като прочетено.");
-		return '';
+		$next = $this->makeNextSeriesWorkLink() . $this->makeNextBookWorkLink();
+		return $next;
 	}
+
 }

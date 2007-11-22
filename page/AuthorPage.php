@@ -5,8 +5,8 @@ class AuthorPage extends ViewPage {
 	const
 		DB_TABLE = DBT_PERSON, FF_SORTBY = 'sortby';
 	protected
-		$titles = array('simple' => 'Автори — ',
-			'extended' => 'Автори и заглавия — '),
+		$titles = array('simple' => 'Списък на автори — $1',
+			'extended' => '$1 — Автори'),
 		$altTypes = array('p' => 'псевдоним', 'r' => 'истинско име',
 			'a' => 'алтернативно изписване');
 
@@ -28,7 +28,7 @@ class AuthorPage extends ViewPage {
 		$items = $this->db->iterateOverResult($this->makeSimpleListQuery(),
 			'makeSimpleListItem', $this);
 		if ( empty($items) ) {
-			if ( $this->startwith{0} != '%' ) {
+			if ( !empty($this->startwith) && $this->startwith{0} != '%' ) {
 				$this->addMessage("Не са намерени имена, започващи с „{$this->startwith}“. Показани са такива, съдържащи „{$this->startwith}“.");
 				$this->expandSearchString();
 				return $this->makeSimpleList();
@@ -107,7 +107,7 @@ class AuthorPage extends ViewPage {
 		$this->db->iterateOverResult($this->makeExtendedListQuery(),
 			'makeExtendedListItem', $this);
 		if ( empty($this->authorsData) ) {
-			if ( $this->startwith{0} != '%' ) {
+			if ( !empty($this->startwith) && $this->startwith{0} != '%' ) {
 				$this->expandSearchString();
 				return $this->makeExtendedList(true);
 			}
@@ -293,15 +293,15 @@ EOS;
 		$qa = array(
 			'SELECT' => 'a.name author, a.orig_name origAuthorName,
 				a.id authorId, a.real_name, a.oreal_name,
-				a.country, (a.role & 2) is_t, a.info, at.year ayear,
+				a.country, (a.role & 2) is_t, a.info, aof.year ayear,
 				t.id textId, t.title, t.lang, t.orig_title,
 				t.orig_lang, t.year, t.year2, t.type, t.sernr, t.size, t.zsize,
 				t.entrydate date, UNIX_TIMESTAMP(t.entrydate) datestamp,
 				s.name series, s.orig_name orig_series, s.type seriesType',
-			'FROM' => DBT_AUTHOR_OF .' at',
+			'FROM' => DBT_AUTHOR_OF .' aof',
 			'LEFT JOIN' => array(
-				DBT_TEXT .' t' => 'at.text = t.id',
-				self::DB_TABLE .' a' => 'at.author = a.id',
+				DBT_TEXT .' t' => 'aof.text = t.id',
+				self::DB_TABLE .' a' => 'aof.person = a.id',
 				DBT_SERIES .' s' => 't.series = s.id',
 			),
 			'ORDER BY' => "a.$this->dbsortby, a.name"

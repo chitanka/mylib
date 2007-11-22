@@ -131,14 +131,14 @@ class EditPage extends Page {
 						if ( empty($person) ) {
 							continue;
 						}
-						$set = array($key => $person, 'text' => $this->textId, 'pos' => $pos);
+						$set = array('person' => $person, 'text' => $this->textId, 'pos' => $pos);
 						$qs[] = $this->db->insertQ($dbt, $set);
 					}
 				}
 			}
 		}
 		$qs = array_merge($qs, $this->makeUpdateTextContentQueries());
-		CacheManager::clearCache(CacheManager::SFBZIP_DIR, $this->textId);
+		CacheManager::clearDlCache($this->textId);
 		return $qs;
 	}
 
@@ -207,7 +207,7 @@ class EditPage extends Page {
 			mycopy($file, $bak);
 		}
 		myfile_put_contents($file, $this->tcontent);
-		CacheManager::clearCache(CacheManager::SFBZIP_DIR, $this->textId);
+		CacheManager::clearDlCache($this->textId);
 		# Засега редактирането на доп. информация не се отразява в базата.
 		#$this->addEditCommentQuery($qs);
 		return $qs;
@@ -236,7 +236,7 @@ class EditPage extends Page {
 			$qs[] = $this->db->updateQ(self::DB_TABLE, $set, $dbkey);
 		}
 		myfile_put_contents($file, $this->tcontent);
-		CacheManager::clearCache(CacheManager::SFBZIP_DIR, $this->textId);
+		CacheManager::clearDlCache($this->textId);
 		$this->addEditCommentQuery($qs);
 		return $qs;
 	}
@@ -521,9 +521,9 @@ EOS;
 		$js = rtrim($js, ',') . "\n}; // end of array persons['$key']\n";
 		$this->addJs($js);
 		$dbkey = array('text' => $this->textId);
-		$q = $this->db->selectQ($dbtables[$ind], $dbkey, $key, 'pos');
+		$q = $this->db->selectQ($dbtables[$ind], $dbkey, 'person', 'pos');
 		$addRowFunc = create_function('$row',
-			'return "addRow(\''.$key.'\', $row['.$key.']); ";');
+			'return "addRow(\''.$key.'\', $row[person]); ";');
 		$load = $this->db->iterateOverResult($q, $addRowFunc);
 		fillOnEmpty($load, "addRow('$key', 0); ");
 		$is_changed = $this->out->hiddenField("is_changed[$key]", 0);
@@ -589,10 +589,10 @@ EOS;
 		var ser = new Array();
 EOS;
 		$qa = array(
-			'SELECT' => 'aof.author, s.id, s.name',
+			'SELECT' => 'aof.person, s.id, s.name',
 			'FROM' => DBT_SER_AUTHOR_OF .' aof',
 			'LEFT JOIN' => array(DBT_SERIES .' s' => 'aof.series = s.id'),
-			'ORDER BY' => 'aof.author, s.name',
+			'ORDER BY' => 'aof.person, s.name',
 		);
 		$this->curInd = 0;
 		$this->curAuthor = 0;
@@ -614,15 +614,15 @@ EOS;
 	public function makeSeriesJsItem($dbrow) {
 		extract($dbrow);
 		if ( empty($id) ) {
-			continue;
+			return;
 		}
 		$js = '';
-		if ($this->curAuthor != $author) {
-			$js .= "\nser[$author]=new Array();";
-			$this->curAuthor = $author;
+		if ($this->curAuthor != $person) {
+			$js .= "\nser[$person]=new Array();";
+			$this->curAuthor = $person;
 			$this->curInd = 0;
 		}
-		$js .= "\nser[$author][$this->curInd]=new Array($id, '$name');";
+		$js .= "\nser[$person][$this->curInd]=new Array($id, '$name');";
 		$this->curInd++;
 		return $js;
 	}
@@ -646,11 +646,11 @@ EOS;
 			'SELECT' => 'title ttitle, orig_title, orig_lang,
 				subtitle, orig_subtitle, trans_year, trans_year2, t.year, year2,
 				license_orig, license_trans, type, series, sernr, collection,
-				GROUP_CONCAT(aof.author) author, GROUP_CONCAT(a.name) nauthor',
+				GROUP_CONCAT(aof.person) author, GROUP_CONCAT(a.name) nauthor',
 			'FROM' => self::DB_TABLE .' t',
 			'LEFT JOIN' => array(
 				DBT_AUTHOR_OF .' aof' => 't.id = aof.text',
-				DBT_PERSON .' a' => 'aof.author = a.id'
+				DBT_PERSON .' a' => 'aof.person = a.id'
 			),
 			'WHERE' => array('t.id = '.$this->textId),
 			'GROUP BY' => 't.id'
@@ -684,7 +684,7 @@ EOS;
 		$qa = array(
 			'SELECT' => 'a.name',
 			'FROM' => DBT_AUTHOR_OF .' aof',
-			'LEFT JOIN' => array(DBT_PERSON .' a' => 'aof.author = a.id'),
+			'LEFT JOIN' => array(DBT_PERSON .' a' => 'aof.person = a.id'),
 			'WHERE' => array('aof.text' => $this->textId),
 		);
 		$this->nauthor = array();

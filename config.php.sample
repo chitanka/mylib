@@ -66,6 +66,7 @@ $cfg['rights'] = array(
 		'author',
 		'authors',
 		'blacklist',
+		'book',
 		'comment',
 		'css',
 		'download',

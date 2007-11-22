@@ -47,8 +47,8 @@ class ViewPage extends Page {
 		$this->mode1 = isset($this->titles[ $modes[0] ]) ? $modes[0] : '';
 		$this->mode2 = isset( $modes[1] ) ? $modes[1] : '';
 
-		$this->title = $this->titles[$this->mode1];
-		$this->title .= $this->makeTitleSuffix($this->mode2);
+		$this->title = strtr($this->titles[$this->mode1],
+			array('$1' => $this->makeTitleObject($this->mode2)) );
 	}
 
 
@@ -151,7 +151,7 @@ EOS;
 	}
 
 
-	protected function makeTitleSuffix($mode) {
+	protected function makeTitleObject($mode) {
 		if ($mode == 'toc') {
 			return 'Съдържание';
 		}

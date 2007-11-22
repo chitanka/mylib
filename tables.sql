@@ -1,22 +1,39 @@
---
--- Table structure for table /*$prefix*/author_of
---
-
 DROP TABLE IF EXISTS /*$prefix*/author_of;
 CREATE TABLE /*$prefix*/author_of (
-  `author` mediumint(8) unsigned NOT NULL default '0',
+  `person` mediumint(8) unsigned NOT NULL default '0',
   `text` mediumint(8) unsigned NOT NULL default '0',
   `pos` tinyint(2) unsigned NOT NULL default '0',
   `year` smallint(4) unsigned NOT NULL,
-  PRIMARY KEY  (`author`,`text`),
+  PRIMARY KEY  (`person`,`text`),
   KEY `text` (`text`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 -- --------------------------------------------------------
 
---
--- Table structure for table /*$prefix*/comment
---
+DROP TABLE IF EXISTS /*$prefix*/book;
+CREATE TABLE /*$prefix*/book (
+  `id` smallint(5) unsigned NOT NULL auto_increment,
+  `title` varchar(255) NOT NULL,
+  `subtitle` varchar(255) NOT NULL,
+  `lang` varchar(2) character set latin1 collate latin1_general_ci NOT NULL default 'bg',
+  `year` smallint(4) NOT NULL,
+  `type` enum('book','collection', 'poetry') NOT NULL default 'book',
+  PRIMARY KEY  (`id`),
+  KEY `name` (`title`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+
+-- --------------------------------------------------------
+
+DROP TABLE IF EXISTS /*$prefix*/book_text;
+CREATE TABLE /*$prefix*/book_text (
+  `book` smallint(5) unsigned NOT NULL,
+  `text` mediumint(8) unsigned NOT NULL,
+  `pos` smallint(5) unsigned NOT NULL,
+  PRIMARY KEY  (`book`,`text`),
+  KEY `text` (`text`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COMMENT='Relation: book contains text';
+
+-- --------------------------------------------------------
 
 DROP TABLE IF EXISTS /*$prefix*/comment;
 CREATE TABLE /*$prefix*/comment (
@@ -35,10 +52,6 @@ CREATE TABLE /*$prefix*/comment (
 
 -- --------------------------------------------------------
 
---
--- Table structure for table /*$prefix*/edit_history
---
-
 DROP TABLE IF EXISTS /*$prefix*/edit_history;
 CREATE TABLE /*$prefix*/edit_history (
   `id` int(10) unsigned NOT NULL auto_increment,
@@ -53,10 +66,6 @@ CREATE TABLE /*$prefix*/edit_history (
 
 -- --------------------------------------------------------
 
---
--- Table structure for table /*$prefix*/header
---
-
 DROP TABLE IF EXISTS /*$prefix*/header;
 CREATE TABLE /*$prefix*/header (
   `text` mediumint(8) unsigned NOT NULL default '0',
@@ -70,10 +79,6 @@ CREATE TABLE /*$prefix*/header (
 
 -- --------------------------------------------------------
 
---
--- Table structure for table /*$prefix*/label
---
-
 DROP TABLE IF EXISTS /*$prefix*/label;
 CREATE TABLE /*$prefix*/label (
   `id` smallint(5) unsigned NOT NULL auto_increment,
@@ -83,10 +88,6 @@ CREATE TABLE /*$prefix*/label (
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 -- --------------------------------------------------------
-
---
--- Table structure for table /*$prefix*/label_log
---
 
 DROP TABLE IF EXISTS /*$prefix*/label_log;
 CREATE TABLE /*$prefix*/label_log (
@@ -102,10 +103,6 @@ CREATE TABLE /*$prefix*/label_log (
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 -- --------------------------------------------------------
-
---
--- Table structure for table /*$prefix*/license
---
 
 DROP TABLE IF EXISTS /*$prefix*/license;
 CREATE TABLE /*$prefix*/license (
@@ -132,10 +129,6 @@ INSERT INTO /*$prefix*/license VALUES (1, 'pd', 'Обществено досто
 
 -- --------------------------------------------------------
 
---
--- Table structure for table /*$prefix*/liternews
---
-
 DROP TABLE IF EXISTS /*$prefix*/liternews;
 CREATE TABLE /*$prefix*/liternews (
   `id` int(11) unsigned NOT NULL auto_increment,
@@ -153,10 +146,6 @@ CREATE TABLE /*$prefix*/liternews (
 
 -- --------------------------------------------------------
 
---
--- Table structure for table /*$prefix*/news
---
-
 DROP TABLE IF EXISTS /*$prefix*/news;
 CREATE TABLE /*$prefix*/news (
   `id` mediumint(8) unsigned NOT NULL auto_increment,
@@ -168,10 +157,6 @@ CREATE TABLE /*$prefix*/news (
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8 COMMENT='News about the site';
 
 -- --------------------------------------------------------
-
---
--- Table structure for table /*$prefix*/person
---
 
 DROP TABLE IF EXISTS /*$prefix*/person;
 CREATE TABLE /*$prefix*/person (
@@ -194,10 +179,6 @@ CREATE TABLE /*$prefix*/person (
 
 -- --------------------------------------------------------
 
---
--- Table structure for table /*$prefix*/person_alt
---
-
 DROP TABLE IF EXISTS /*$prefix*/person_alt;
 CREATE TABLE /*$prefix*/person_alt (
   `id` mediumint(8) unsigned NOT NULL auto_increment,
@@ -214,10 +195,6 @@ CREATE TABLE /*$prefix*/person_alt (
 
 -- --------------------------------------------------------
 
---
--- Table structure for table /*$prefix*/question
---
-
 DROP TABLE IF EXISTS /*$prefix*/question;
 CREATE TABLE /*$prefix*/question (
   `id` smallint(5) unsigned NOT NULL auto_increment,
@@ -226,63 +203,58 @@ CREATE TABLE /*$prefix*/question (
   PRIMARY KEY  (`id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8 AUTO_INCREMENT=6;
 
-INSERT INTO /*$prefix*/question VALUES (1, 'Колко прави 2 по 2 (с думи)?', 'четири'),
-(2, 'Колко прави 2 по 4 (с думи)?', 'осем'),
-(3, 'Колко прави 4 по 5 (с думи)?', 'двайсет,двадесет'),
-(4, 'Колко прави 3 по 3 (с думи)?', 'девет'),
-(5, 'Колко прави 5 минус 3 (с думи)?', 'две');
+INSERT INTO /*$prefix*/question VALUES (1, 'Колко прави 2 по 2 (словом)?', 'четири'),
+(2, 'Колко прави 2 по 4 (словом)?', 'осем'),
+(3, 'Колко прави 4 по 5 (словом)?', 'двайсет,двадесет'),
+(4, 'Колко прави 3 по 3 (словом)?', 'девет'),
+(5, 'Колко прави 5 минус 3 (словом)?', 'две');
 
 -- --------------------------------------------------------
 
---
--- Table structure for table /*$prefix*/reader_of
---
-
 DROP TABLE IF EXISTS /*$prefix*/reader_of;
 CREATE TABLE /*$prefix*/reader_of (
-  `id` int(10) unsigned NOT NULL auto_increment,
   `user` mediumint(8) unsigned NOT NULL default '0',
   `text` mediumint(8) unsigned NOT NULL default '0',
   `date` date NOT NULL,
-  PRIMARY KEY  (`id`),
-  KEY `user_title` (`user`,`text`),
+  PRIMARY KEY (`user`,`text`),
   KEY `text` (`text`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8 COMMENT='Relation: user read a title';
 
 -- --------------------------------------------------------
 
---
--- Table structure for table /*$prefix*/ser_author_of
---
-
 DROP TABLE IF EXISTS /*$prefix*/ser_author_of;
 CREATE TABLE /*$prefix*/ser_author_of (
-  `author` mediumint(8) unsigned NOT NULL default '0',
+  `person` mediumint(8) unsigned NOT NULL default '0',
   `series` smallint(5) unsigned NOT NULL default '0',
-  PRIMARY KEY  (`author`,`series`)
+  PRIMARY KEY  (`person`,`series`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8 COMMENT='Relation: is author of series';
 
 -- --------------------------------------------------------
-
---
--- Table structure for table /*$prefix*/series
---
 
 DROP TABLE IF EXISTS /*$prefix*/series;
 CREATE TABLE /*$prefix*/series (
   `id` smallint(5) unsigned NOT NULL auto_increment,
   `name` varchar(255) NOT NULL default '',
   `orig_name` varchar(255) NOT NULL default '',
-  `type` enum('series','collection','book') NOT NULL default 'series',
+  `type` enum('series','collection', 'poetry') NOT NULL default 'series',
   PRIMARY KEY  (`id`),
   KEY `name` (`name`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 -- --------------------------------------------------------
 
---
--- Table structure for table /*$prefix*/text
---
+DROP TABLE IF EXISTS /*$prefix*/subseries;
+CREATE TABLE /*$prefix*/subseries (
+  `id` smallint(5) unsigned NOT NULL auto_increment,
+  `name` varchar(255) NOT NULL,
+  `orig_name` varchar(255) NOT NULL,
+  `series` smallint(5) unsigned NOT NULL,
+  PRIMARY KEY  (`id`),
+  KEY `name` (`name`),
+  KEY `series` (`series`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+
+-- --------------------------------------------------------
 
 DROP TABLE IF EXISTS /*$prefix*/text;
 CREATE TABLE /*$prefix*/text (
@@ -303,6 +275,7 @@ CREATE TABLE /*$prefix*/text (
   `cover` mediumint(8) NOT NULL COMMENT 'use this cover if no cover in COVERDIR',
   `series` smallint(5) unsigned NOT NULL default '0',
   `sernr` tinyint(2) unsigned NOT NULL default '0',
+  `subseries` smallint(5) unsigned NOT NULL default '0',
   `collection` enum('false','true') NOT NULL default 'false',
   `headlevel` tinyint(1) unsigned NOT NULL COMMENT 'Maximal header level',
   `size` mediumint(8) unsigned NOT NULL default '0' COMMENT 'File size',
@@ -323,10 +296,6 @@ CREATE TABLE /*$prefix*/text (
 
 -- --------------------------------------------------------
 
---
--- Table structure for table /*$prefix*/text_label
---
-
 DROP TABLE IF EXISTS /*$prefix*/text_label;
 CREATE TABLE /*$prefix*/text_label (
   `text` mediumint(8) unsigned NOT NULL,
@@ -337,25 +306,17 @@ CREATE TABLE /*$prefix*/text_label (
 
 -- --------------------------------------------------------
 
---
--- Table structure for table /*$prefix*/translator_of
---
-
 DROP TABLE IF EXISTS /*$prefix*/translator_of;
 CREATE TABLE /*$prefix*/translator_of (
-  `translator` mediumint(8) unsigned NOT NULL default '0',
+  `person` mediumint(8) unsigned NOT NULL default '0',
   `text` mediumint(8) unsigned NOT NULL default '0',
   `pos` tinyint(2) unsigned NOT NULL default '0',
   `year` smallint(4) unsigned NOT NULL,
-  PRIMARY KEY  (`translator`,`text`),
+  PRIMARY KEY  (`person`,`text`),
   KEY `text` (`text`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8 COMMENT='Relation: translator has translated a text';
 
 -- --------------------------------------------------------
-
---
--- Table structure for table /*$prefix*/user
---
 
 DROP TABLE IF EXISTS /*$prefix*/user;
 CREATE TABLE /*$prefix*/user (
@@ -374,14 +335,10 @@ CREATE TABLE /*$prefix*/user (
   `registration` datetime NOT NULL COMMENT 'Registration date',
   `touched` datetime NOT NULL COMMENT 'Last user visit',
   PRIMARY KEY  (`id`),
-  UNIQUE KEY `username` (`username`),
+  UNIQUE KEY `username` (`username`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 -- --------------------------------------------------------
-
---
--- Table structure for table /*$prefix*/user_text
---
 
 DROP TABLE IF EXISTS /*$prefix*/user_text;
 CREATE TABLE /*$prefix*/user_text (
@@ -394,10 +351,6 @@ CREATE TABLE /*$prefix*/user_text (
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8 COMMENT='User has scanned title';
 
 -- --------------------------------------------------------
-
---
--- Table structure for table /*$prefix*/work
---
 
 DROP TABLE IF EXISTS /*$prefix*/work;
 CREATE TABLE /*$prefix*/work (
@@ -419,10 +372,6 @@ CREATE TABLE /*$prefix*/work (
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 -- --------------------------------------------------------
-
---
--- Table structure for table /*$prefix*/work_multi
---
 
 DROP TABLE IF EXISTS /*$prefix*/work_multi;
 CREATE TABLE /*$prefix*/work_multi (

@@ -276,7 +276,7 @@ class Database {
 			}
 			$whs[] = "$field $rel $val";
 		}
-		$cl .= implode(" $join ", $whs);
+		$cl .= '('. implode(") $join (", $whs) . ')';
 		return $cl;
 	}
 

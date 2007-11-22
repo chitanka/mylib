@@ -225,7 +225,7 @@ class User {
 		$this->isHuman = $isHuman;
 	}
 
-	public function saveNewPassword($username, $password) {
+	public static function saveNewPassword($username, $password) {
 		$db = Setup::db();
 		$set = array('newpassword' => self::encodePasswordDB($password));
 		$key = array('username' => $username);
@@ -234,7 +234,7 @@ class User {
 	}
 
 
-	public function activateNewPassword($uid) {
+	public static function activateNewPassword($uid) {
 		$db = Setup::db();
 		$set = array('password = newpassword');
 		$db->update(self::DB_TABLE, $set, array('id' => $uid));

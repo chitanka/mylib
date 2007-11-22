@@ -180,8 +180,7 @@ EOS;
 		$this->fullContent = expandTemplates($this->fullContent);
 		$this->fullContent = $this->encprint($this->fullContent, true);
 		if ( !headers_sent() ) {
-			header("Content-Type: $this->contentType; charset=$this->outencoding");
-			header("Content-Language: $this->langCode");
+			$this->sendCommonHeaders();
 			header('Content-Style-Type: text/css');
 			header('Content-Script-Type: text/javascript');
 			header('Content-Length: '. strlen($this->fullContent));
@@ -189,6 +188,11 @@ EOS;
 		print $this->fullContent;
 	}
 
+
+	public function sendCommonHeaders() {
+		header("Content-Type: $this->contentType; charset=$this->outencoding");
+		header("Content-Language: $this->langCode");
+	}
 
 	public function isValidEncoding($enc) {
 		return @iconv($this->inencoding, $enc, '') !== false;
@@ -569,11 +573,11 @@ EOS;
 	@return string
 	*/
 	protected function makeDlLink($textId, $zfsize, $ltext = NULL) {
-		$zfsize = $zfsize >> 10; // divide by 2^10 w/o rest
-		if ($zfsize == 0) $zfsize = 1;
+		$zfsize = int_b2k($zfsize);
 		$ltext = empty($ltext) ? "$zfsize&nbsp;KiB" : htmlspecialchars($ltext);
 		$p = array(self::FF_ACTION => 'download', 'textId' => $textId);
-		$title = "Сваляне във формат ZIP, $zfsize кибибайта";
+		$title = "Сваляне във формат ZIP, $zfsize ".
+			chooseGrammNumber($zfsize, 'кибибайт', 'кибибайта');
 		$attrs = array('class' => 'download', 'rel' => 'nofollow');
 		return $this->out->internLink($ltext, $p, 2, $title, $attrs);
 	}
@@ -596,8 +600,9 @@ EOS;
 	protected function makeTextLink($data) {
 		extract($data);
 		$class = empty($reader) ? 'unread' : 'read';
-		$ksize = $size >> 10; // divide by 2^10 w/o rest
-		$etitle = workType($type) .', '. $ksize .' кибибайта';
+		$ksize = int_b2k($size);
+		$etitle = workType($type) .', '. $ksize . ' '.
+			chooseGrammNumber($ksize, 'кибибайт', 'кибибайта');
 		if ( ($this->time - $datestamp) < 2592000 ) { // 30 days limit
 			$class .= ' new';
 			$etitle .= ' — ново произведение';
@@ -633,7 +638,7 @@ EOS;
 		$title = empty($title) ? 'Към суровия текст на произведението' : htmlspecialchars($title);
 		$p = array(self::FF_ACTION=>'text', 'textId'=>$textId, 'chunkId'=>'raw');
 		if ( !empty($enc) ) $p['enc'] = $enc;
-		return $this->out->internLink($ltext, $p, count($p), $title);
+		return $this->out->internLink($ltext, $p, 3, $title);
 	}
 
 
@@ -705,6 +710,11 @@ EOS;
 		return $this->out->internLink("$pref<em>$name</em>$suf", $p + $query, 2);
 	}
 
+	protected function makeBookLink($name, $pref='', $suf='', $query=array()) {
+		settype($query, 'array');
+		$p = array(self::FF_ACTION=>'book', 'q'=>$name);
+		return $this->out->internLink("$pref<em>$name</em>$suf", $p + $query, 2);
+	}
 
 	protected function makeLabelLink($name, $query = array()) {
 		$p = array(self::FF_ACTION=>'label', 'q'=>$name) + $query;
@@ -768,6 +778,12 @@ EOS;
 		return $this->makeEditLink('series', $id, $title, 'ред.');
 	}
 
+	protected function makeEditBookLink($id, $name = '') {
+		$title = 'книгата';
+		if ( !empty($name) ) $title .= ' „'.$name.'“';
+		return $this->makeEditLink('book', $id, $title, 'ред.');
+	}
+
 	protected function makeEditLabelLink($id, $name = '') {
 		$title = 'етикета';
 		if ( !empty($name) ) $title .= ' „'.$name.'“';
@@ -810,7 +826,8 @@ EOS;
 		preg_match('/([^,]+) ([^,]+)(, .+)?/', $name, $m);
 		if ( !isset($m[2]) ) { return $name; }
 		$last = "<span class='lastname'>$m[2]</span>";
-		return $sortby == 'last' ? $last.', '.$m[1].@$m[3] : $m[1].' '.$last.@$m[3];
+		$m3 = isset($m[3]) ? $m[3] : '';
+		return $sortby == 'last' ? $last.', '.$m[1].$m3 : $m[1].' '.$last.$m3;
 	}
 
 

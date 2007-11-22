@@ -2,6 +2,11 @@
 /** @file
 The main entry point of the application.
 */
+// we need at least PHP 5
+if ( version_compare(phpversion(), '5', '<') ) {
+	die('Mylib needs PHP 5 or greater. You are using PHP '. phpversion() .'.');
+}
+
 define('MYLIB', 1);
 
 /** @mainpage
@@ -11,7 +16,7 @@ Software for an on-line digital library.
 ini_set('error_log', './log/error');
 ini_set('display_errors', 1);
 ini_set('log_errors', 1);
-error_reporting(E_ALL);
+error_reporting(E_ALL | E_STRICT);
 
 $startTime = microtime(true);
 

@@ -8,7 +8,8 @@ class HistoryPage extends Page {
 	public
 		$extQS = '', $extQF = array(), $extQW = array();
 	protected
-		$allowViewAll = false,
+		$defListLimit = 50, $maxListLimit = 200,
+		$allowViewAll = true,
 		$headerExts = array(
 			'entrydate' => 'нови текстове',
 			'lastmod' => 'редактирани текстове'),
@@ -29,6 +30,7 @@ class HistoryPage extends Page {
 		parent::__construct();
 		$this->action = 'history';
 		$this->title = 'История';
+		$this->initPaginationFields();
 		$this->defDate = date('Y-n');
 		$this->date = $this->request->value(self::FF_DATE, $this->defDate);
 		if ( preg_match('/[^\d-]/', $this->date) ) {
@@ -58,7 +60,9 @@ class HistoryPage extends Page {
 		$inputContent = $this->makeMonthInput() .
 			' '. $this->makeGetbyInput() .
 			' '. $this->makeOrderInput() .
-			' '. $this->makeViewTypeInput();
+			' '. $this->makeViewTypeInput().
+			$this->out->hiddenField(self::FF_LIMIT, $this->llimit) .
+			$this->out->hiddenField(self::FF_OFFSET, $this->loffset);
 		$submit = $this->out->submitButton('Обновяване', 'Обновяване на страницата', 0, false);
 		$limits = array(10, 25, 50);
 		$feednew = $this->makeFeedLinks($limits, 'new');
@@ -83,14 +87,23 @@ $inputContent
 
 EOS;
 		$list = $this->orderby == 'date'
-			? $this->makeListByDate() : $this->makeListByAuthor();
+			? $this->makeListByDate($this->llimit, $this->loffset)
+			: $this->makeListByAuthor($this->llimit, $this->loffset);
 		if ( empty($list) ) {
 			$keyword = $this->getby == 'entrydate' ? 'добавени' : 'редактирани';
 			$list = "<p>През избрания месец не са $keyword произведения.</p>";
 		}
 		$this->addRssLink('добавени текстове', 'new');
 		$this->addRssLink('редактирани текстове', 'edit');
-		return $o . $list;
+		$count = $this->getCount();
+		$params = array(
+			self::FF_DATE => $this->date,
+			self::FF_GETBY => $this->getby,
+			self::FF_ORDERBY => $this->orderby,
+			self::FF_VIEW_TYPE => $this->viewType,
+			self::FF_MEDIA => $this->media);
+		$pagelinks = $this->makePageLinks($count, $this->llimit, $this->loffset, $params);
+		return $o . $pagelinks . $list . $pagelinks;
 	}
 
 
@@ -106,9 +119,9 @@ EOS;
 	}
 
 
-	public function makeListByDate($limit = 0, $showHeader = true) {
+	public function makeListByDate($limit = 0, $offset = 0, $showHeader = true) {
 		$this->texts = array();
-		$query = $this->makeSqlQuery($limit);
+		$query = $this->makeSqlQuery($limit, $offset);
 		$this->db->iterateOverResult($query, 'addTextForListByDate', $this);
 		$o = $edit_comment = '';
 		$mark = ' <span class="newmark">Н</span>';
@@ -163,9 +176,9 @@ EOS;
 	}
 
 
-	public function makeListByAuthor($limit = 0) {
+	public function makeListByAuthor($limit = 0, $offset = 0) {
 		$this->texts = array();
-		$query = $this->makeSqlQuery($limit);
+		$query = $this->makeSqlQuery($limit, $offset);
 		$this->db->iterateOverResult($query, 'addTextForListByAuthor', $this);
 		$o = '';
 		$translator = '';
@@ -340,12 +353,12 @@ EOS;
 			'FROM' => DBT_TEXT .' t',
 			'LEFT JOIN' => array(
 				DBT_AUTHOR_OF .' aof' => 't.id = aof.text',
-				DBT_PERSON .' a' => 'aof.author = a.id',
+				DBT_PERSON .' a' => 'aof.person = a.id',
 				DBT_TRANSLATOR_OF .' tof' => 't.id = tof.text',
-				DBT_PERSON .' tr' => 'tof.translator = tr.id',
+				DBT_PERSON .' tr' => 'tof.person = tr.id',
 				DBT_SERIES .' s' => 't.series = s.id',
 			) + $this->extQF,
-			'WHERE' => array(),
+			'WHERE' => $this->makeSqlWhere($col),
 			'GROUP BY' => 't.id',
 			'ORDER BY' => "$col DESC, t.id DESC",
 			'LIMIT' => array($offset, $limit)
@@ -359,19 +372,34 @@ EOS;
 			$qa['LEFT JOIN'][DBT_READER_OF .' r'] =
 				't.id = r.text AND r.user = '. $this->user->id;
 		}
+		return $this->db->extselectQ($qa);
+	}
+
+	public function getCount() {
+		if ($this->getby == 'entrydate') {
+			$table = DBT_TEXT;
+			$field = 'entrydate';
+		} else {
+			$table = DBT_EDIT_HISTORY;
+			$field = 'date';
+		}
+		return $this->db->getCount($table, $this->makeSqlWhere($field));
+	}
+
+	protected function makeSqlWhere($field) {
+		$wh = array();
 		if ($this->date === '0' && $this->allowViewAll) {
-			$qa['WHERE'][$col] = array('!=', '0000-00-00');
+			$wh[$field] = array('!=', '0000-00-00');
 		} else if ($this->date !== -1) {
 			if ( strpos($this->date, '-') === false ) {
 				$this->date = $this->defDate;
 			}
 			$end = $this->monthEndDate();
-			$qa['WHERE'][] = "$col BETWEEN '$this->date-1' AND '$end'";
+			$wh[] = "$field BETWEEN '$this->date-1' AND '$end'";
 		}
-		if ( !empty($this->extQW) ) $qa['WHERE'] += $this->extQW;
-		return $this->db->extselectQ($qa);
+		if ( !empty($this->extQW) ) $wh += $this->extQW;
+		return $wh;
 	}
-
 
 	protected function getStartDate() {
 		$key = array('`entrydate`' => array('!=', '0000-00-00'));

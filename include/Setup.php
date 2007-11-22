@@ -152,7 +152,9 @@ class Setup {
 				'username' => $user, 'password' => $pass,
 				'persist' => $persist,
 			);
-			self::$mailer = Mail::factory($backend, $params);
+			// @ to avoid strict error:
+			// Non-static method Mail::factory() should not be called statically
+			self::$mailer = @Mail::factory($backend, $params);
 		}
 		return self::$mailer;
 	}
@@ -161,6 +163,8 @@ class Setup {
 	private static function defineDbTableConsts($prefix) {
 		$tables = array(
 			'AUTHOR_OF' => 'author_of',
+			'BOOK' => 'book',
+			'BOOK_TEXT' => 'book_text',
 			'COMMENT' => 'comment',
 			'EDIT_HISTORY' => 'edit_history',
 			'HEADER' => 'header',

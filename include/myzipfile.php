@@ -25,26 +25,26 @@ class myzipfile {
 	 * Array to store compressed data
 	 * @var  array    $datasec
 	 */
-	var $datasec      = array();
+	private $datasec      = array();
 
 	/**
 	 * Central directory
 	 * @var  array    $ctrl_dir
 	 */
-	var $ctrl_dir     = array();
+	private $ctrl_dir     = array();
 
 	/**
 	 * End of central directory record
 	 * @var  string   $eof_ctrl_dir
 	 */
-	var $eof_ctrl_dir = "\x50\x4b\x05\x06\x00\x00\x00\x00";
+	private $eof_ctrl_dir = "\x50\x4b\x05\x06\x00\x00\x00\x00";
 
 	/**
 	 * Last offset position
 	 * @var  integer  $old_offset
 	 */
-	var $old_offset   = 0;
-	var $old_offset_ph = '__OLD_OFFSET__';
+	private $old_offset   = 0;
+	private $old_offset_ph = '__OLD_OFFSET__';
 
 
 	/**
@@ -55,7 +55,7 @@ class myzipfile {
 	 * @return integer  the current date in a four byte DOS format
 	 * @access private
 	 */
-	function unix2DosTime($unixtime = 0) {
+	public function unix2DosTime($unixtime = 0) {
 		$timearray = ($unixtime == 0) ? getdate() : getdate($unixtime);
 
 		if ($timearray['year'] < 1980) {
@@ -81,7 +81,7 @@ class myzipfile {
 	 * @param  integer  the current timestamp
 	 * @access public
 	 */
-    function newFileEntry($data, $name, $time = 0) {
+    public function newFileEntry($data, $name, $time = 0) {
 		$name     = str_replace('\\', '/', $name);
 
 		$dtime    = dechex($this->unix2DosTime($time));
@@ -144,7 +144,7 @@ class myzipfile {
 	 * Adds previously created file entry to archive
 	 * @param array $fileEntry Associative array
 	 */
-	function addFileEntry($fileEntry) {
+	public function addFileEntry($fileEntry) {
 		$this->datasec[] = $fileEntry['fr'];
 		$fileEntry['cdrec'] = str_replace($this->old_offset_ph,
 			pack('V', $this->old_offset), $fileEntry['cdrec']);
@@ -159,7 +159,7 @@ class myzipfile {
 	 * @return  string  the zipped file
 	 * @access public
 	 */
-	function file() {
+	public function file() {
 		$data    = implode('', $this -> datasec);
 		$ctrldir = implode('', $this -> ctrl_dir);
 		$size = sizeof($this -> ctrl_dir);

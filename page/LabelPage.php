@@ -4,8 +4,8 @@ class LabelPage extends ViewPage {
 
 	protected
 		$titles = array(
-			'simple' => 'Етикети — ',
-			'extended' => 'Етикети и заглавия — ',
+			'simple' => 'Списък на етикети — $1',
+			'extended' => '$1 — Етикети',
 		),
 		$defListLimit = 100, $maxListLimit = 500;
 
@@ -108,7 +108,7 @@ EOS;
 				DBT_LABEL .' l' => 'h.label = l.id',
 				DBT_TEXT .' t' => 'h.text = t.id',
 				DBT_AUTHOR_OF .' aof' => 't.id = aof.text',
-				DBT_PERSON .' a' => 'aof.author = a.id',
+				DBT_PERSON .' a' => 'aof.person = a.id',
 				DBT_SERIES .' s' => 't.series = s.id',
 			),
 			'WHERE' => array(),

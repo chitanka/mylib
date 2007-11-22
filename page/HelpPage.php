@@ -31,7 +31,7 @@ class HelpPage extends WikiPage {
 	}
 
 
-	protected function filename() {
+	protected function filename($action = NULL) {
 		return parent::filename() .'-'. $this->topic;
 	}
 

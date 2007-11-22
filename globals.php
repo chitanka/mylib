@@ -48,6 +48,7 @@ $contentDirs = array(
 	'info' => 'info/',
 	'img' => 'img/',
 	'cover' => 'cover/',
+	'book' => 'book/',
 );
 foreach ($contentDirs as $key => $dir) {
 	$contentDirs[$key] = $contentDir . $dir;
@@ -85,33 +86,41 @@ $cyrs = array(
 );
 
 $types = array(
-	// code => array(singular, plural)
-	'anecdote' => array('Анекдот', 'Анекдоти'),
-	'fable' => array('Басни', 'Басни'),
-	'essay' => array('Есе', 'Есета'),
-	'playbook' => array('Книга-игра', 'Книги-игри'),
-	'science' => array('Научно', 'Научни'),
-	'novelette' => array('Новела', 'Новели'),
-	'shortstory' => array('Разказ', 'Разкази'),
-	'novel' => array('Роман', 'Романи'),
-	'play' => array('Пиеса', 'Пиеси'),
-	'poetry' => array('Поезия', 'Поезия'),
-	'poem' => array('Поема', 'Поеми'),
-	'novella' => array('Повест', 'Повести'),
-	'intro' => array('Предговор', 'Предговори'),
-	'tale' => array('Приказка', 'Приказки'),
-	'travelnotes' => array('Пътепис', 'Пътеписи'),
-	'speech' => array('Реч', 'Речи'),
-	'article' => array('Статия', 'Статии'),
-	'screenplay' => array('Сценарий', 'Сценарии'),
-	'textbook' => array('Учебник', 'Учебници'),
-	'other' => array('Разни', 'Разни'),
+	// code => array(singular, plural, sing. article, pl. article)
+	'anecdote' => array('Анекдот', 'Анекдоти', 'анекдота', 'анекдотите'),
+	'fable' => array('Басня', 'Басни', '', ''),
+	'essay' => array('Есе', 'Есета', 'есето', 'есетата'),
+	'playbook' => array('Книга-игра', 'Книги-игри', 'книгата-игра', 'книгите-игри'),
+	'science' => array('Научно', 'Научни', '', ''),
+	'novelette' => array('Новела', 'Новели', 'новелата', 'новелите'),
+	'shortstory' => array('Разказ', 'Разкази', 'разказа', 'разказите'),
+	'novel' => array('Роман', 'Романи', 'романа', 'романите'),
+	'play' => array('Пиеса', 'Пиеси', 'пиесата', 'пиесите'),
+	'letter' => array('Писмо', 'Писма', 'писмото', 'писмата'),
+	'poetry' => array('Поезия', 'Поезия', '', ''),
+	'poem' => array('Поема', 'Поеми', 'поемата', 'поемите'),
+	'novella' => array('Повест', 'Повести', 'повестта', 'повестите'),
+	'intro' => array('Предговор', 'Предговори', 'предговора', 'предговорите'),
+	'tale' => array('Приказка', 'Приказки', 'приказката', 'приказките'),
+	'travelnotes' => array('Пътепис', 'Пътеписи', 'пътеписа', 'пътеписите'),
+	'speech' => array('Реч', 'Речи', 'речта', 'речите'),
+	'article' => array('Статия', 'Статии', 'статията', 'статиите'),
+	'screenplay' => array('Сценарий', 'Сценарии', 'сценария', 'сценариите'),
+	'textbook' => array('Учебник', 'Учебници', 'учебника', 'учебниците'),
+	'feuilleton' => array('Фейлетон', 'Фейлетони', 'фейлетона', 'фейлетоните'),
+	'other' => array('Разни', 'Разни', '', ''),
 );
 
 function workType($code, $singular = true) {
 	global $types;
 	if ( !array_key_exists($code, $types) ) return '';
 	return $singular ? $types[$code][0] : $types[$code][1];
+}
+
+function workTypeArticle($code, $singular = true) {
+	global $types;
+	if ( !array_key_exists($code, $types) ) return '';
+	return $singular ? $types[$code][2] : $types[$code][3];
 }
 
 function workTypes($singular = true) {
@@ -238,17 +247,43 @@ function humanDate($isodate = '') {
 	return trim($d, '0') .' '. mystrtolower(monthName($m)) .' '. $y . $hours;
 }
 
-$serSuffices = array('series' => '', 'collection' => ' (сборник)', 'book' => ' (книга)');
-function seriesSuffix($seriesType) {
-	return isset($GLOBALS['serSuffices'][$seriesType]) ? $GLOBALS['serSuffices'][$seriesType] : '';
+$seriesTypes = array(
+	// code => array(singular, plural, sing. article, pl. article)
+	'series' => array('поредица', 'поредици', 'поредицата', 'поредиците'),
+	'collection' => array('сборник', 'сборници', 'сборника', 'сборниците'),
+	'poetry' => array('стихосбирка', 'стихосбирки', 'стихосбирката', 'стихосбирките'),
+);
+
+function seriesSuffix($code) {
+	global $seriesTypes;
+	return $code == 'series' || empty($seriesTypes[$code][0])
+		? ''
+		: ' ('. $seriesTypes[$code][0] .')';
 }
 
+function seriesType($code, $singular = true) {
+	global $seriesTypes;
+	if ( !array_key_exists($code, $seriesTypes) ) return '';
+	return $singular ? $seriesTypes[$code][0] : $seriesTypes[$code][1];
+}
+
+function seriesTypeArticle($code, $singular = true) {
+	global $seriesTypes;
+	if ( !array_key_exists($code, $seriesTypes) ) return '';
+	return $singular ? $seriesTypes[$code][2] : $seriesTypes[$code][3];
+}
 
 $cyrUppers = 'А Б В Г Д Е Ж З И Й К Л М Н О П Р С Т У Ф Х Ц Ч Ш Щ Ъ Ю Я';
 $cyrLowers = 'а б в г д е ж з и й к л м н о п р с т у ф х ц ч ш щ ъ ю я';
 function mystrtolower($s) {
 	global $cyrUppers, $cyrLowers;
 	return str_replace(explode(' ', $cyrUppers), explode(' ', $cyrLowers), $s);
+}
+
+function myucfirst($s) {
+	global $cyrUppers, $cyrLowers;
+	$ls = '#'. strtr($cyrLowers, array(' ' => ' #'));
+	return str_replace(explode(' ', $ls), explode(' ', $cyrUppers), '#'.$s);
 }
 
 
@@ -467,12 +502,12 @@ function isArchive($file) {
 }
 
 /**
-Validates an e-mail address.
-Regexps are taken from http://www.iki.fi/markus.sipila/pub/emailvalidator.php
-(author: Markus Sipilä, version: 1.0, 2006-08-02)
+	Validates an e-mail address.
+	Regexps are taken from http://www.iki.fi/markus.sipila/pub/emailvalidator.php
+	(author: Markus Sipilä, version: 1.0, 2006-08-02)
 
-@param string $input E-mail address to be validated
-@return int 1 if valid, 0 if not valid, -1 if valid but strange
+	@param string $input E-mail address to be validated
+	@return int 1 if valid, 0 if not valid, -1 if valid but strange
 */
 function validateEmailAddress($input, $allowEmpty = true) {
 	if ( empty($input) ) {
@@ -550,4 +585,34 @@ function make_parent($filename) {
 	if ( !file_exists($dir) ) {
 		mkdir($dir, 0755, true);
 	}
+}
+
+/**
+	Convert a php.ini value to an integer
+	(copied from php.net)
+*/
+function ini_bytes($val) {
+	$val = trim($val);
+	$last = strtolower($val{strlen($val)-1});
+	switch ($last) {
+		// The 'G' modifier is available since PHP 5.1.0
+		case 'g':
+			$val *= 1024;
+		case 'm':
+			$val *= 1024;
+		case 'k':
+			$val *= 1024;
+	}
+	return $val;
+}
+
+/** bytes to kibibytes */
+function int_b2k($bytes) {
+	$k = $bytes >> 10; // divide by 2^10 w/o rest
+	return $k > 0 ? $k : 1;
+}
+/** bytes to mebibytes */
+function int_b2m($bytes) {
+	$m = $bytes >> 20; // divide by 2^20 w/o rest
+	return $m > 0 ? $m : 1;
 }

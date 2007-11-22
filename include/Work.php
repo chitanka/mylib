@@ -61,32 +61,51 @@ class Work {
 		} else {
 			$lis = $lie = '';
 		}
+		$now = date('Y');
+		$maxCrPeriod = 70;
+		$crSym = '©';
 		$c = '';
 		if ($this->lo_copyright) {
 			if ( count($this->authors) > 1 ) {
 				foreach ($this->authors as $author) {
-					$year = empty($author['year']) ? $this->getYear() : $author['year'];
+					if ( empty($author['year']) ) {
+						$year = $this->getYear();
+					} else if ( $now - $author['year'] > $maxCrPeriod ) {
+						continue;
+					} else {
+						$year = $author['year'];
+					}
 					$name = is_object($out)
 						? $out->makeAuthorLink($author['name'], 'first')
 						: $author['name'];
-					$c .= "\n\t{$lis}© $year $name$lie";
+					$c .= "\n\t{$lis}$crSym $year $name$lie";
 				}
 			} else {
 				$name = is_object($out)
 					? $out->makeAuthorLink($this->author_name, 'first',
-						"\n\t{$lis}© ". $this->getYear() .' ', $lie)
-					: "\n\t© ". $this->getYear() .' '. $this->author_name;
+						"\n\t{$lis}$crSym ". $this->getYear() .' ', $lie)
+					: "\n\t$crSym ". $this->getYear() .' '. $this->author_name;
 				$c .= $name;
 			}
 		}
 		if ( $this->lt_copyright && !empty($this->translators) ) {
 			$lang = langName($this->orig_lang, false);
 			if ( !empty($lang) ) $lang = ' от '.$lang;
-			$name = is_object($out)
-				? $out->makeTranslatorLink($this->translator_name, 'first',
-					"\n\t{$lis}© ". $this->getTransYear() .' ', ", превод$lang$lie")
-				: "\n\t© ". $this->getTransYear() .' '. $this->translator_name .", превод$lang";
-			$c .= $name;
+			if ( count($this->translators) > 1 ) {
+				foreach ($this->translators as $translator) {
+					$year = empty($translator['year']) ? $this->getTransYear() : $translator['year'];
+					$name = is_object($out)
+						? $out->makeTranslatorLink($translator['name'], 'first')
+						: $translator['name'];
+					$c .= "\n\t{$lis}$crSym $year $name, превод$lang$lie";
+				}
+			} else {
+				$name = is_object($out)
+					? $out->makeTranslatorLink($this->translator_name, 'first',
+						"\n\t{$lis}$crSym ". $this->getTransYear() .' ', ", превод$lang$lie")
+					: "\n\t$crSym ". $this->getTransYear() .' '. $this->translator_name .", превод$lang";
+				$c .= $name;
+			}
 		}
 		return $c;
 	}
@@ -118,6 +137,79 @@ class Work {
 	}
 
 
+	public function getAnnotation($id = null) {
+		fillOnEmpty($id, $this->id);
+		$file = getContentFilePath('text-anno', $id);
+		$info = '';
+		if ( file_exists($file) ) {
+			$info = file_get_contents($file);
+		}
+		return $info;
+	}
+
+
+	public function getExtraInfo($id = null) {
+		fillOnEmpty($id, $this->id);
+		$file = getContentFilePath('text-info', $id);
+		$info = '';
+		if ( file_exists($file) ) {
+			$info = file_get_contents($file);
+		}
+		foreach ($this->books as $bid => $book) {
+			$file = getContentFilePath('book', $bid);
+			if ( file_exists($file) ) {
+				$info .= "\n\n" . file_get_contents($file);
+			}
+		}
+		return $info;
+	}
+
+
+	public function getNextFromSeries() {
+		if ( empty($this->seriesId) ) {
+			return false;
+		}
+		$dbkey = array('series' => $this->seriesId);
+		if ($this->sernr == 0) {
+			$dbkey['t.id'] = array('>', $this->id);
+		} else {
+			$dbkey[] = 'sernr = '. ($this->sernr + 1)
+				. " OR (sernr > $this->sernr AND t.id > $this->id)";
+		}
+		return self::newFromDB($dbkey);
+	}
+
+
+	public function getNextFromBooks() {
+		$nextWorks = array();
+		foreach ($this->books as $id => $book) {
+			$nextWorks[$id] = $this->getNextFromBook($id);
+		}
+		return $nextWorks;
+	}
+
+	public function getNextFromBook($book) {
+		if ( empty($this->books[$book]) ) {
+			return false;
+		}
+		$subkey = array('book' => $book, 'pos' => $this->books[$book]['pos'] + 1);
+		$subquery = Setup::db()->selectQ(DBT_BOOK_TEXT, $subkey, 'text');
+		$dbkey = array("t.id IN ($subquery)");
+		return self::newFromDB($dbkey);
+	}
+
+
+	public function getPrefaceOfBook($book) {
+		if ( empty($this->books[$book]) || $this->type == 'intro' ) {
+			return false;
+		}
+		$subkey = array('book' => $book);
+		$subquery = Setup::db()->selectQ(DBT_BOOK_TEXT, $subkey, 'text');
+		$dbkey = array("t.id IN ($subquery)", 't.type' => 'intro');
+		return self::newFromDB($dbkey);
+	}
+
+
 	public static function renameCover($cover, $newname) {
 		$rexts = strtr(implode('|', self::$exts), array('.'=>'\.'));
 		return preg_replace("/\d+(-\d+)?($rexts)/", "$newname$1$2", $cover);
@@ -145,6 +237,7 @@ class Work {
 		$db = Setup::db();
 		$qa = array(
 			'SELECT' => 't.*,
+				s.id seriesId,
 				s.name series, s.orig_name seriesOrigName, s.type seriesType,
 				lo.code lo_code, lo.name lo_name, lo.copyright lo_copyright, lo.uri lo_uri,
 				lt.code lt_code, lt.name lt_name, lt.copyright lt_copyright, lt.uri lt_uri,
@@ -157,6 +250,7 @@ class Work {
 				DBT_READER_OF .' r' => "t.id = r.text AND r.user = $reader",
 			),
 			'WHERE' => $dbkey,
+			'LIMIT' => 1,
 		);
 		$fields = $db->fetchAssoc( $db->extselect($qa) );
 		if ( empty($fields) ) {
@@ -166,12 +260,13 @@ class Work {
 		$fields['lo_copyright'] = $db->s2b($fields['lo_copyright']);
 		$fields['lt_copyright'] = $db->s2b($fields['lt_copyright']);
 
+		// Author(s), translator(s)
 		$tables = array('author' => DBT_AUTHOR_OF, 'translator' => DBT_TRANSLATOR_OF);
 		foreach ($tables as $role => $table) {
 			$qa = array(
 				'SELECT' => 'p.*, of.year',
 				'FROM' => $table .' of',
-				'LEFT JOIN' => array(DBT_PERSON .' p' => "of.$role = p.id"),
+				'LEFT JOIN' => array(DBT_PERSON .' p' => "of.person = p.id"),
 				'WHERE' => array('of.text' => $fields['id']),
 				'ORDER BY' => 'of.pos ASC',
 			);
@@ -186,6 +281,18 @@ class Work {
 			$fields[$role.'s'] = $persons;
 			$fields[$role.'_name'] = ltrim($string_name, ', ');
 			$fields[$role.'_year'] = ltrim($string_year, ', 0');
+		}
+		// Books
+		$qa = array(
+			'SELECT' => 'b.*, bt.*',
+			'FROM' => DBT_BOOK_TEXT .' bt',
+			'LEFT JOIN' => array(DBT_BOOK .' b' => 'bt.book = b.id'),
+			'WHERE' => array('bt.text' => $fields['id']),
+		);
+		$res = $db->extselect($qa);
+		$fields['books'] = array();
+		while ( $data = $db->fetchAssoc($res) ) {
+			$fields['books'][$data['id']] = $data;
 		}
 		return new Work($fields);
 	}

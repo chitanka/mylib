@@ -5,7 +5,7 @@ class TitlePage extends ViewPage {
 	const
 		FF_TYPE = 'type', FF_ORIGLANG = 'orig_lang';
 	protected
-		$titles = array('simple' => 'Заглавия — ');
+		$titles = array('simple' => 'Списък на заглавия — $1');
 
 
 	public function __construct() {
@@ -60,7 +60,7 @@ EOS;
 			'FROM' => DBT_AUTHOR_OF .' aof',
 			'LEFT JOIN' => array(
 				DBT_TEXT .' t' => 'aof.text = t.id',
-				DBT_PERSON .' a' => 'aof.author = a.id',
+				DBT_PERSON .' a' => 'aof.person = a.id',
 				DBT_SERIES .' s' => 't.series = s.id',
 			),
 			'WHERE' => array(),

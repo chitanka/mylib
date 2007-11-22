@@ -6,8 +6,8 @@ class TranslatorPage extends ViewPage {
 		DB_TABLE = DBT_PERSON, FF_SORTBY = 'sortby';
 	protected
 		$titles = array(
-			'simple' => 'Преводачи — ',
-			'extended' => 'Преводачи и заглавия — ',
+			'simple' => 'Списък на преводачи — $1',
+			'extended' => '$1 — Преводачи',
 		);
 
 
@@ -206,9 +206,9 @@ EOS;
 			'FROM' => DBT_TRANSLATOR_OF .' tof',
 			'LEFT JOIN' => array(
 				DBT_TEXT .' t' => 'tof.text = t.id',
-				self::DB_TABLE .' tr' => 'tof.translator = tr.id',
+				self::DB_TABLE .' tr' => 'tof.person = tr.id',
 				DBT_AUTHOR_OF .' aof' => 'aof.text = tof.text',
-				self::DB_TABLE .' a' => 'aof.author = a.id',
+				self::DB_TABLE .' a' => 'aof.person = a.id',
 				DBT_SERIES .' s' => 't.series = s.id',
 			),
 			'GROUP BY' => 'tr.id, t.id',

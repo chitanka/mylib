@@ -194,11 +194,15 @@ class CommentPage extends Page {
 					$this->makeFromAuthorSuffix($fields) .'</p>';
 			$acts = '';
 			if ( !empty($textId) ) {
-				$params = array(self::FF_ACTION=>$this->action, 'textId'=>$textId,
-					'replyto' => $id);
+				$params = array(self::FF_ACTION=>$this->action, 'textId'=>$textId);
+				$replyParams = $params + array('replyto' => $id);
 				$attrs = array('class'=>'js', 'onclick'=>"initReply($id)");
-				$link = $this->out->internLink('Отговор', $params, 2,
+				$link = $this->out->internLink('Отговор', $replyParams, 2,
 					'Отговор на коментара', $attrs, "e$id");
+				if ( empty($this->textId) ) {
+					$link .= ' | '. $this->out->internLink('Всички коментари', $params, 2,
+						'Всички коментари за произведението');
+				}
 				$acts = "<span style='float:right'>$link</span>";
 			}
 			$nr = $this->putNr ? $nr.'. ' : '';
@@ -337,7 +341,7 @@ EOS;
 			'LEFT JOIN' => array(
 				DBT_TEXT .' t' => 'c.text = t.id',
 				DBT_AUTHOR_OF .' aof' => 't.id = aof.text',
-				DBT_PERSON .' a' => 'aof.author = a.id',
+				DBT_PERSON .' a' => 'aof.person = a.id',
 			),
 			'WHERE' => $this->wheres[$this->showMode],
 			'GROUP BY' => 'c.id',

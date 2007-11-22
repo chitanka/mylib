@@ -21,7 +21,8 @@ class Request {
 
 		$this->params = explode('/', ltrim(urldecode($this->path), '/'));
 		foreach ($this->params as $key => $param) {
-			if ( empty($param) ) {
+			if ( $param === '' ) {
+				unset($this->params[$key]);
 				continue;
 			}
 			if ( strpos($param, '=') === false ) {
@@ -101,7 +102,7 @@ class Request {
 	public function value($name, $default = null, $paramno = null, $allowed = null) {
 		if ( isset($_REQUEST[$name]) ) {
 			$val = $_REQUEST[$name];
-		} else if ( empty($paramno) ) {
+		} else if ( is_null($paramno) ) {
 			return $default;
 		} else if ( isset($this->params[$paramno]) ) {
 			$val = $_REQUEST[$name] = $_GET[$name] = $this->params[$paramno];
@@ -169,6 +170,42 @@ class Request {
 
 	public function requestUri() {
 		return isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : '';
+	}
+
+	/**
+	*/
+	public function fileName($name) {
+		if( !isset( $_FILES[$name] ) ) { return null; }
+		return $_FILES[$name]['name'];
+	}
+
+	/**
+	 */
+	public function fileTempName($name) {
+		if ( !isset($_FILES[$name]) ) { return null; }
+		if ( $_FILES[$name]['error'] !== 0 ) { return false; }
+		return $_FILES[$name]['tmp_name'];
+	}
+
+	/**
+	 */
+	public function fileSize( $name ) {
+		if( !isset( $_FILES[$name] ) ) { return null; }
+		return $_FILES[$name]['size'];
+	}
+
+	public function fileError($name) {
+		if( !isset( $_FILES[$name] ) ) { return null; }
+		$max = return_bytes( ini_get('upload_max_filesize') );
+		$errmax = "Прекрачена е максималната файлова големина от $max байта.";
+		$err = array(
+			UPLOAD_ERR_INI_SIZE => $errmax,
+			UPLOAD_ERR_FORM_SIZE => $errmax,
+			UPLOAD_ERR_PARTIAL => 'Непълно качване на файл.',
+			UPLOAD_ERR_NO_FILE => 'Не е избран файл.',
+			UPLOAD_ERR_NO_TMP_DIR => 'Няма временна директория.'
+		);
+		return $err[ $_FILES[$name]['error'] ];
 	}
 
 

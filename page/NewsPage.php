@@ -33,7 +33,7 @@ class NewsPage extends Page {
 		while ($row = $this->db->fetchAssoc($res)) {
 			$c .= $this->makeNewsEntry($row);
 		}
-		$count = $this->db->getCount(self::DB_TABLE, $this->dbkey);
+		$count = $this->db->getCount(self::DB_TABLE .' m', $this->dbkey);
 		$pagelinks = $showPageLinks
 			? $this->makePageLinks($count, $this->llimit, $this->loffset) : '';
 		return $pagelinks . $c . $pagelinks;
@@ -57,7 +57,7 @@ class NewsPage extends Page {
 		fillOnEmpty($offset, $this->loffset);
 		fillOnEmpty($order, 'DESC');
 		if ( !empty($this->objId) && is_numeric($this->objId) ) {
-			$this->dbkey = array('id' => $this->objId);
+			$this->dbkey = array('m.id' => $this->objId);
 		}
 		$qa = array(
 			'SELECT' => 'm.*, u.username',

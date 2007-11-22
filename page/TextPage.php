@@ -14,7 +14,6 @@ class TextPage extends Page {
 			$this->ttitle = $this->request->value('title', '', 1);
 		}
 		$this->chunkId = $this->request->value('chunkId', 1, 2);
-		$this->enc = $this->request->value('enc', $this->outencoding, 3);
 		$this->isRead = false;
 		$this->hasAnno = $this->hasExtraInfo = false;
 	}
@@ -81,19 +80,18 @@ class TextPage extends Page {
 			$this->addMessage("Няма текст с номер $this->textId.", true);
 			return '';
 		}
-		$this->setOutEncoding($this->enc);
 		if ( !$this->isValidEncoding($this->outencoding) ) {
 			$this->addMessage("<strong>$this->outencoding</strong> не е валидно название на кодиране. Ето малко предложения: ".$this->makeEncodingSuggestions(), true);
 			$this->outencoding = $this->inencoding;
 			return;
 		}
-		header("Content-Type: text/plain; charset=$this->outencoding");
-		header("Content-Language: $this->langCode");
+		$this->contentType = 'text/plain';
+		$this->sendCommonHeaders();
 		if ( !empty($this->work->author_name) ) {
 			$this->encprint("|\t".$this->work->author_name."\n");
 		}
 		$this->encprint($this->work->getTitleAsSfb() ."\n\n\n");
-		$anno = $this->getAnnotation($this->textId);
+		$anno = $this->work->getAnnotation();
 		if ( !empty($anno) ) {
 			$this->encprint("A>\n$anno\nA$\n\n");
 		}
@@ -110,7 +108,7 @@ class TextPage extends Page {
 		}
 		$extra = $this->work->getCopyright() ."\n\n".
 			$this->work->getOrigTitleAsSfb() ."\n\n".
-			$this->getExtraInfo($this->textId) .
+			$this->work->getExtraInfo() .
 			"\n\n\tСвалено от „{$this->sitename}“ [$this->purl/text/$this->textId]";
 		$extra = preg_replace('/\n\n+/', "\n\n", $extra);
 		$this->encprint("\nI>$extra\nI$\n");
@@ -149,21 +147,29 @@ class TextPage extends Page {
 				$this->makeAuthorLink($this->work->author_name). '</li>';
 		}
 		if ( !empty($this->work->series) ) {
-			if ($this->work->seriesType == 'collection') {
-				$start = $this->work->type == 'intro' ? 'Предговор към' : 'Включено в';
-				$ser = $start .' сборника „'.
-					$this->makeSeriesLink($this->work->series) .'“';
-				if ( !empty($this->work->sernr) )
-					$ser .= ' ('.$this->work->sernr.')';
-			} elseif ($this->work->seriesType == 'book') {
-				$ser = 'Част от книгата „'.
-					$this->makeSeriesLink($this->work->series) .'“';
-			} else {
-				$ser = 'Поредица: '. $this->makeSeriesLink($this->work->series);
-				if ( !empty($this->work->sernr) )
-					$ser .= ' ('.$this->work->sernr.')';
+			$ser = myucfirst(seriesType($this->work->seriesType)) .': '.
+				$this->makeSeriesLink($this->work->series);
+			if ($this->work->type == 'intro') {
+				$ser .= ' (предговор)';
+			} else if ( !empty($this->work->sernr) ) {
+				$ser .= ' ('.$this->work->sernr.')';
 			}
 			$extra .= "\n<li>$ser</li>";
+		}
+		if ( !empty($this->work->books) ) {
+			$item = ($this->work->type == 'intro' ? 'Предговор към' : 'Част от')
+				.' '. (count($this->work->books) == 1 ? 'книгата' : 'книгите');
+			foreach ($this->work->books as $id => $book) {
+				$item .= ' „'. $this->makeBookLink($book['title']) .'“';
+				$preface = $this->work->getPrefaceOfBook($id);
+				if ($preface instanceof Work) {
+					$l = $this->makeSimpleTextLink($preface->title, $preface->id, 1, 'предговор');
+					$a = $this->makeAuthorLink($preface->author_name);
+					$item .= " ($l от $a)";
+				}
+				$item .= ',';
+			}
+			$extra .= "\n<li>". rtrim($item, ',') .'</li>';
 		}
 		if ( $this->work->orig_lang == $this->work->lang ) {
 			$extra .= "\n<li><span title='Година на написване или първа публикация'>Година</span>: ".
@@ -207,7 +213,7 @@ class TextPage extends Page {
 		}
 		$commCnt = $this->getReaderCommentCount();
 		$extra .= "\n<li>";
-		$extra .= $commCnt > 0 ? "Има <strong>$commCnt</strong>" : 'Няма';
+		$extra .= $commCnt > 0 ? "Има <strong>$commCnt</strong>" : 'Все още не са дадени';
 		$readCmnts = $commCnt == 1 ? 'читателско мнение' : 'читателски мнения';
 		$params = array(self::FF_ACTION=>'comment', 'textId'=>$this->textId);
 		$clink = $this->out->internLink("$readCmnts за произведението", $params,
@@ -284,21 +290,33 @@ EOS;
 	protected function makeExtraInfo() {
 		if ( isset($this->extraInfo) ) return $this->extraInfo;
 		$file = getContentFilePath('text-info', $this->textId);
-		if ( !file_exists($file) ) { return ''; }
-		$this->hasExtraInfo = true;
-		$parser = new Sfb2HTMLConverter($file, $this->getImgDir());
-		$parser->parse();
+		$text = '';
+		if ( file_exists($file) ) {
+			$parser = new Sfb2HTMLConverter($file, $this->getImgDir());
+			$parser->parse();
+			$text .= $parser->text;
+		}
+		foreach ($this->work->books as $id => $book) {
+			$file = getContentFilePath('book', $id);
+			if ( !file_exists($file) ) { continue; }
+			$parser = new Sfb2HTMLConverter($file);
+			$parser->parse();
+			$text .= '<p><br /></p>' . $parser->text;
+		}
 		$cover = $this->makeCoverImage();
-		$this->extraInfo = <<<EOS
+		if ( empty($text) && empty($cover) ) {
+			return '';
+		}
+		$this->hasExtraInfo = true;
+		return $this->extraInfo = <<<EOS
 
 <fieldset class="infobox">
 	<legend>Допълнителна информация <a href="#after-extrainfobox" class="non-graphic">(Прескачане на допълнителната информация)</a></legend>
 $cover
-$parser->text
+$text
 </fieldset>
 <p id="after-extrainfobox" class="non-graphic"><a name="after-extrainfobox"> </a></p>
 EOS;
-		return $this->extraInfo;
 	}
 
 
@@ -309,7 +327,7 @@ EOS;
 			$delim = $cnt++ % 2 == 0 ? '<br />' : ' ';
 			$cover .= $delim . $this->makeCoverImageView($file);
 		}
-		return "<span style='float:right; margin:0 0 1em 1em'>$cover</span>";
+		return empty($cover) ? '' : "<span style='float:right; margin:0 0 1em 1em'>$cover</span>";
 	}
 
 	protected function makeCoverImageView($file) {
@@ -377,6 +395,7 @@ EOS;
 
 
 	protected function makeEndMessage() {
+		$nextLinks = '';
 		if ($this->hasNext && $this->chunkId > 0) {
 			$p = array(self::FF_ACTION=>$this->action, 'textId'=>$this->textId,
 				'chunkId' => $this->nextChunkId);
@@ -385,8 +404,10 @@ EOS;
 		} else {
 			$endMsg = 'Край &nbsp; '. ($this->user->canExecute('markRead')
 				? $this->makeMarkReadLink() : '');
+			$nextLinks = $this->makeNextSeriesWorkLink(true) .
+				$this->makeNextBookWorkLink(true);
 		}
-		return "\n".'<p id="text-end-msg">'.$endMsg.'</p>';
+		return "\n<p id='text-end-msg'>$endMsg</p>$nextLinks";
 	}
 
 
@@ -415,6 +436,34 @@ $o
 </ul>
 </fieldset>
 EOS;
+	}
+
+	protected function makeNextSeriesWorkLink($separate = false) {
+		$nextWork = $this->work->getNextFromSeries();
+		$o = '';
+		if ( is_object($nextWork) ) {
+			$sl = $this->makeSeriesLink($this->work->series);
+			$tl = $this->makeSimpleTextLink($nextWork->title, $nextWork->id);
+			$type = workTypeArticle($nextWork->type);
+			$sep = $separate ? '<hr />' : '';
+			$stype = seriesTypeArticle($this->work->seriesType);
+			$o = "$sep<p>Към следващото произведение от $stype $sl: $type $tl</p>";
+		}
+		return $o;
+	}
+
+	protected function makeNextBookWorkLink($separate = false) {
+		$o = '';
+		foreach ($this->work->getNextFromBooks() as $book => $nextWork) {
+			if ( is_object($nextWork) ) {
+				$sl = $this->makeBookLink($this->work->books[$book]['title']);
+				$tl = $this->makeSimpleTextLink($nextWork->title, $nextWork->id);
+				$type = workTypeArticle($nextWork->type);
+				$o .= "\n<p>Към следващото произведение от книгата $sl: $type $tl</p>";
+			}
+		}
+		$sep = !empty($o) && $separate ? '<hr />' : '';
+		return $sep . $o;
 	}
 
 
@@ -490,21 +539,6 @@ EOS;
 			$this->linecnt = 100000;
 		}
 		return true;
-	}
-
-
-
-	protected function getAnnotation($textId) {
-		$file = getContentFilePath('text-anno', $textId);
-		if ( !file_exists($file) ) { return ''; }
-		return file_get_contents($file);
-	}
-
-
-	protected function getExtraInfo($textId) {
-		$file = getContentFilePath('text-info', $textId);
-		if ( !file_exists($file) ) { return ''; }
-		return file_get_contents($file);
 	}
 
 

@@ -1,17 +1,17 @@
 <?php
 
-class SeriesPage extends ViewPage {
+class BookPage extends ViewPage {
 
 	protected
 		$titles = array(
-			'simple' => 'Списък на поредици — $1',
-			'extended' => '$1 — Поредици');
+			'simple' => 'Списък на книги — $1',
+			'extended' => '$1 — Книги');
 
 
 	public function __construct() {
 		parent::__construct();
-		$this->action = 'series';
-		$this->uCanEditObj = $this->user->canExecute('editSeries');
+		$this->action = 'book';
+		$this->uCanEditObj = $this->user->canExecute('editBook');
 	}
 
 
@@ -23,8 +23,8 @@ class SeriesPage extends ViewPage {
 			return false;
 		}
 		if ( substr_count($items, '<li>') == 1 ) {
-			$this->mode1 = 'extended';
-			return $this->makeExtendedList(); // only one object
+			#$this->mode1 = 'extended';
+			#return $this->makeExtendedList(); // only one object
 		}
 		$o = '<ul style="display:none"><li></li>'. $items .'</ul>';
 		return $o;
@@ -33,18 +33,19 @@ class SeriesPage extends ViewPage {
 
 	protected function makeSimpleListQuery() {
 		$qa = array(
-			'SELECT' => 's.id, s.name, s.orig_name, s.type,
-				GROUP_CONCAT(a.name) author',
-			'FROM' => DBT_SER_AUTHOR_OF .' isSA',
+			'SELECT' => 'b.*, GROUP_CONCAT(a.name) author',
+			'FROM' => DBT_BOOK_TEXT .' bt',
 			'LEFT JOIN' => array(
-				DBT_SERIES .' s' => 'isSA.series = s.id',
-				DBT_PERSON .' a' => 'isSA.person = a.id',
+				DBT_BOOK .' b' => 'bt.book = b.id',
+				DBT_TEXT .' t' => 'bt.text = t.id',
+				DBT_AUTHOR_OF .' aof' => 'aof.text = t.id',
+				DBT_PERSON .' a' => 'a.id = aof.person',
 			),
-			'GROUP BY' => 's.id',
-			'ORDER BY' => 's.name',
+			'GROUP BY' => 'b.id',
+			'ORDER BY' => 'b.title',
 		);
 		if ( !empty($this->startwith) ) {
-			$qa['WHERE']['s.name'] = array('LIKE', $this->startwith .'%');
+			$qa['WHERE']['b.title'] = array('LIKE', $this->startwith .'%');
 		}
 		return $this->db->extselectQ($qa);
 	}
@@ -53,29 +54,25 @@ class SeriesPage extends ViewPage {
 	public function makeSimpleListItem($dbrow) {
 		extract($dbrow);
 		$o = '';
-		$lcurch = $this->firstChar($name);
+		$lcurch = $this->firstChar($title);
 		if ($this->curch != $lcurch) {
 			$this->curch = $lcurch;
 			$o .= "</ul>\n<h2>$this->curch</h2>\n<ul>";
 		}
-		$editLink = $this->uCanEditObj ? $this->makeEditSeriesLink($id) : '';
+		$editLink = $this->uCanEditObj ? $this->makeEditBookLink($id) : '';
 		$author = $this->makeAuthorLink($author);
-		$suff = seriesSuffix($type);
 		if ( !empty($author) ) { $author = '— '.$author; }
-		if ($orig_name == $name) { $orig_name = ''; }
-		if ( !empty($orig_name) ) { $orig_name = " ($orig_name)"; }
 		$query = array();
 		if ($this->showDlForm) $query[self::FF_DLMODE] = $this->dlMode;
 		if ($this->order != $this->defOrder) {
 			$query[self::FF_ORDER] = $this->order;
 		}
-		$link = $this->makeSeriesLink($name, '', $suff, $query);
+		$link = $this->makeBookLink($title, '', '', $query);
 		$o .= <<<EOS
 
 <li>
 	$link
 	<span class="extra">
-	<em>$orig_name</em>
 	$editLink
 	</span>
 	$author
@@ -86,40 +83,39 @@ EOS;
 
 
 	protected function makeExtendedList() {
-		$this->curSeries = 0;
+		$this->curObj = 0;
 		$this->curAuthor = '';
 		$this->displayAuthor = false;
-		$this->data = $this->serTitles = array();
+		$this->data = $this->objTitles = array();
 		$this->db->iterateOverResult($this->makeExtendedListQuery(),
 			'makeExtendedListItem', $this);
-		if ( empty($this->serTitles) ) {
+		if ( empty($this->objTitles) ) {
 			return false;
 		}
-		$this->data[$this->curSeries] = array(
-			'titles' => $this->serTitles,
-			'series' => $this->serTitles[0]['series'],
-			'type' => $this->serTitles[0]['seriesType'],
+		$this->data[$this->curObj] = array(
+			'titles' => $this->objTitles,
+			'book' => $this->objTitles[0]['book'],
+			'type' => $this->objTitles[0]['bookType'],
 			'author' => ($this->displayAuthor ? '' : $this->curAuthor),
 		);
 
 		$o = '';
 		$toc = '<div id="toc"><h2>Съдържание</h2><ul>';
 		$userCanEdit = $this->user->canExecute('edit');
-		foreach ($this->data as $seriesId => $serData) {
-			extract($serData);
-			$fullSerName = ltrim("$author - $series", ' -');
-			$seriesAnchor = md5($series);
-			$suff = seriesSuffix($type);
-			$toc .= "\n\t<li><a href='#$seriesAnchor'>$series$suff</a></li>";
+		foreach ($this->data as $objId => $objData) {
+			extract($objData);
+			$fullObjName = ltrim("$author - $book", ' -');
+			$bookAnchor = '_'.md5($book);
+			$toc .= "\n\t<li><a href='#$bookAnchor'>$book</a></li>";
 			$displayAuthor = true;
 			if ( !empty($author) ) {
 				$author = ' — '. $this->makeAuthorLink($author);
 				$displayAuthor = false;
 			}
-			$editLink = $this->uCanEditObj ? $this->makeEditSeriesLink($seriesId) : '';
+			$editLink = $this->uCanEditObj ? $this->makeEditBookLink($objId) : '';
 			$o .= <<<EOS
 
-<h2 id="$seriesAnchor">$series$suff $editLink $author</h2>
+<h2 id="$bookAnchor">$book $editLink $author</h2>
 
 <ul>
 EOS;
@@ -132,7 +128,6 @@ EOS;
 				if ( !empty($orig_title) && $orig_lang != $lang ) {
 					$extras[] = "<em>$orig_title</em>";
 				}
-				if ($sernr > 0) { $title = $sernr .'. '. $title; }
 				$textLink = $this->makeTextLink(compact('textId', 'type', 'size', 'zsize', 'title', 'date', 'datestamp', 'reader'));
 				if ($this->order == 'time') {
 					$titleView = '<span class="extra"><tt>'.$this->makeYearView($year).
@@ -163,7 +158,7 @@ EOS;
 			}
 			$o .= "</ul>\n";
 			if (!$this->showDlForm && count($tids) > 1) {
-				$o .= $this->makeDlSeriesForm($tids, $fullSerName);
+				$o .= $this->makeDlSeriesForm($tids, $fullObjName, 'цялата книга');
 			}
 			$o .= $this->makeDlSubmit();
 		}
@@ -180,7 +175,7 @@ EOS;
 		}
 		$o .= $this->makeColorLegend();
 		unset($this->data);
-		unset($this->serTitles);
+		unset($this->objTitles);
 		return $toc . $o;
 	}
 
@@ -188,21 +183,21 @@ EOS;
 	protected function makeExtendedListQuery() {
 		$chrono = $this->order == 'time' ? 't.year,' : '';
 		$qa = array(
-			'SELECT' => 's.id seriesId, s.name series, s.orig_name orig_series,
-				s.type seriesType,
+			'SELECT' => 'b.id objId, b.title book, b.type bookType,
 				t.id textId, t.title, t.lang, t.orig_title, t.orig_lang,
 				t.year, t.type, t.sernr, t.size, t.zsize, t.entrydate date,
 				UNIX_TIMESTAMP(t.entrydate) datestamp,
 				GROUP_CONCAT(a.name ORDER BY aof.pos) author',
-			'FROM' => DBT_SERIES .' s',
+			'FROM' => DBT_BOOK_TEXT .' bt',
 			'LEFT JOIN' => array(
-				DBT_TEXT .' t' => 's.id = t.series',
-				DBT_AUTHOR_OF .' aof' => 't.id = aof.text',
-				DBT_PERSON .' a' => 'aof.person = a.id',
+				DBT_BOOK .' b' => 'bt.book = b.id',
+				DBT_TEXT .' t' => 'bt.text = t.id',
+				DBT_AUTHOR_OF .' aof' => 'aof.text = t.id',
+				DBT_PERSON .' a' => 'a.id = aof.person',
 			),
 			'WHERE' => array(),
-			'GROUP BY' => 's.id, t.id',
-			'ORDER BY' => "s.name, $chrono t.sernr, t.title",
+			'GROUP BY' => 'b.id, t.id',
+			'ORDER BY' => "b.title, $chrono bt.pos",
 // 			'LIMIT' => array($this->qstart, $this->qlimit)
 		);
 		if ($this->user->id > 0) {
@@ -211,7 +206,7 @@ EOS;
 				't.id = r.text AND r.user = '. $this->user->id;
 		}
 		if ( !empty($this->startwith) ) {
-			$qa['WHERE']['s.name'] = array('LIKE', $this->startwith .'%');
+			$qa['WHERE']['b.title'] = array('LIKE', $this->startwith .'%');
 		}
 		return $this->db->extselectQ($qa);
 	}
@@ -222,26 +217,26 @@ EOS;
 		if ( empty($textId) ) {
 			return;
 		}
-		if ($this->curSeries != $seriesId) {
-			if ( !empty($this->curSeries) ) {
-				$this->data[$this->curSeries] = array(
-					'titles' => $this->serTitles,
-					'series' => $this->serTitles[0]['series'],
-					'type' => $this->serTitles[0]['seriesType'],
+		if ($this->curObj != $objId) {
+			if ( !empty($this->curObj) ) {
+				$this->data[$this->curObj] = array(
+					'titles' => $this->objTitles,
+					'book' => $this->objTitles[0]['book'],
+					'type' => $this->objTitles[0]['bookType'],
 					'author' => ($this->displayAuthor ? '' : $this->curAuthor),
 				);
 				$this->curAuthor = '';
 				$this->displayAuthor = false;
-				$this->serTitles = array();
+				$this->objTitles = array();
 			}
-			$this->curSeries = $seriesId;
+			$this->curObj = $objId;
 		}
 		if ($this->curAuthor != $author) {
 			if ( !empty($this->curAuthor) ) { $this->displayAuthor = true; }
 			$this->curAuthor = $author;
 		}
-		unset($dbrow['seriesId']);
-		$this->serTitles[] = $dbrow;
+		unset($dbrow['objId']);
+		$this->objTitles[] = $dbrow;
 		return '';
 	}
 
@@ -257,7 +252,7 @@ EOS;
 		$submit = $this->out->submitButton('Обновяване');
 		return <<<EOS
 <p class="buttonlinks" style="margin-bottom:1em;"
-	title="Това са препратки към списъци на поредиците, започващи със съответната буква">
+	title="Това са препратки към списъци на книгите, започващи със съответната буква">
 $toc
 </p>
 <form action="$this->root" style="text-align:center"><div>
@@ -276,7 +271,7 @@ EOS;
 		$modeExpl = $this->makeModeExplanation();
 		$dlModeExpl = $this->makeDlModeExplanation();
 		return <<<EOS
-<p>Горните връзки водят към списъци на поредиците$extra започващи със съответната буква. Чрез препратката „Всички“ можете да разгледате всички поредици наведнъж.</p>
+<p>Горните връзки водят към списъци на книгите$extra започващи със съответната буква. Чрез препратката „Всички“ можете да разгледате всички книги наведнъж.</p>
 $modeExpl
 $dlModeExpl
 EOS;
@@ -284,6 +279,6 @@ EOS;
 
 
 	protected function addEmptyListMessage() {
-		$this->addMessage('Няма намерени поредици.', true);
+		$this->addMessage('Няма намерени книги.', true);
 	}
 }

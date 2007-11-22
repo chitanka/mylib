@@ -13,15 +13,11 @@ class SendNewsletterPage extends Page {
 		$this->subject = $this->request->value('subject', '');
 		$this->message = $this->request->value('content', '');
 		$this->checked = (int) $this->request->value('checked', 1, 1);
-		$emailsRow = (array) $this->request->value('emails');
-		$emailsRow = array_keys($emailsRow);
-		$this->emails = array();
-		foreach ($emailsRow as $row) {
-			list($user, $email) = explode("\t", base64_decode($row));
-			$this->emails[$user] = $email;
-		}
-		// TODO remove
 		$this->emails = (array) $this->request->value('emails');
+		$this->initFromDb = (int) $this->request->value('db', 0);
+		if ($this->initFromDb) {
+			$this->initData();
+		}
 	}
 
 
@@ -32,24 +28,24 @@ class SendNewsletterPage extends Page {
 		}
 		$headers = array(
 			'Content-type' => 'text/plain; charset=utf-8',
-			'From' => NEWS_EMAIL,
-			'Reply-To' => NEWS_EMAIL,
+			'From' => SITE_EMAIL,
+			'Reply-To' => SITE_EMAIL,
 			'Subject' => header_encode($this->subject),
 			'X-Mailer' => 'MyLib mailer',
 		);
 		$sent = $notsent = array();
 		$date = date('Y-m-d H:i:s');
 		$mailer = Setup::mailer();
-		foreach ($this->emails as $user => $email) {
+		foreach ($this->emails as $email => $user) {
 			$to = header_encode($user) . " <$email>";
 			$res = $mailer->send($to, $headers, $this->message);
 			if ( $res === true ) {
 				file_put_contents($this->logFile, "$date: $user <$email>\n", FILE_APPEND);
-				unset( $this->emails[$user] );
+				unset( $this->emails[$email] );
 				$sent[] = "$user &lt;$email&gt;";
 			} else {
 				$notsent[] = "$user &lt;$email&gt; — ".$res->getMessage();
-				file_put_contents($this->logFileNot, "'$user' => '$email',\n", FILE_APPEND);
+				file_put_contents($this->logFileNot, "'$email' => '$user',\n", FILE_APPEND);
 			}
 		}
 
@@ -77,7 +73,7 @@ class SendNewsletterPage extends Page {
 		while ( $data = $this->db->fetchAssoc($res)) {
 			extract($data);
 			fillOnEmpty($realname, $username);
-			$this->emails[$realname] = $email;
+			$this->emails[$email] = $realname;
 		}
 		$this->subject = 'Новото в '.$this->sitename;
 		$this->message = $this->makeMailMessage();
@@ -132,16 +128,11 @@ EOS;
 	protected function makeRecipientsInput() {
 		$c = '';
 		$ch = $this->checked ? ' checked="checked"' : '';
-		foreach ($this->emails as $user => $email) {
-
-			// TODO remove
-			$c .= "\n<br/>'$user'=> '$email',"; continue;
-
-
-			$enc = base64_encode("$user\t$email");
-			$cemail = $this->out->checkbox("emails[$enc]", "m$enc",
-				$this->checked, "$user &lt;$email&gt;");
-			$c .= '<br/>'.$cemail;
+		$i = 0;
+		foreach ($this->emails as $email => $user) {
+			$cemail = $this->out->checkbox("emails[$user]", 'm'. $i++,
+				$this->checked, "$user &lt;$email&gt;", $email);
+			$c .= "\n<div>$cemail</div>";
 		}
 		return $c;
 	}

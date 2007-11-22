@@ -128,17 +128,19 @@ EOS;
 
 	protected function makeLastForumPosts($limit = 10) {
 		$proc = new XSLTProcessor();
-		$xsl_filename = $this->forum_root .'templates/rss-compact.xsl';
-		$xml_filename = $this->forum_root ."rss.php?c=$limit";
-		$proc->importStyleSheet(DOMDocument::load($xsl_filename));
-		return $proc->transformToXML(DOMDocument::load($xml_filename));
+		$xsl = new DOMDocument();
+		$xsl->load($this->forum_root .'templates/rss-compact.xsl');
+		$proc->importStyleSheet($xsl);
+		$rss = new DOMDocument();
+		$rss->load($this->forum_root ."rss.php?c=$limit");
+		return $proc->transformToXML($rss);
 	}
 
 
 	protected function makeLastNewTitles($limit = 10) {
 		$page = PageManager::buildPage('history');
 		$page->date = -1;
-		return $page->makeListByDate($limit, false);
+		return $page->makeListByDate($limit, 0, false);
 	}
 
 

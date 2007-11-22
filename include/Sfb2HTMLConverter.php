@@ -13,7 +13,8 @@ class Sfb2HTMLConverter {
 		DEDICATION_S = 'D>', DEDICATION_E = 'D$',
 		EPIGRAPH_S = 'E>', EPIGRAPH_E = 'E$',
 		LETTER_S = 'L>', LETTER_E = 'L$',
-		NOTICE_S = 'S>', NOTICE_E = 'S$', NOTICE_OL = 'S',
+		SIGN_S = 'S>', SIGN_E = 'S$', SIGN_OL = 'S',
+		NOTICE_S = 'N>', NOTICE_E = 'N$', NOTICE_OL = 'N',
 		POEM_S = 'P>', POEM_E = 'P$',
 		CITE_S = 'C>', CITE_E = 'C$',
 		PREFORMATTED_S = 'F>', PREFORMATTED_E = 'F$', PREFORMATTED_OL = 'F',
@@ -21,7 +22,7 @@ class Sfb2HTMLConverter {
 		TABLE_HCELL = '!', TABLE_CELL_SEP = '|',
 		PARAGRAPH_OL = '',
 		SUBHEADER = '#', SUBHEADER2 = '|',
-		AUTHOR_OL = '@',
+		AUTHOR_OL = '@', PLACE_OL = '@@',
 		SEPARATOR = '* * *', LINE = '--';
 
 	protected
@@ -29,7 +30,8 @@ class Sfb2HTMLConverter {
 			'epigraph' => '<blockquote class="epigraph">',
 			'dedication' => '<blockquote class="dedication">',
 			'letter' => '<blockquote class="letter">',
-			'notice' => '<blockquote class="notice">',
+			'sign' => '<blockquote class="sign">',
+			'notice' => '<div class="notice">',
 			'anno' => '<fieldset class="annotation"><legend>Анотация</legend>',
 			'info' => '<fieldset class="infobox"><legend>Допълнителна информация</legend>',
 			'poem' => '<blockquote class="poem">',
@@ -39,7 +41,8 @@ class Sfb2HTMLConverter {
 			'epigraph' => '</blockquote>',
 			'dedication' => '</blockquote>',
 			'letter' => '</blockquote>',
-			'notice' => '</blockquote>',
+			'sign' => '</blockquote>',
+			'notice' => '</div>',
 			'anno' => '</fieldset>',
 			'info' => '</fieldset>',
 			'poem' => '</blockquote>',
@@ -76,8 +79,8 @@ class Sfb2HTMLConverter {
 		'/{img:([^}|]+)\|([^}]+)(\|([^}]+))?}/Ue' =>
 			"'<img src=\"$this->imgDir$1\" alt=\"$2\" title=\"$2\"'.('$3'==''?'':' class=\"float-$4\"').' />'",
 		'/{img:([^}]+)}/U' => '<img src="'.$this->imgDir.'$1" alt="$1" />',
-		'/{img-thumb:([^}|]+)\|([^}]+)}/U' =>
-			"<div class='thumb'><a href='$this->imgDir$1' title='Щракнете за увеличен размер'><img src='{$this->imgDir}thumb/$1' alt='$2' /></a><p><a href='$this->imgDir$1' title='Щракнете за увеличен размер'><img src='{IMGDIR}viewmag.png' /></a> $2</p></div>",
+		'/{img-thumb:([^}|]+)\|([^}]+)(\|([^}]+))?}/Ue' =>
+			"'<div class=\"thumb\" '.('$3'==''?'':' style=\"width: $4px\"').'><a href=\"$this->imgDir$1\" title=\"Щракнете за увеличен размер\"><img src=\"{$this->imgDir}thumb/$1\" alt=\"$2\" /></a><p><a href=\"$this->imgDir$1\" title=\"Щракнете за увеличен размер\"><img src=\"{IMGDIR}viewmag.png\" /></a> $2</p></div>'",
 		// foot notes
 		'/(?<=[^\s(])(\*+)(\d*)/e' => "\$this->makeRef('$1', '$2')",
 		);
@@ -175,6 +178,7 @@ class Sfb2HTMLConverter {
 		case self::DEDICATION_S: $this->doBlock('dedication', self::DEDICATION_E); break;
 		case self::EPIGRAPH_S: $this->doBlock('epigraph', self::EPIGRAPH_E); break;
 		case self::LETTER_S: $this->doBlock('letter', self::LETTER_E); break;
+		case self::SIGN_S: $this->doBlock('sign', self::SIGN_E); break;
 		case self::NOTICE_S: $this->doBlock('notice', self::NOTICE_E); break;
 		case self::ANNO_S: $this->doBlock('anno', self::ANNO_E); break;
 		case self::INFO_S: $this->doBlock('info', self::INFO_E); break;
@@ -182,10 +186,12 @@ class Sfb2HTMLConverter {
 		case self::CITE_S: $this->doCite(); break;
 		case self::PREFORMATTED_S: $this->doPreformatted(); break;
 		case self::TABLE_S: $this->doTable(); break;
+		case self::SIGN_OL: $this->doSign(); break;
 		case self::NOTICE_OL: $this->doNotice(); break;
 		case self::PREFORMATTED_OL: $this->doPreformattedOneLine(); break;
 		case self::SUBHEADER: $this->doSubheader(); break;
 		case self::AUTHOR_OL: $this->doAuthor(); break;
+		case self::PLACE_OL: $this->doPlace(); break;
 		default: $this->save($this->ltext);
 		}
 	}
@@ -216,9 +222,12 @@ class Sfb2HTMLConverter {
 		case self::AUTHOR_OL: $this->doAuthor(); break;
 		case self::SUBHEADER: $this->doSubheader(); break;
 		case self::SUBHEADER2: $this->doSubheader(); break;
+		case self::SIGN_S: $this->doBlock('sign', self::SIGN_E); break;
+		case self::SIGN_OL: $this->doSign(); break;
 		case self::NOTICE_S: $this->doBlock('notice', self::NOTICE_E); break;
 		case self::NOTICE_OL: $this->doNotice(); break;
 		case self::PREFORMATTED_OL: $this->doPreformattedOneLine(); break;
+		case self::PLACE_OL: $this->doPlace(); break;
 		case $end: break;
 		default: $this->save($this->line);
 		}
@@ -269,6 +278,7 @@ class Sfb2HTMLConverter {
 		case self::SUBHEADER:
 		case self::SUBHEADER2: $this->doSubheader(); break;
 		case self::POEM_E: break;
+		case self::PLACE_OL: $this->doPlace(); break;
 		default: $this->save($this->line);
 		}
 	}
@@ -300,10 +310,13 @@ class Sfb2HTMLConverter {
 		case self::SUBHEADER: $this->doSubheader(); break;
 		case self::PREFORMATTED_S: $this->doPreformatted(); break;
 		case self::PREFORMATTED_OL: $this->doPreformattedOneLine(); break;
+		case self::SIGN_S: $this->doBlock('sign', self::SIGN_E); break;
+		case self::SIGN_OL: $this->doSign(); break;
 		case self::NOTICE_S: $this->doBlock('notice', self::NOTICE_E); break;
 		case self::NOTICE_OL: $this->doNotice(); break;
 		case self::CITE_S: $this->doCite(); break;
 		case self::CITE_E: break;
+		case self::PLACE_OL: $this->doPlace(); break;
 		default: $this->save($this->line);
 		}
 	}
@@ -371,35 +384,38 @@ class Sfb2HTMLConverter {
 			$this->simpleSave("<p class='separator'>$this->ltext</p>\n");
 		} elseif (strpos($this->ltext, self::LINE) === 0) {
 			$this->simpleSave("<hr />\n");
-		} elseif ( preg_match('/\[\*+(\d*) (.+)(\]?)$/U', $this->ltext, $m)  ) {
+		} elseif ( preg_match('/\[\*+(\d*)( (.+)(\]?))?$/U', $this->ltext, $m)  ) {
 			// here starts a foot note
 			if ( empty($m[1]) || $this->curFn >= $m[1] ) {
 				$this->curFn++;
 			} else {
 				$this->curFn = $m[1];
 			}
-			$back = "<a href='#_ref-$this->curFn'>[$this->curFn]</a>";
-			if ( empty($m[3]) ) { // no “]” at the end; more than one paragraph in the note
+			$back = "<a href='#_ref-$this->curFn' title='Обратно'>[$this->curFn]</a>";
+			if ( empty($m[4]) ) { // no “]” at the end; more than one paragraph in the note
 				$this->inFn = true;
 				$this->curCont = &$this->footnotes;
 				$pref = "<div id='_note-$this->curFn'><p>";
 				$suf = '';
 			} else {
 				$pref = "<p id='_note-$this->curFn'>";
-				$suf = "<a href='#_ref-$this->curFn'>↑</a>";
+				$suf = "<a href='#_ref-$this->curFn' title='Обратно'>↑</a>";
 			}
-			$this->footnotes .= "$pref$back ". $this->wiki2html($m[2]) ." $suf</p>\n";
+			$line = empty($m[3]) ? '' : $this->wiki2html($m[3]);
+			$this->footnotes .= "$pref$back $line $suf</p>\n";
 		} elseif ($this->inFn) { // we are in a foot note
 			if ( preg_match('/(.*)\]$/', $this->ltext, $m) ) { // this is the end, my friend
 				$this->inFn = false;
 				$this->curCont = &$this->text;
 				$line = $m[1];
-				$suf = " <a href='#_ref-$this->curFn'>↑</a></p>\n</div>\n";
+				$suf = " <a href='#_ref-$this->curFn' title='Обратно'>↑</a></p>\n</div>\n";
 			} else { // just another paragraph in the foot note
 				$line = $this->ltext;
 				$suf = '</p>';
 			}
 			$this->footnotes .= '<p>'. $this->wiki2html($line) . $suf;
+		} elseif (strpos($this->ltext, '{img:') === 0) {
+			$this->savePar($this->ltext, 'image');
 		} else {
 			$this->savePar($this->ltext);
 		}
@@ -411,8 +427,16 @@ class Sfb2HTMLConverter {
 		$this->savePar($this->ltext, 'author');
 	}
 
+	protected function doPlace() {
+		$this->savePar($this->ltext, 'placeyear');
+	}
+
 	protected function doSubheader() {
 		$this->savePar($this->ltext, 'subheader');
+	}
+
+	protected function doSign() {
+		$this->savePar($this->ltext, 'sign');
 	}
 
 	protected function doNotice() {
@@ -445,7 +469,7 @@ class Sfb2HTMLConverter {
 		} else {
 			$this->curRef = $num;
 		}
-		return "<sup id='_ref-$this->curRef' class='ref'><a href='#_note-$this->curRef'>[$this->curRef]</a></sup>";
+		return "<sup id='_ref-$this->curRef' class='ref'><a href='#_note-$this->curRef' title='Към бележката'>[$this->curRef]</a></sup>";
 	}
 
 }

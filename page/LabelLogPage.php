@@ -58,12 +58,13 @@ EOS;
 			}
 			el.checked = true;
 		}
+		return false;
 	}
 </script>
 <form action="{FACTION}" method="post">
 <ul>$l
 </ul>
-	<div id="checker">Избиране на <a href="#" onclick="javascript:checkAll();">всички</a></div>
+	<div id="checker">Избиране на <a href="#" onclick="javascript:return checkAll();">всички</a></div>
 	<div>$submit</div>
 </form>
 EOS;

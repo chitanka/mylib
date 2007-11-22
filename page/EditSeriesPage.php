@@ -56,7 +56,7 @@ class EditSeriesPage extends Page {
 				if ( empty($author) ) {
 					continue;
 				}
-				$set = array('author' => $author, 'series' => $this->seriesId);
+				$set = array('person' => $author, 'series' => $this->seriesId);
 				$queries[] = $this->db->insertQ(DBT_SER_AUTHOR_OF, $set);
 			}
 		}
@@ -79,7 +79,7 @@ class EditSeriesPage extends Page {
 		$seriesId = $this->out->hiddenField('id', $this->seriesId);
 		$name = $this->out->textField('name', '', $this->name, 50);
 		$orig_name = $this->out->textField('orig_name', '', $this->orig_name, 50);
-		$opts = array('series'=>'Цикъл', 'collection'=>'Сборник', 'book'=>'Книга');
+		$opts = array('series'=>'Цикъл', 'collection'=>'Сборник', 'book'=>'Книга', 'poetry'=>'Стихосбирка');
 		$type = $this->out->selectBox('type', '', $opts, $this->type);
 		$showagain = $this->out->checkbox('showagain', '', $this->showagain,
 			'Показване на формуляра отново');
@@ -126,9 +126,9 @@ EOS;
 		$js = rtrim($js, ',') . "\n}; // end of array persons['$key']\n";
 		$this->addJs($js);
 		$dbkey = array('series' => $this->seriesId);
-		$q = $this->db->selectQ(DBT_SER_AUTHOR_OF, $dbkey, $key);
+		$q = $this->db->selectQ(DBT_SER_AUTHOR_OF, $dbkey, 'person');
 		$addRowFunc = create_function('$row',
-			'return "addRow(\''.$key.'\', $row['.$key.']); ";');
+			'return "addRow(\''.$key.'\', $row[person]); ";');
 		$load = $this->db->iterateOverResult($q, $addRowFunc);
 		fillOnEmpty($load, "addRow('$key', 0); ");
 		$is_changed = $this->out->hiddenField("is_changed[$key]", 0);

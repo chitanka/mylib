@@ -32,14 +32,16 @@ class UserPage extends Page {
 			$this->title = 'Няма такъв потребител';
 			return;
 		}
-		return $this->makeEditLink() . $this->makeAllUsersLink() .
+		$dataView = $this->user->isSuperUser() ? $this->makeUserDataView() : '';
+		$o = $dataView . $this->makeEditOwnPageLink() . $this->makeAllUsersLink() .
 			$this->makeHTML() . $this->makeContribList();
+		return $o;
 	}
 
 
 	protected function userExists() {
 		$key = array('username' => $this->username);
-		$sel = array('id userId', 'username', 'realname');
+		$sel = array('id userId', 'username', 'realname', 'email', 'registration', 'touched');
 		$res = $this->db->select(self::DB_TABLE, $key, $sel);
 		$data = $this->db->fetchAssoc($res);
 		if ( empty($data) ) {
@@ -64,6 +66,34 @@ class UserPage extends Page {
 	}
 
 
+	protected function makeUserDataView() {
+		return <<<EOS
+
+<table class="content">
+	<tr>
+		<th>ID</th>
+		<td>$this->userId</td>
+	</tr>
+	<tr>
+		<th>Истинско име</th>
+		<td>$this->realname</td>
+	</tr>
+	<tr>
+		<th>Е-поща</th>
+		<td>$this->email</td>
+	</tr>
+	<tr>
+		<th>Регистрация</th>
+		<td>$this->registration</td>
+	</tr>
+	<tr>
+		<th>Последно влизане</th>
+		<td>$this->touched</td>
+	</tr>
+</table>
+EOS;
+	}
+
 	protected function makeContribList() {
 		$contribCnt = $this->getContribCount();
 		if ($contribCnt == 0) return '';
@@ -75,7 +105,7 @@ class UserPage extends Page {
 			self::DB_TABLE .' u' => 'ut.user = u.id');
 		$page->extQW = array('ut.user' => $this->userId);
 		$limit = $this->climit == 0 ? 0 : $this->contribLimit;
-		$list = $page->makeListByDate($limit, false);
+		$list = $page->makeListByDate($limit, 0, false);
 		$showAllLink = '';
 		if ($this->climit != 0 && $contribCnt > $this->contribLimit) {
 			$p = array(self::FF_ACTION=>$this->action, 'username'=>$this->username, 'climit'=> 0);
@@ -96,7 +126,7 @@ EOS;
 	}
 
 
-	protected function makeEditLink() {
+	protected function makeEditOwnPageLink() {
 		if ($this->username != $this->user->username) {
 			return '';
 		}
