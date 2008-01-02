@@ -28,8 +28,8 @@ class SendNewsletterPage extends Page {
 		}
 		$headers = array(
 			'Content-type' => 'text/plain; charset=utf-8',
-			'From' => SITE_EMAIL,
-			'Reply-To' => SITE_EMAIL,
+			'From' => SITE_EMAIL_ENC,
+			'Reply-To' => SITE_EMAIL_ENC,
 			'Subject' => header_encode($this->subject),
 			'X-Mailer' => 'MyLib mailer',
 		);

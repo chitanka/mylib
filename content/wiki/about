@@ -47,7 +47,7 @@ C$
 	Ако името е достатъчно уникално, можете да ползвате само част от него, например само фамилията на автора: http://purl.org/NET{ROOT}/author/!Zelazni вместо http://purl.org/NET{ROOT}/author/!Rodzhyr+Zelazni
 
 >	Зад кулисите
-	_{SITENAME}_ се задвижва от скриптове, написани на [[http://bg.wikipedia.org/wiki/PHP|PHP&nbsp;5]]. Информацията за произведенията се съхранява в база от данни на [[http://en.wikipedia.org/wiki/MySQL|MySQL]], а самите текстове се намират в обикновени текстови файлове.
+	_{SITENAME}_ се задвижва от скриптове, написани на [[http://bg.wikipedia.org/wiki/PHP|PHP&nbsp;5]]. Информацията за произведенията се съхранява в база от данни на [[http://en.wikipedia.org/wiki/MySQL|MySQL]], а самите текстове се намират в обикновени текстови файлове във [[{ROOT}/help/sfb|формат SFB]].
 	Можете да си свалите [[http://sourceforge.net/project/showfiles.php?group_id=190257|софтуера]] (лиценз: [[http://www.gnu.org/licenses/gpl.html|GNU GPL]]) и [[{DOCROOT}archive/mylib-db.sql.gz|базата от данни]] (лиценз: [[http://creativecommons.org/licenses/by-sa/3.0/|CC-BY-SA 3.0]] или [[http://www.gnu.org/copyleft/fdl.html|GNU FDL]]) и да се пробвате да ги подкарате на друг сървър. Ако успеете, в директорията [[{DOCROOT}archive/|archive]] ще намерите архиви и на останалата част от данните в _{SITENAME}_ — текстови файлове, картинки, корици и други.
 
 >	Картинки

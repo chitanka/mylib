@@ -11,7 +11,7 @@ class Page {
 		$action, $title, $head, $langCode, $outencoding, $contentType,
 		$request, $user, $db, $content, $messages, $jsContent, $style,
 		$scriptStart, $scriptEnd, $styleStart, $styleEnd,
-
+		$fullContent, $outputLength, $allowCaching,
 		$maxCaptchaTries = 2, $defListLimit = 10, $maxListLimit = 50;
 
 
@@ -24,6 +24,7 @@ class Page {
 		$this->langCode = Setup::setting('lang_code');
 		$this->out->inencoding = $this->inencoding = Setup::IN_ENCODING;
 		$this->doIconv = true;
+		$this->allowCaching = true;
 		$this->encfilter = '';
 		$this->setOutEncoding($this->request->outputEncoding);
 		$this->root = Setup::setting('webroot');
@@ -34,7 +35,7 @@ class Page {
 		$this->infoSrcs = Setup::setting('info');
 
 		$this->action = $action;
-		$this->messages = $this->content =
+		$this->messages = $this->content = $this->fullContent =
 		$this->style = $this->jsContent = $this->extra = '';
 		$this->contentType = 'text/html';
 
@@ -60,9 +61,7 @@ class Page {
 
 
 	/**
-	Generate page content according to submission type (POST or GET).
-
-	@return string
+		Generate page content according to submission type (POST or GET).
 	*/
 	public function execute() {
 		$this->content = $this->request->wasPosted()
@@ -71,39 +70,30 @@ class Page {
 	}
 
 
-	/**
-	@param $message
-	@param $isError
-	*/
-	public function addMessage($message, $isError = false) {
-		$class = $isError ? ' class="error"' : '';
-		$this->messages .= "<p$class>$message</p>\n";
-	}
-
-
 	public function title() {
 		return $this->title;
 	}
+
 	public function messages() {
 		return $this->messages;
 	}
+
 	public function content() {
 		return $this->content;
 	}
+
+	public function get($field) {
+		return isset($this->$field) ? $this->$field : null;
+	}
+
+	public function set($field, $value) {
+		if ( isset($this->$field) ) {
+			$this->$field = $value;
+		}
+	}
+
 	public function setAction($action) {
 		$this->action = $action;
-	}
-	public function setContent($content) {
-		$this->content = $content;
-	}
-	public function setFullContent($content) {
-		$this->fullContent = $content;
-	}
-	public function setMessages($messages) {
-		$this->messages = $messages;
-	}
-	public function setTitle($title) {
-		$this->title = $title;
 	}
 
 	public function setOutEncoding($enc) {
@@ -125,26 +115,37 @@ class Page {
 		$this->out->outencoding = $this->outencoding;
 	}
 
-	public function setContentType($contentType) { $this->contentType = $contentType; }
-
 	public function setFields($data) {
 		foreach ((array) $data as $field => $value) {
 			$this->$field = $value;
 		}
 	}
 
+	/**
+		@param $message
+		@param $isError
+	*/
+	public function addMessage($message, $isError = false) {
+		$class = $isError ? ' class="error"' : '';
+		$this->messages .= "<p$class>$message</p>\n";
+	}
+
 	public function addContent($content) {
 		$this->content .= $content;
 	}
+
 	public function addStyle($style) {
 		$this->style .= $style;
 	}
+
 	public function addJs($jsContent) {
 		$this->jsContent .= $jsContent;
 	}
+
 	public function addExtraLinks($extra) {
 		$this->extra .= $extra;
 	}
+
 	public function addHeadContent($content) {
 		$this->head .= $content;
 	}
@@ -164,10 +165,14 @@ EOS;
 		$this->addHeadContent( $this->out->scriptInclude($file) . "\n" );
 	}
 
-	/**
-	Output page content.
+	public function allowCaching() {
+		return $this->allowCaching;
+	}
 
-	@param $elapsedTime How much time took the page generation (in seconds).
+	/**
+		Output page content.
+
+		@param $elapsedTime How much time took the page generation (in seconds).
 	*/
 	public function output($elapsedTime) {
 		if ( $this->outputDone ) { // already outputted
@@ -179,11 +184,12 @@ EOS;
 		$this->addTemplates();
 		$this->fullContent = expandTemplates($this->fullContent);
 		$this->fullContent = $this->encprint($this->fullContent, true);
+		$this->outputLength = strlen($this->fullContent);
 		if ( !headers_sent() ) {
 			$this->sendCommonHeaders();
 			header('Content-Style-Type: text/css');
 			header('Content-Script-Type: text/javascript');
-			header('Content-Length: '. strlen($this->fullContent));
+			header('Content-Length: '. $this->outputLength);
 		}
 		print $this->fullContent;
 	}
@@ -200,27 +206,10 @@ EOS;
 
 
 	/**
-	Process POST Forms if there are any.
-	Override this function if your page contains POST Forms.
+		Build full page content.
+		@return string
 	*/
-	protected function processSubmission() {
-		return $this->buildContent();
-	}
-
-	/**
-	Create page content.
-	Override this function to include content in your page.
-	*/
-	protected function buildContent() {
-		return '';
-	}
-
-
-	/**
-	Build full page content.
-	@return string
-	*/
-	protected function makeFullContent($elapsedTime = NULL) {
+	public function makeFullContent($elapsedTime = NULL) {
 		$nav = $this->makeNavigationBar();
 		$pageTitle = strtr($this->title(), array('<br />'=>' — '));
 		$pageTitle = strip_tags($pageTitle);
@@ -244,6 +233,7 @@ EOS;
 		$req = strtr($this->request->requestUri(), array($this->root => ''));
 		$req = preg_replace('/&submitButton=[^&]+/', '', $req);
 		$aboutL = $this->out->internLink('За '.$this->sitename, array(self::FF_ACTION=>'about'), 1);
+		$rulesL = $this->out->internLink('Правила', array(self::FF_ACTION=>'rules'), 1);
 		$purl = $this->out->link($this->purl . $req,
 			strtr($this->purl . urldecode($req), ' ', '+'),
 			'Постоянен адрес на страницата');
@@ -304,6 +294,7 @@ $nav
 <div id="footer">
 <ul>
 	<li>$aboutL</li>
+	<li>$rulesL</li>
 	<li>{SITENAME} се задвижва от $appLink.</li>
 </ul>
 </div>
@@ -325,6 +316,23 @@ EOS;
 				$this->outencoding.'//TRANSLIT', $o);
 		}*/
 		return $this->fullContent;
+	}
+
+
+	/**
+		Process POST Forms if there are any.
+		Override this function if your page contains POST Forms.
+	*/
+	protected function processSubmission() {
+		return $this->buildContent();
+	}
+
+	/**
+		Create page content.
+		Override this function to include content in your page.
+	*/
+	protected function buildContent() {
+		return '';
 	}
 
 
@@ -491,11 +499,11 @@ EOS;
 
 
 	/**
-	Generate a menu link.
+		Generate a menu link.
 
-	@param $data Associative array
-	@return An array with two elements: the link and a boolean flag telling if
-		this link corressponds to the currently requested page
+		@param $data Associative array
+		@return An array with two elements: the link and a boolean flag telling if
+			this link corressponds to the currently requested page
 	*/
 	protected function makeMenuLink($data) {
 		list($urlparams, $text, $title) = $data;
@@ -530,12 +538,16 @@ EOS;
 		if ( !empty($this->encfilter) && function_exists($this->encfilter) ) {
 			$s = call_user_func($this->encfilter, $s);
 		}
-		return $return ? $s : print $s;
+		if ($return) {
+			return $s;
+		}
+		$this->fullContent .= $s;
+		return print $s;
 	}
 
 
 	/**
-	Redirect to another page.
+		Redirect to another page.
 	*/
 	protected function redirect($action = '') {
 		if ( empty($action) ) {
@@ -548,7 +560,7 @@ EOS;
 
 
 	protected function copyPage($page) {
-		$fields = array('title', 'content', 'style', 'jsContent', 'extra', 'user');
+		$fields = array('title', 'content', 'fullContent', 'style', 'jsContent', 'extra', 'user');
 		$this->messages .= $page->messages;
 		foreach ($fields as $field) {
 			$this->$field = $page->$field;
@@ -557,8 +569,8 @@ EOS;
 
 
 	/**
-	Returns first char of a string, which may be build from up to 3 Bytes
-	(taken from MediaWiki).
+		Returns first char of a string, which may be build from up to 3 Bytes
+		(taken from MediaWiki).
 	*/
 	protected function firstChar($s) {
 		preg_match( '/^([\x00-\x7f]|[\xc0-\xdf][\x80-\xbf]|' .
@@ -568,9 +580,8 @@ EOS;
 
 
 	/**
-	@param $textId Text ID
-	@param $zfsize Zip file size in bytes
-	@return string
+		@param $textId Text ID
+		@param $zfsize Zip file size in bytes
 	*/
 	protected function makeDlLink($textId, $zfsize, $ltext = NULL) {
 		$zfsize = int_b2k($zfsize);

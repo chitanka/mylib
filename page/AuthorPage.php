@@ -171,10 +171,21 @@ EOS;
 EOS;
 				$o .= $this->$makeStartFunc();
 				ksort($titles);
-				$tids = array();
+				$curCount = 0;
 				foreach ($titles as $textId) {
+					$curCount++;
+					if ($this->useThreshold && isPseudoSeries($seriesType)
+							&& $this->workCount > $this->gthreshold
+							&& $curCount > $this->sthreshold) {
+						$rest = count($titles) - $this->sthreshold;
+						if ($rest > 1) {
+							$p = array(self::FF_ACTION=>'series', 'q'=>$serName);
+							$allLink = $this->out->internLink("още $rest произведения", $p, 2);
+							$o .= "\n<li>и $allLink</li>";
+							break;
+						}
+					}
 					extract( $this->textsData[$textId] );
-					$tids[] = $textId;
 					if ( $sernr > 0 ) { $title = "$sernr. $title"; }
 					$textLink = $this->makeTextLink(compact('textId', 'type', 'size', 'zsize', 'title', 'date', 'datestamp', 'reader'));
 					$extras = array();
@@ -207,8 +218,8 @@ EOS;
 EOS;
 				}
 				$o .= "\n" . $this->$makeEndFunc();
-				if (!$this->showDlForm && count($tids) > 1) {
-					$o .= $this->makeDlSeriesForm($tids, "$author - $serName",
+				if (!$this->showDlForm && count($titles) > 1) {
+					$o .= $this->makeDlSeriesForm($titles, "$author - $serName",
 						$isTrueSeries ? '' : "всички от „{$serName}“");
 				}
 				$o .= "\n</fieldset>\n";
@@ -340,6 +351,7 @@ EOS;
 		}
 		$key .= str_pad($sernr, 2, '0', STR_PAD_LEFT).$title . $textId;
 		$this->authors_titles[$authorId][$series][$key] = $textId;
+		$this->workCount++;
 		return '';
 	}
 

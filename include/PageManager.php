@@ -13,8 +13,8 @@ class PageManager {
 
 
 	/**
-	Tests whether a given page exists.
-	@return bool
+		Tests whether a given page exists.
+		@return bool
 	*/
 	public static function pageExists($page) {
 		return file_exists(self::$pageDir."$page.php");
@@ -39,10 +39,10 @@ class PageManager {
 
 
 	/**
-	Returns a page class name for a given action.
+		Returns a page class name for a given action.
 
-	@param string $action
-	@return string
+		@param string $action
+		@return string
 	*/
 	public static function getPageClass($action) {
 		return ucfirst($action) .'Page';
@@ -50,30 +50,29 @@ class PageManager {
 
 
 	/**
-	Creates a new page and executes it or sets its content from cache.
+		Creates a new page and executes it or sets its content from cache.
 
-	@param string $action
-	@param bool $useCache
-	@param string hash
-	@return Page
+		@param string $action
+		@param bool $useCache
+		@param string hash
+		@return Page
 	*/
 	public static function executePage($action, $useCache = false, $hash = '') {
 		global $user;
+		$page = null;
 		if ( PageManager::pageCanBeCachedServer($action) && $user->isAnon() && !empty($hash) ) {
 			if ( $useCache && CacheManager::cacheExists($action, $hash) ) {
-				$page = new Page($action);
-				$data = unserialize( CacheManager::getCache($action, $hash) );
-				$page->setTitle( $data['title'] );
-				$page->setContent( $data['content'] );
-				$page->setMessages( $data['messages'] );
+				$page = unserialize( CacheManager::getCache($action, $hash) );
+				$page->set('outputDone', false);
+				$page->set('doIconv', false); // encoding is already done
 			} else {
 				$page = PageManager::buildPage($action);
-				$data = array(
-					'content' => $page->execute(),
-					'title' => $page->title(),
-					'messages' => $page->messages()
-				);
-				CacheManager::setCache( $action, $hash, serialize($data) );
+				$page->execute();
+				if ( $page->allowCaching() ) {
+					// contains sensitive data
+					$page->set('db', null);
+					CacheManager::setCache( $action, $hash, serialize($page) );
+				}
 			}
 		} else {
 			$page = PageManager::buildPage($action);
@@ -84,10 +83,10 @@ class PageManager {
 
 
 	/**
-	Loads class file for a given page name and create the page object.
+		Loads class file for a given page name and create the page object.
 
-	@param string $action Action (or the page name)
-	@return Page
+		@param string $action Action (or the page name)
+		@return Page
 	*/
 	public static function buildPage($action) {
 		$pageClass = PageManager::loadPage($action);
@@ -96,10 +95,10 @@ class PageManager {
 
 
 	/**
-	Loads class file for a given page name.
+		Loads class file for a given page name.
 
-	@param string $action Action (or the page name)
-	@return string Page class name
+		@param string $action Action (or the page name)
+		@return string Page class name
 	*/
 	public static function loadPage($action) {
 		$page = PageManager::getPageClass($action);

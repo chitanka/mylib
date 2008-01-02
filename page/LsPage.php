@@ -2,7 +2,9 @@
 
 class LsPage extends Page {
 
-	protected $maxSaveSize = 20000000;
+	protected
+		$maxSaveSize = 20000000,
+		$dirs = array('text', 'text-info', 'text-anno', 'cover', 'book', 'book-anno', 'wiki', 'info', 'user');
 
 
 	public function __construct() {
@@ -20,19 +22,23 @@ class LsPage extends Page {
 
 	protected function buildContent() {
 		global $contentDirs;
-		$dir = $contentDirs[$this->dir];
-		$this->files = array();
-		$this->starttime = time() - $this->days * 24*60*60;
-		$this->processDir($dir);
-
-		ksort($this->files, SORT_NUMERIC);
-		$files = array_reverse($this->files, true);
+		$dirs = $this->dir == '*' ? $this->dirs : array($this->dir);
 		$o = '';
-		foreach ($this->files as $mtime => $tfiles) {
-			$date = date('Y-m-d H:i:s', $mtime);
-			foreach ($tfiles as $file) {
-				$link = $this->out->link($this->rootd.'/'.$file, $file);
-				$o .= "$date  $link\n";
+		foreach ($dirs as $dir) {
+			$dir = $contentDirs[$dir];
+			$this->files = array();
+			$this->starttime = time() - $this->days * 24*60*60;
+			$this->processDir($dir);
+
+			ksort($this->files, SORT_NUMERIC);
+			$files = array_reverse($this->files, true);
+			$o .= "<h2>$dir</h2>";
+			foreach ($this->files as $mtime => $tfiles) {
+				$date = date('Y-m-d H:i:s', $mtime);
+				foreach ($tfiles as $file) {
+					$link = $this->out->link($this->rootd.'/'.$file, $file);
+					$o .= "$date  $link\n";
+				}
 			}
 		}
 		return $this->makeForm() . '<pre>'. $o .'</pre>';

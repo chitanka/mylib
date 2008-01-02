@@ -20,7 +20,7 @@ class User {
 		$isHuman = false;
 
 
-	private function __construct($id = 0, $username = '', $password = '',
+	public function __construct($id = 0, $username = '', $password = '',
 			$realname = '', $email = '', $group = 'anon', $options = array()) {
 		$this->id = $id;
 		$this->setIsHuman($id > 0);

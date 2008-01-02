@@ -3,6 +3,9 @@
 class SuggestDataPage extends MailPage {
 
 	protected
+		$FF_SUBACTION = 'subaction',
+		$FF_TEXT_ID = 'textId', $FF_CHUNK_ID = 'chunkId',
+		$FF_INFO = 'info', $FF_NAME = 'name', $FF_EMAIL = 'email',
 		$subactions = array(
 			'origTitle' => '+оригинално заглавие',
 			'year' => '+година на написване или първа публикация',
@@ -17,15 +20,15 @@ class SuggestDataPage extends MailPage {
 		parent::__construct();
 		$this->action = 'suggestData';
 		$this->subaction = normKey(
-			$this->request->value('sa', $this->defSubaction, 1),
+			$this->request->value($this->FF_SUBACTION, $this->defSubaction, 1),
 			$this->subactions, $this->defSubaction);
 		$this->title = strtr($this->subactions[$this->subaction],
 			array('+' => 'Информация за '));
-		$this->textId = (int) $this->request->value('textId', 0, 2);
-		$this->chunkId = (int) $this->request->value('chunkId', 1, 3);
-		$this->info = $this->request->value('info');
-		$this->name = $this->request->value('name', $this->user->username);
-		$this->email = $this->request->value('email', $this->user->email);
+		$this->textId = (int) $this->request->value($this->FF_TEXT_ID, 0, 2);
+		$this->chunkId = (int) $this->request->value($this->FF_CHUNK_ID, 1, 3);
+		$this->info = $this->request->value($this->FF_INFO);
+		$this->name = $this->request->value($this->FF_NAME, $this->user->username);
+		$this->email = $this->request->value($this->FF_EMAIL, $this->user->email);
 		$this->initData();
 	}
 
@@ -59,12 +62,12 @@ class SuggestDataPage extends MailPage {
 			return '';
 		}
 		$intro = $this->makeIntro();
-		$textId = $this->out->hiddenField('textId', $this->textId);
-		$chunkId = $this->out->hiddenField('chunkId', $this->chunkId);
-		$subaction = $this->out->hiddenField('subaction', $this->subaction);
-		$info = $this->out->textarea('info', '', $this->info, 15, 80);
-		$name = $this->out->textField('name', '', $this->name, 50);
-		$email = $this->out->textField('email', '', $this->email, 50);
+		$textId = $this->out->hiddenField($this->FF_TEXT_ID, $this->textId);
+		$chunkId = $this->out->hiddenField($this->FF_CHUNK_ID, $this->chunkId);
+		$subaction = $this->out->hiddenField($this->FF_SUBACTION, $this->subaction);
+		$info = $this->out->textarea($this->FF_INFO, '', $this->info, 15, 80);
+		$name = $this->out->textField($this->FF_NAME, '', $this->name, 50);
+		$email = $this->out->textField($this->FF_EMAIL, '', $this->email, 50);
 		$submit = $this->out->submitButton('Пращане');
 		return <<<EOS
 $intro
@@ -75,13 +78,13 @@ $intro
 	$chunkId
 	$subaction
 	<table summary="table for the layout"><tr>
-		<td class="fieldname-left"><label for="name">Име:</label></td>
+		<td class="fieldname-left"><label for="$this->FF_NAME">Име:</label></td>
 		<td>$name</td>
 	</tr><tr>
-		<td class="fieldname-left"><label for="email">Е-поща:</label></td>
+		<td class="fieldname-left"><label for="$this->FF_EMAIL">Е-поща:</label></td>
 		<td>$email</td>
 	</tr></table>
-	<label for="info">Информация:</label><br />
+	<label for="$this->FF_INFO">Информация:</label><br />
 	$info<br />
 	$submit
 </fieldset>
@@ -104,7 +107,7 @@ EOS;
 			$commentlink = $this->out->internLink('страницата за читателски мнения', $params, 2);
 			return <<<EOS
 <p>Чрез долния формуляр можете да предложите анотация на $ta. Ако просто искате да оставите коментар към произведението, ползвайте $commentlink.</p>
-<p><strong>Ако сте копирали анотацията, задължително посочете източника!</strong></p>
+<p><strong>Ако сте копирали анотацията, задължително посочете точния източник!</strong></p>
 EOS;
 		case 'year':
 			return "<p>Ако имате информация за годината на написване или първа публикация на $ta, можете да ми пратите набързо едно съобщение чрез долния формуляр.</p>";

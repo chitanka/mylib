@@ -86,6 +86,7 @@ $cfg['rights'] = array(
 		'main',
 		'news',
 		'register',
+		'rules',
 		'sendNewPassword',
 		'sendUsername',
 		'series',

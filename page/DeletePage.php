@@ -18,6 +18,7 @@ class DeletePage extends Page {
 		$qs[] = $this->db->deleteQ(DBT_TRANSLATOR_OF, $key);
 		$qs[] = $this->db->deleteQ(DBT_READER_OF, $key);
 		$qs[] = $this->db->deleteQ(DBT_HEADER, $key);
+		$qs[] = $this->db->deleteQ(DBT_EDIT_HISTORY, $key);
 		if ( $this->db->transaction($qs) ) {
 			$this->addMessage("Текстът с номер $this->textId и всички данни, свързани с него — автор(и), преводач(и), читатели, бяха безвъзвратно изтрити.");
 		} else {

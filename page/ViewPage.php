@@ -4,7 +4,7 @@ class ViewPage extends Page {
 
 	const
 		FF_MODE = 'mode', FF_ORDER = 'order', FF_COUNTRY = 'country',
-		FF_DLMODE = 'dlMode', FF_VIEW_TYPE = 'vt';
+		FF_DLMODE = 'dlMode', FF_VIEW_TYPE = 'vt', FF_USE_THRESHOLD = 'ult';
 	protected
 		$titles = array('simple' => '', 'extended' => ''),
 		$modes = array(
@@ -15,7 +15,10 @@ class ViewPage extends Page {
 		$viewTypes = array('plain' => 'Списък', 'table' => 'Таблица'),
 		$defViewType = 'plain',
 		$defOrder = 'alpha', $defDlMode = 'one', $defMode = 'simple-toc',
-		$defCountry = '';
+		$defCountry = '', $defUseThreshold = 1,
+		$workCount = 0,
+		$gthreshold = 60, $sthreshold = 2;
+
 
 	public function __construct() {
 		parent::__construct();
@@ -42,6 +45,7 @@ class ViewPage extends Page {
 			$this->request->value(self::FF_VIEW_TYPE, $this->defViewType),
 			$this->viewTypes,
 			$this->defViewType);
+		$this->useThreshold = (bool) $this->request->value(self::FF_USE_THRESHOLD, $this->defUseThreshold);
 
 		$modes = explode('-', $this->mode);
 		$this->mode1 = isset($this->titles[ $modes[0] ]) ? $modes[0] : '';

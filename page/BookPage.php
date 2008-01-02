@@ -33,7 +33,7 @@ class BookPage extends ViewPage {
 
 	protected function makeSimpleListQuery() {
 		$qa = array(
-			'SELECT' => 'b.*, GROUP_CONCAT(a.name) author',
+			'SELECT' => 'b.*, GROUP_CONCAT(DISTINCT a.name) author',
 			'FROM' => DBT_BOOK_TEXT .' bt',
 			'LEFT JOIN' => array(
 				DBT_BOOK .' b' => 'bt.book = b.id',
@@ -84,6 +84,7 @@ EOS;
 
 	protected function makeExtendedList() {
 		$this->curObj = 0;
+		$this->curPart = '';
 		$this->curAuthor = '';
 		$this->displayAuthor = false;
 		$this->data = $this->objTitles = array();
@@ -92,16 +93,14 @@ EOS;
 		if ( empty($this->objTitles) ) {
 			return false;
 		}
-		$this->data[$this->curObj] = array(
-			'titles' => $this->objTitles,
-			'book' => $this->objTitles[0]['book'],
-			'type' => $this->objTitles[0]['bookType'],
-			'author' => ($this->displayAuthor ? '' : $this->curAuthor),
-		);
+		$this->data[$this->curObj]['book'] = $this->objTitles[0]['book'];
+		$this->data[$this->curObj]['type'] = $this->objTitles[0]['bookType'];
+		$this->data[$this->curObj]['author'] = ($this->displayAuthor ? '' : $this->curAuthor);
 
 		$o = '';
 		$toc = '<div id="toc"><h2>Съдържание</h2><ul>';
 		$userCanEdit = $this->user->canExecute('edit');
+		#dpr($this->data);
 		foreach ($this->data as $objId => $objData) {
 			extract($objData);
 			$fullObjName = ltrim("$author - $book", ' -');
@@ -117,34 +116,49 @@ EOS;
 
 <h2 id="$bookAnchor">$book $editLink $author</h2>
 
-<ul>
 EOS;
-			$tids = array();
-			foreach ($titles as $tData) {
-				extract($tData);
-				$tids[] = $textId;
-				$dlLink = $this->makeDlLink($textId, $zsize);
-				$extras = array();
-				if ( !empty($orig_title) && $orig_lang != $lang ) {
-					$extras[] = "<em>$orig_title</em>";
-				}
-				$textLink = $this->makeTextLink(compact('textId', 'type', 'size', 'zsize', 'title', 'date', 'datestamp', 'reader'));
-				if ($this->order == 'time') {
-					$titleView = '<span class="extra"><tt>'.$this->makeYearView($year).
-						'</tt> — </span>'.$textLink;
-				} else {
-					$titleView = $textLink;
-					if ( !empty($year) ) { $extras[] = $year; }
-				}
-				if ($displayAuthor) {
-					$author = $this->makeAuthorLink($author);
-					if ( !empty($author) ) { $extras[] = $author; }
-				}
-				$extras = empty($extras) ? '' : '('. implode(', ', $extras) .')';
-				$dlCheckbox = $this->makeDlCheckbox($textId);
-				$editLink = $userCanEdit ? $this->makeEditTextLink($textId) : '';
-				$title = workType($type);
+			$annoFile = getContentFilePath('book-anno', $objId);
+			if ( file_exists($annoFile) ) {
+				$parser = new Sfb2HTMLConverter($annoFile);
+				$parser->parse();
 				$o .= <<<EOS
+<fieldset id="annotation">
+<legend>Анотация</legend>
+$parser->text
+</fieldset>
+EOS;
+			}
+			$tids = array();
+			foreach ($titles as $part => $ptitles) {
+				if ( !empty($part) ) {
+					$o .= "\n<h3>$part</h3>";
+				}
+				$o .= '<ul>';
+				foreach ($ptitles as $tData) {
+					extract($tData);
+					$tids[] = $textId;
+					$dlLink = $this->makeDlLink($textId, $zsize);
+					$extras = array();
+					if ( !empty($orig_title) && $orig_lang != $lang ) {
+						$extras[] = "<em>$orig_title</em>";
+					}
+					$textLink = $this->makeTextLink(compact('textId', 'type', 'size', 'zsize', 'title', 'date', 'datestamp', 'reader'));
+					if ($this->order == 'time') {
+						$titleView = '<span class="extra"><tt>'.$this->makeYearView($year).
+							'</tt> — </span>'.$textLink;
+					} else {
+						$titleView = $textLink;
+						if ( !empty($year) ) { $extras[] = $year; }
+					}
+					if ($displayAuthor) {
+						$author = $this->makeAuthorLink($author);
+						if ( !empty($author) ) { $extras[] = $author; }
+					}
+					$extras = empty($extras) ? '' : '('. implode(', ', $extras) .')';
+					$dlCheckbox = $this->makeDlCheckbox($textId);
+					$editLink = $userCanEdit ? $this->makeEditTextLink($textId) : '';
+					$title = workType($type);
+					$o .= <<<EOS
 
 <li class="$type" title="$title">
 	$dlCheckbox
@@ -155,8 +169,9 @@ EOS;
 	</span>
 </li>
 EOS;
+				}
+				$o .= "</ul>\n";
 			}
-			$o .= "</ul>\n";
 			if (!$this->showDlForm && count($tids) > 1) {
 				$o .= $this->makeDlSeriesForm($tids, $fullObjName, 'цялата книга');
 			}
@@ -183,7 +198,7 @@ EOS;
 	protected function makeExtendedListQuery() {
 		$chrono = $this->order == 'time' ? 't.year,' : '';
 		$qa = array(
-			'SELECT' => 'b.id objId, b.title book, b.type bookType,
+			'SELECT' => 'b.id objId, b.title book, b.type bookType, bp.name part,
 				t.id textId, t.title, t.lang, t.orig_title, t.orig_lang,
 				t.year, t.type, t.sernr, t.size, t.zsize, t.entrydate date,
 				UNIX_TIMESTAMP(t.entrydate) datestamp,
@@ -191,6 +206,7 @@ EOS;
 			'FROM' => DBT_BOOK_TEXT .' bt',
 			'LEFT JOIN' => array(
 				DBT_BOOK .' b' => 'bt.book = b.id',
+				DBT_BOOK_PART .' bp' => 'bt.part = bp.id',
 				DBT_TEXT .' t' => 'bt.text = t.id',
 				DBT_AUTHOR_OF .' aof' => 'aof.text = t.id',
 				DBT_PERSON .' a' => 'a.id = aof.person',
@@ -217,14 +233,12 @@ EOS;
 		if ( empty($textId) ) {
 			return;
 		}
+		$this->curPart = $part;
 		if ($this->curObj != $objId) {
 			if ( !empty($this->curObj) ) {
-				$this->data[$this->curObj] = array(
-					'titles' => $this->objTitles,
-					'book' => $this->objTitles[0]['book'],
-					'type' => $this->objTitles[0]['bookType'],
-					'author' => ($this->displayAuthor ? '' : $this->curAuthor),
-				);
+				$this->data[$this->curObj]['book'] = $this->objTitles[0]['book'];
+				$this->data[$this->curObj]['type'] = $this->objTitles[0]['bookType'];
+				$this->data[$this->curObj]['author'] = ($this->displayAuthor ? '' : $this->curAuthor);
 				$this->curAuthor = '';
 				$this->displayAuthor = false;
 				$this->objTitles = array();
@@ -236,6 +250,7 @@ EOS;
 			$this->curAuthor = $author;
 		}
 		unset($dbrow['objId']);
+		$this->data[$this->curObj]['titles'][$this->curPart][] = $dbrow;
 		$this->objTitles[] = $dbrow;
 		return '';
 	}

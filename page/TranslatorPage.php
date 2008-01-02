@@ -119,8 +119,8 @@ EOS;
 			ksort($series);
 			foreach ($series as $serName => $titles) {
 				$isTrueSeries = $serName{0} == ' '; // false by novels, etc.
-				$orig = $ser[$serName];
 				list($orig, $seriesType) = $ser[$serName];
+				$serName = trim($serName);
 				$orig = !empty($orig) && $orig != $serName ? "($orig)" : '';
 				$serLink = $isTrueSeries
 					? $this->makeSeriesLink($serName) . seriesSuffix($seriesType)

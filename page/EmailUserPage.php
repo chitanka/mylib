@@ -96,7 +96,7 @@ class EmailUserPage extends MailPage {
 		<td class="fieldname-left">От:</td>
 		<td>$fromuserlink</td>
 	</tr><tr>
-		<td class="fieldname-left">До:</td>
+		<td class="fieldname-left"><label for="username">До:</label></td>
 		<td>$username</td>
 	</tr><tr>
 		<td class="fieldname-left"><label for="subject">Относно:</label></td>

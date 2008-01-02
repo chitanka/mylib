@@ -22,7 +22,7 @@ class EditUserPagePage extends UserPage {
 		}
 		file_put_contents($this->filename, $this->userpage);
 		$this->setDefaultTitle();
-		return $this->makeEditLink() . $this->makeHTML();
+		return $this->makeEditOwnPageLink() . $this->makeHTML();
 	}
 
 

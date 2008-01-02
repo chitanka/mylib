@@ -61,6 +61,7 @@ class WorkPage extends Page {
 			$this->defViewList, null, $this->viewLists);
 
 		$this->multidata = array();
+		$this->tooltips = array();
 	}
 
 
@@ -85,9 +86,7 @@ class WorkPage extends Page {
 				$this->db->delete(self::DB_TABLE2, array('pid'=>$this->entry));
 			}
 			$this->addMessage("Произведението „{$this->btitle}“ беше махнато от списъка.");
-			if ( $this->isSingleUser($this->workType) ) {
-				$this->handleUpload();
-			}
+			$this->handleUpload();
 			return $this->makeLists();
 		}
 		if ( empty($this->btitle) ) {
@@ -117,10 +116,13 @@ class WorkPage extends Page {
 			'user'=>$this->scanuser, 'comment' => $this->comment,
 			'date'=>$this->date, 'frozen' => $this->frozen,
 			'status'=>$this->status, 'progress' => $this->progress,
-			'tmpfiles' => $this->tmpfiles, 'tfsize' => $this->tfsize);
-		if ( $this->isSingleUser($this->workType) ) {
-			if ( $this->handleUpload() && !empty($this->uplfile) ) {
-				$set['uplfile'] = $this->uplfile;
+			'tmpfiles' => $this->tmpfiles, 'tfsize' => $this->tfsize
+		);
+		if ( $this->handleUpload() && !empty($this->uplfile) ) {
+			$set['uplfile'] = $this->uplfile;
+			if ( $this->isMultiUser() ) {
+				$set['tmpfiles'] = $this->makeTmpFilePath($this->uplfile);
+				$set['tfsize'] = int_b2m(filesize($this->tmpDir . $this->uplfile));
 			}
 		}
 		$this->db->update(self::DB_TABLE, $set, $this->entry);
@@ -172,7 +174,7 @@ class WorkPage extends Page {
 
 
 	protected function handleUpload() {
-		$tmpfile = $_FILES['file']['tmp_name'];
+		$tmpfile = $this->request->fileTempName('file');
 		if ( !is_uploaded_file($tmpfile) ) {
 			return false;
 		}
@@ -182,7 +184,8 @@ class WorkPage extends Page {
 			$this->addMessage("Файлът не успя да бъде качен. Опитайте пак!", true);
 			return false;
 		}
-		$this->addMessage("Файлът беше качен и през идните дни ще бъде добавен в библиотеката. Благодаря ви за положения труд!");
+		$flink = $this->out->link($this->rootd .'/'. $dest, 'Файлът');
+		$this->addMessage("$flink беше качен. Благодаря ви за положения труд!");
 		$log = "$this->date\t$this->scanuser ({$this->user->username})\t$dest\t$this->btitle\t$this->author\n";
 		file_put_contents('log/todo', $log, FILE_APPEND);
 		$mailpage = PageManager::buildPage('mail');
@@ -217,6 +220,8 @@ class WorkPage extends Page {
 
 
 	protected function makeLists() {
+		$this->addScript('prototype.js');
+		$this->addScript('tooltip.js');
 		$listFunc = 'make' . ucfirst($this->viewList) . 'List';
 		return $this->makePageHelp() . $this->makeNewEntryLink() .
 			$this->makeViewListSelector() . $this->$listFunc();
@@ -240,12 +245,12 @@ EOS;
 	}
 
 	public function makeWorkList($limit = 0) {
-		$this->tooltips = '';
 		$q = $this->makeSqlQuery($limit);
 		$l = $this->db->iterateOverResult($q, 'makeWorkListItem', $this, true);
 		if ( empty($l) ) {
 			return '<p style="text-align:center"><strong>Няма подготвящи се произведения.</strong></p>';
 		}
+		$tt = implode("\n", $this->tooltips);
 		return <<<EOS
 
 <table class="content sortable" cellpadding="0" cellspacing="0">
@@ -262,6 +267,9 @@ EOS;
 <tbody>$l
 </tbody>
 </table>
+$this->scriptStart
+$tt
+$this->scriptEnd
 EOS;
 	}
 
@@ -307,7 +315,7 @@ EOS;
 		if ( $this->isMultiUser($type) ) {
 			$mdata = $this->getMultiEditData($id);
 			foreach ($mdata as $muser => $data) {
-				$uinfo = $this->makeExtraInfo($data['comment']);
+				$uinfo = $this->makeExtraInfo("$data[comment] ($data[progress]%)");
 				if ($muser == $user) {
 					$userlink = $uinfo .'&nbsp;'. $userlink;
 					continue;
@@ -374,10 +382,13 @@ EOS;
 
 
 	public function makeExtraInfo($info, $expand = false) {
-		$info = strtr($info, array("\n" => '', "\r" => ''));
-		return $expand
-			? $info
-			: $this->out->image($this->skin->image('info'),  '', $info);
+		$info = strtr($info, array("\n" => '<br/>', "\r" => ''));
+		if ($expand) {
+			return $info;
+		}
+		$id = count($this->tooltips);
+		$this->tooltips[] = "var tt$id = new Tooltip('itt$id', 'tt$id');";
+		return $this->out->image($this->skin->image('info'),  '', '', array('id' => "itt$id")) . "<div id='tt$id' class='tooltip'>". $info .'</div>';
 	}
 
 
@@ -509,6 +520,7 @@ EOS;
 		$frozen = $this->out->checkbox('frozen', '', $this->frozen,
 			'Подготовката е спряна за известно време');
 		$file = $this->out->fileField('file', '', 50);
+		$maxFileSize = $this->out->makeMaxFileSizeField();
 		return <<<EOS
 	<tr>
 		<td><label for="status">Етап:</label></td>
@@ -519,7 +531,7 @@ EOS;
 		</td>
 	</tr><tr>
 		<td><label for="file">Файл:</label></td>
-		<td>$file</td>
+		<td>$maxFileSize $file</td>
 	</tr>
 EOS;
 	}
@@ -572,6 +584,8 @@ EOS;
 		$flink = $this->tmpfiles == self::DEF_TMPFILE ? ''
 			: $this->out->link($this->tmpfiles) .
 			($this->tfsize > 0 ? " ($this->tfsize&nbsp;MB)" : '');
+		$file = $this->out->fileField('file', '', 50);
+		$maxFileSize = $this->out->makeMaxFileSizeField();
 		return <<<EOS
 	<fieldset>
 		<legend>Сканиране и разпознаване ($ulink)</legend>
@@ -580,6 +594,12 @@ EOS;
   		$status
 		$frozen
 		</div>
+		<div>
+		<label for="file">Файл:</label>
+		$maxFileSize
+		$file
+		</div>
+		<p>или</p>
 		<div>
 		<label for="tmpfiles">Междинни файлове:</label>
 		$tmpfiles $flink
@@ -663,7 +683,7 @@ EOS;
 			$class = $this->out->nextRowClass($class);
 			$ulink = $this->makeUserLinkWithEmail($username, $email, $allowemail);
 			if ( !empty($uplfile) ) {
-				$url = $this->rootd .'/'. $this->tmpDir . $uplfile;
+				$url = $this->makeTmpFilePath($uplfile);
 				$comment .= ' ('.$this->out->link($url, 'Качен файл', "Качен от $username файл").')';
 			}
 			$progressbar = $this->makeProgressBar($progress);
@@ -749,10 +769,11 @@ EOS;
 
 
 	protected function makeMultiUserScanHelp() {
+		$maxUploadSizeInMiB = getMaxUploadSizeInMiB();
 		return <<<EOS
 
 <h2>Сканиране и разпознаване</h2>
-<p>След като сканирате произведението, е нужно да качите суровите файлове някъде в интернет и да посочите адреса в полето „Междинни файлове“. Така останалите потребители ще могат да се включат в редакцията на текста. Полезно е да въведете и големината на файловете в полето „Размер“.</p>
+<p>След като сканирате произведението, можете да качите суровите файлове в библиотеката (чрез полето „Файл“) или някъде в интернет. Ако изберете библиотеката, имайте предвид, че ограничението за големината на файла е <strong>$maxUploadSizeInMiB</strong> мебибайта. При втория вариант е нужно да посочите адреса в полето „Междинни файлове“. Полезно е да въведете и големината на файловете в полето „Размер“.</p>
 EOS;
 	}
 
@@ -771,9 +792,9 @@ EOS;
 	}
 
 	protected function makeSendFileHelp() {
-		$tmpDir = $this->out->link($this->rootd.'/'.$this->tmpDir);
+		$tmpDir = $this->out->link( $this->makeTmpFilePath() );
 		$adminMail = $this->out->obfuscateEmail(ADMIN_EMAIL);
-		$maxUploadSizeInMiB = int_b2m( ini_bytes( ini_get('upload_max_filesize') ) );
+		$maxUploadSizeInMiB = getMaxUploadSizeInMiB();
 		return <<<EOS
 
 <p>Когато сте готови с текста, в полето „Файл“ изберете файла с произведението (като натиснете бутона до полето ще ви се отвори прозорче за избор).</p>
@@ -897,8 +918,14 @@ EOS;
 	}
 
 
-	public function isSingleUser($type) { return $type == 0; }
-	public function isMultiUser($type) { return $type == 1; }
+	public function isSingleUser($type = null) {
+		fillOnEmpty($type, $this->workType);
+		return $type == 0;
+	}
+	public function isMultiUser($type = null) {
+		fillOnEmpty($type, $this->workType);
+		return $type == 1;
+	}
 
 	public function thisUserCanEditEntry($entry, $type) {
 		if ($this->user->isSuperUser() || $type == 1) return true;
@@ -965,4 +992,10 @@ EOS;
 		$filename = ltrim($filename, '.');
 		return $filename;
 	}
+
+
+	protected function makeTmpFilePath($file = '') {
+		return $this->rootd.'/'.$this->tmpDir . $file;
+	}
+
 }

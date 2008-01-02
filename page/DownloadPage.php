@@ -52,7 +52,9 @@ class DownloadPage extends Page {
 		$this->zipFileName = $this->cleanFileName(cyr2lat($this->zipFileName));
 		$fullZipFileName = $this->zipFileName .'.zip';
 		CacheManager::setDlFile($fullZipFileName, $this->zf->file());
-		header('Location: '. $this->rootd .'/'. CacheManager::getDlFile($fullZipFileName));
+		$dlFile = CacheManager::getDlFile($fullZipFileName);
+		$this->outputLength = filesize($dlFile);
+		header('Location: '. $this->rootd .'/'. $dlFile);
 		CacheManager::deleteOldDlFiles();
 		$this->outputDone = true;
 	}

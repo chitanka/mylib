@@ -425,22 +425,27 @@ class Sfb2HTMLConverter {
 
 	protected function doAuthor() {
 		$this->savePar($this->ltext, 'author');
+		$this->acceptEmptyLine = true;
 	}
 
 	protected function doPlace() {
 		$this->savePar($this->ltext, 'placeyear');
+		$this->acceptEmptyLine = true;
 	}
 
 	protected function doSubheader() {
 		$this->savePar($this->ltext, 'subheader');
+		$this->acceptEmptyLine = true;
 	}
 
 	protected function doSign() {
 		$this->savePar($this->ltext, 'sign');
+		$this->acceptEmptyLine = true;
 	}
 
 	protected function doNotice() {
 		$this->savePar($this->ltext, 'notice');
+		$this->acceptEmptyLine = true;
 	}
 
 	protected function savePar($content, $class = '') {

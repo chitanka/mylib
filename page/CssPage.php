@@ -19,6 +19,7 @@ class CssPage extends Page {
 			$this->contentType = 'text/css';
 			$this->sendCommonHeaders();
 			require $file;
+			$this->outputLength = filesize($file);
 			$this->outputDone = true;
 		}
 		return '';

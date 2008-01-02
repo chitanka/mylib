@@ -62,6 +62,7 @@ class TextPage extends Page {
 
 
 	protected function makeRandomContent() {
+		$this->allowCaching = false;
 		$res = $this->db->select(Work::DB_TABLE, array(), array('MIN(id)', 'MAX(id)'));
 		list($this->minTextId, $this->maxTextId) = $this->db->fetchRow($res);
 		$c = '';
@@ -97,6 +98,7 @@ class TextPage extends Page {
 		}
 		if ( $this->outencoding == $this->inencoding ) {
 			readfile($file);
+			$this->fullContent .= file_get_contents($file);
 		} else {
 			$handle = fopen($file, 'r');
 			if ($handle) {
@@ -112,6 +114,7 @@ class TextPage extends Page {
 			"\n\n\tСвалено от „{$this->sitename}“ [$this->purl/text/$this->textId]";
 		$extra = preg_replace('/\n\n+/', "\n\n", $extra);
 		$this->encprint("\nI>$extra\nI$\n");
+		$this->outputLength = filesize($file);
 		$this->outputDone = true;
 	}
 
@@ -157,7 +160,7 @@ class TextPage extends Page {
 			$extra .= "\n<li>$ser</li>";
 		}
 		if ( !empty($this->work->books) ) {
-			$item = ($this->work->type == 'intro' ? 'Предговор към' : 'Част от')
+			$item = 'Част от'
 				.' '. (count($this->work->books) == 1 ? 'книгата' : 'книгите');
 			foreach ($this->work->books as $id => $book) {
 				$item .= ' „'. $this->makeBookLink($book['title']) .'“';
@@ -209,7 +212,7 @@ class TextPage extends Page {
 		}
 		$extra .= "\n<li>Етикети: ". $this->makeLabelInfo() .'</li>';
 		if ($this->work->isRead) {
-			$extra .= "\n".'<li>Това произведение е отбелязано като прочетено.</li>';
+			$extra .= "\n".'<li><span class="ok">Това произведение е отбелязано като прочетено.</span></li>';
 		}
 		$commCnt = $this->getReaderCommentCount();
 		$extra .= "\n<li>";

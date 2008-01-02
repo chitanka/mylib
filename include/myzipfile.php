@@ -136,7 +136,7 @@ class myzipfile {
 		$cdrec .= $this->old_offset_ph;
 		$cdrec .= $name;
 
-		return array('name'=>$name, 'fr'=>$fr, 'cdrec'=>$cdrec);
+		return compact('name', 'fr', 'cdrec');
     } // end of the 'newFileEntry()' method
 
 

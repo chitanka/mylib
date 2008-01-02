@@ -49,6 +49,7 @@ $contentDirs = array(
 	'img' => 'img/',
 	'cover' => 'cover/',
 	'book' => 'book/',
+	'book-anno' => 'book-anno/',
 );
 foreach ($contentDirs as $key => $dir) {
 	$contentDirs[$key] = $contentDir . $dir;
@@ -93,6 +94,7 @@ $types = array(
 	'playbook' => array('Книга-игра', 'Книги-игри', 'книгата-игра', 'книгите-игри'),
 	'science' => array('Научно', 'Научни', '', ''),
 	'novelette' => array('Новела', 'Новели', 'новелата', 'новелите'),
+	'ocherk' => array('Очерк', 'Очерци', 'очерка', 'очерците'),
 	'shortstory' => array('Разказ', 'Разкази', 'разказа', 'разказите'),
 	'novel' => array('Роман', 'Романи', 'романа', 'романите'),
 	'play' => array('Пиеса', 'Пиеси', 'пиесата', 'пиесите'),
@@ -100,6 +102,7 @@ $types = array(
 	'poetry' => array('Поезия', 'Поезия', '', ''),
 	'poem' => array('Поема', 'Поеми', 'поемата', 'поемите'),
 	'novella' => array('Повест', 'Повести', 'повестта', 'повестите'),
+	'outro' => array('Послеслов', 'Послеслови', 'послеслова', 'послесловите'),
 	'intro' => array('Предговор', 'Предговори', 'предговора', 'предговорите'),
 	'tale' => array('Приказка', 'Приказки', 'приказката', 'приказките'),
 	'travelnotes' => array('Пътепис', 'Пътеписи', 'пътеписа', 'пътеписите'),
@@ -155,6 +158,7 @@ $langs = array(
 	'sk' => 'Словашки',
 	'sl' => 'Словенски',
 	'sr' => 'Сръбски',
+	'chu' => 'Старобългарски',
 	'grc' => 'Старогръцки',
 	'hr' => 'Хърватски',
 	'tr' => 'Турски',
@@ -254,6 +258,8 @@ $seriesTypes = array(
 	'poetry' => array('стихосбирка', 'стихосбирки', 'стихосбирката', 'стихосбирките'),
 );
 
+$pseudoSeries = array('collection', 'poetry');
+
 function seriesSuffix($code) {
 	global $seriesTypes;
 	return $code == 'series' || empty($seriesTypes[$code][0])
@@ -271,6 +277,12 @@ function seriesTypeArticle($code, $singular = true) {
 	global $seriesTypes;
 	if ( !array_key_exists($code, $seriesTypes) ) return '';
 	return $singular ? $seriesTypes[$code][2] : $seriesTypes[$code][3];
+}
+
+
+function isPseudoSeries($type) {
+	global $pseudoSeries;
+	return in_array($type, $pseudoSeries);
 }
 
 $cyrUppers = 'А Б В Г Д Е Ж З И Й К Л М Н О П Р С Т У Ф Х Ц Ч Ш Щ Ъ Ю Я';
@@ -615,4 +627,8 @@ function int_b2k($bytes) {
 function int_b2m($bytes) {
 	$m = $bytes >> 20; // divide by 2^20 w/o rest
 	return $m > 0 ? $m : 1;
+}
+
+function getMaxUploadSizeInMiB() {
+	return int_b2m( ini_bytes( ini_get('upload_max_filesize') ) );
 }

@@ -15,18 +15,30 @@ CREATE TABLE /*$prefix*/book (
   `id` smallint(5) unsigned NOT NULL auto_increment,
   `title` varchar(255) NOT NULL,
   `subtitle` varchar(255) NOT NULL,
+  `orig_title` varchar(255) NOT NULL,
   `lang` varchar(2) character set latin1 collate latin1_general_ci NOT NULL default 'bg',
   `year` smallint(4) NOT NULL,
-  `type` enum('book','collection', 'poetry') NOT NULL default 'book',
+  `type` enum('book','collection','poetry') NOT NULL default 'book',
   PRIMARY KEY  (`id`),
   KEY `name` (`title`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 -- --------------------------------------------------------
 
+DROP TABLE IF EXISTS /*$prefix*/book_part;
+CREATE TABLE /*$prefix*/book_part (
+  `id` smallint(5) unsigned NOT NULL auto_increment,
+  `name` varchar(255) NOT NULL,
+  `book` smallint(5) unsigned NOT NULL,
+  PRIMARY KEY  (`id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 COMMENT='Book parts';
+
+-- --------------------------------------------------------
+
 DROP TABLE IF EXISTS /*$prefix*/book_text;
 CREATE TABLE /*$prefix*/book_text (
   `book` smallint(5) unsigned NOT NULL,
+  `part` smallint(5) unsigned NOT NULL,
   `text` mediumint(8) unsigned NOT NULL,
   `pos` smallint(5) unsigned NOT NULL,
   PRIMARY KEY  (`book`,`text`),
@@ -236,7 +248,7 @@ CREATE TABLE /*$prefix*/series (
   `id` smallint(5) unsigned NOT NULL auto_increment,
   `name` varchar(255) NOT NULL default '',
   `orig_name` varchar(255) NOT NULL default '',
-  `type` enum('series','collection', 'poetry') NOT NULL default 'series',
+  `type` enum('series','collection','poetry') NOT NULL default 'series',
   PRIMARY KEY  (`id`),
   KEY `name` (`name`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8;

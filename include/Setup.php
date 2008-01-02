@@ -164,6 +164,7 @@ class Setup {
 		$tables = array(
 			'AUTHOR_OF' => 'author_of',
 			'BOOK' => 'book',
+			'BOOK_PART' => 'book_part',
 			'BOOK_TEXT' => 'book_text',
 			'COMMENT' => 'comment',
 			'EDIT_HISTORY' => 'edit_history',
