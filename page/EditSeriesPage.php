@@ -120,7 +120,7 @@ EOS;
 		$key = $keys[$ind];
 		$js = "\npersons['$key'] = {";
 		$dbkey = array("(role & $ind)");
-		foreach ($this->db->getObjects(DBT_PERSON, null, null, $dbkey) as $id => $name) {
+		foreach ($this->db->getNames(DBT_PERSON, $dbkey) as $id => $name) {
 			$js .= "\n\t$id: '$name',";
 		}
 		$js = rtrim($js, ',') . "\n}; // end of array persons['$key']\n";

@@ -132,10 +132,9 @@ class TextPage extends Page {
 				$parser->patterns['/#(\d+)/'] = '<a href="#h$1" title="Към част $1"><strong>$1</strong></a>';
 			}
 			$parser->parse();
-			$fn = empty($parser->footnotes) ? ''
-				: "\n<fieldset class='footnotes'><legend>Бележки</legend>\n$parser->footnotes</fieldset>";
 			return '<p id="textstart" style="clear:both"></p>'.
-				"\n<div class='{$this->work->type}'>\n".$parser->text."\n</div>".$fn;
+				"\n<div class='{$this->work->type}'>\n".$parser->text."\n</div>".
+				$this->prepareFootnotes($parser->footnotes);
 		}
 		$tlink = $this->makeSimpleTextLink($this->ttitle, $this->textId, $this->chunkId);
 		$this->addMessage("Текстът „{$tlink}“ е празен.", true);
@@ -182,8 +181,8 @@ class TextPage extends Page {
 			if ( empty($this->work->orig_title) ) {
 				$params = array(self::FF_ACTION=>'suggestData', 'sa'=>'origTitle',
 					'textId' => $this->textId, 'chunkId' => $this->chunkId);
-				$link = $this->out->internLink('помогнете ми', $params, 4);
-				$orig_title = "[не е въведено; $link да го добавя]";
+				$link = $this->out->internLink('помогнете', $params, 4);
+				$orig_title = "[не е въведено; $link за добавянето му]";
 			} else {
 				$orig_title = $this->work->orig_title;
 				if ( !empty($this->work->orig_subtitle) ) {
@@ -201,8 +200,8 @@ class TextPage extends Page {
 			if ( empty($this->work->translator_name) ) {
 				$params = array(self::FF_ACTION=>'suggestData', 'sa'=>'translator',
 					'textId' => $this->textId, 'chunkId' => $this->chunkId);
-				$link = $this->out->internLink('помогнете ми', $params, 4);
-				$extra .= "[Няма данни за преводача; $link да го добавя]";
+				$link = $this->out->internLink('помогнете', $params, 4);
+				$extra .= "[Няма данни за преводача; $link за добавянето му]";
 			} else {
 				$extra .= $this->makeTranslatorLink($this->work->translator_name, 'first');
 			}
@@ -252,6 +251,7 @@ EOS;
 			'FROM' => DBT_TEXT_LABEL .' h',
 			'LEFT JOIN' => array(DBT_LABEL .' l' => 'h.label = l.id'),
 			'WHERE' => array('h.text' => $this->textId),
+			'ORDER BY' => 'name'
 		);
 		$res = $this->db->extselect($qa);
 		if ( $this->db->numRows($res) == 0 ) { return 'Няма'.$edit; }
@@ -278,7 +278,7 @@ EOS;
 			$this->hasAnno = true;
 			$parser = new Sfb2HTMLConverter($file, $this->getImgDir());
 			$parser->parse();
-			$anno = $parser->text;
+			$anno = $parser->text . $this->prepareFootnotes($parser->footnotes);
 		}
 		return <<<EOS
 
@@ -293,11 +293,12 @@ EOS;
 	protected function makeExtraInfo() {
 		if ( isset($this->extraInfo) ) return $this->extraInfo;
 		$file = getContentFilePath('text-info', $this->textId);
-		$text = '';
+		$text = $footnotes = '';
 		if ( file_exists($file) ) {
 			$parser = new Sfb2HTMLConverter($file, $this->getImgDir());
 			$parser->parse();
 			$text .= $parser->text;
+			$footnotes .= $parser->footnotes;
 		}
 		foreach ($this->work->books as $id => $book) {
 			$file = getContentFilePath('book', $id);
@@ -305,11 +306,13 @@ EOS;
 			$parser = new Sfb2HTMLConverter($file);
 			$parser->parse();
 			$text .= '<p><br /></p>' . $parser->text;
+			$footnotes .= $parser->footnotes;
 		}
 		$cover = $this->makeCoverImage();
 		if ( empty($text) && empty($cover) ) {
 			return '';
 		}
+		$text .= $this->prepareFootnotes($footnotes);
 		$this->hasExtraInfo = true;
 		return $this->extraInfo = <<<EOS
 
@@ -380,7 +383,7 @@ EOS;
 		}
 		$toci = '';
 		if ($this->prevlev < $level) {
-			$toci .= "\n<ul>";
+			$toci .= "\n<ul>".str_repeat("\n<li>\n<ul>", $level - 1 - $this->prevlev);
 		} elseif ($this->prevlev > $level) {
 			$toci .= '</li>'.str_repeat("\n</ul>\n</li>", $this->prevlev - $level);
 		} else $toci .= '</li>';
@@ -561,6 +564,11 @@ EOS;
 		return $this->rootd.'/'. getContentFilePath('img', $this->textId) .'/';
 	}
 
+
+	protected function prepareFootnotes($notes) {
+		return empty($notes) ? ''
+			: "\n<fieldset class='footnotes'><legend>Бележки</legend>\n$notes</fieldset>";
+	}
 
 	protected function makeEncodingSuggestions() {
 		$encs = array('cp1251', 'windows-1251', 'cp866', 'ibm866', 'ibm855',

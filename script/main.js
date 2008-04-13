@@ -1,9 +1,13 @@
+if (window.top != window) {
+	window.top.location = window.location;
+}
+
 /**
-Begin functions copied from MediaWiki
-License: GNU GPL
+	Begin functions copied from MediaWiki
+	License: GNU GPL
 */
 
-// add any onload functions in this hook (please don't hard-code any events in the xhtml source)
+// add any onload functions in this hook
 var doneOnloadHook;
 
 if (!window.onloadFuncts) {
@@ -85,8 +89,8 @@ function toggleToc() {
 
 
 /**
-Copied from A List Apart Magazine, No. 126,
-“Alternative Style: Working With Alternate Style Sheets” by Paul Sowden
+	Copied from A List Apart Magazine, No. 126,
+	“Alternative Style: Working With Alternate Style Sheets” by Paul Sowden
 */
 function setActiveStyleSheet(title) {
 	var i, a, main;
@@ -136,7 +140,7 @@ function getElementsByClassName(oElm, strTagName, oClassNames){
 }
 
 /**
-Uses a global variable postform.
+	Uses a global variable postform.
 */
 function initReply(cid) {
 	if ( typeof(postform) == "undefined" ) {

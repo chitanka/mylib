@@ -89,17 +89,18 @@ $cyrs = array(
 $types = array(
 	// code => array(singular, plural, sing. article, pl. article)
 	'anecdote' => array('Анекдот', 'Анекдоти', 'анекдота', 'анекдотите'),
-	'fable' => array('Басня', 'Басни', '', ''),
+	'fable' => array('Басня', 'Басни', 'баснята', 'басните'),
 	'essay' => array('Есе', 'Есета', 'есето', 'есетата'),
 	'playbook' => array('Книга-игра', 'Книги-игри', 'книгата-игра', 'книгите-игри'),
-	'science' => array('Научно', 'Научни', '', ''),
+	'science' => array('Научно', 'Научни', 'научната творба', 'научните творби'),
 	'novelette' => array('Новела', 'Новели', 'новелата', 'новелите'),
 	'ocherk' => array('Очерк', 'Очерци', 'очерка', 'очерците'),
 	'shortstory' => array('Разказ', 'Разкази', 'разказа', 'разказите'),
+	'review' => array('Рецензия', 'Рецензии', 'рецензия', 'рецензиите'),
 	'novel' => array('Роман', 'Романи', 'романа', 'романите'),
 	'play' => array('Пиеса', 'Пиеси', 'пиесата', 'пиесите'),
 	'letter' => array('Писмо', 'Писма', 'писмото', 'писмата'),
-	'poetry' => array('Поезия', 'Поезия', '', ''),
+	'poetry' => array('Поезия', 'Поезия', 'поетичната творба', 'поетичните творби'),
 	'poem' => array('Поема', 'Поеми', 'поемата', 'поемите'),
 	'novella' => array('Повест', 'Повести', 'повестта', 'повестите'),
 	'outro' => array('Послеслов', 'Послеслови', 'послеслова', 'послесловите'),
@@ -108,10 +109,11 @@ $types = array(
 	'travelnotes' => array('Пътепис', 'Пътеписи', 'пътеписа', 'пътеписите'),
 	'speech' => array('Реч', 'Речи', 'речта', 'речите'),
 	'article' => array('Статия', 'Статии', 'статията', 'статиите'),
+	'prosepoetry' => array('Стихотворение в проза', 'Стихотворения в проза', 'стихотворението', 'стихотворенията'),
 	'screenplay' => array('Сценарий', 'Сценарии', 'сценария', 'сценариите'),
 	'textbook' => array('Учебник', 'Учебници', 'учебника', 'учебниците'),
 	'feuilleton' => array('Фейлетон', 'Фейлетони', 'фейлетона', 'фейлетоните'),
-	'other' => array('Разни', 'Разни', '', ''),
+	'other' => array('Разни', 'Разни', 'творбата', 'творбите'),
 );
 
 function workType($code, $singular = true) {
@@ -482,6 +484,13 @@ function normVal($val, $data, $defVal = null) {
 }
 
 
+function limitLength($str, $len = 80) {
+	if ( strlen($str) > $len ) {
+		return substr($str, 0, $len - 1) . '…';
+	}
+	return $str;
+}
+
 function arrVal($arr, $key, $defVal = null) {
 	return array_key_exists($key, $arr) ? $arr[$key] : $defVal;
 }
@@ -499,6 +508,12 @@ function replaceVars($s, $vars) {
 
 function fillOnEmpty(&$var, $value) {
 	if ( empty($var) ) {
+		$var = $value;
+	}
+}
+
+function fillOnNull(&$var, $value) {
+	if ( is_null($var) ) {
 		$var = $value;
 	}
 }

@@ -239,8 +239,8 @@ class Work {
 			'SELECT' => 't.*,
 				s.id seriesId,
 				s.name series, s.orig_name seriesOrigName, s.type seriesType,
-				lo.code lo_code, lo.name lo_name, lo.copyright lo_copyright, lo.uri lo_uri,
-				lt.code lt_code, lt.name lt_name, lt.copyright lt_copyright, lt.uri lt_uri,
+				lo.code lo_code, lo.fullname lo_name, lo.copyright lo_copyright, lo.uri lo_uri,
+				lt.code lt_code, lt.fullname lt_name, lt.copyright lt_copyright, lt.uri lt_uri,
 				r.user isRead',
 			'FROM' => self::DB_TABLE .' t',
 			'LEFT JOIN' => array(

@@ -2,10 +2,7 @@
 
 class User {
 
-	const
-		DB_TABLE = DBT_USER,
-		PASS_RAW2DB_LOOPS = 10,
-		PASS_RAW2COOKIE_LOOPS = 5;
+	const DB_TABLE = DBT_USER;
 	public static $defOptions = array(
 		'skin' => 'orange',
 		'nav' => 'right', // navigation position
@@ -91,31 +88,35 @@ class User {
 
 
 	/**
-		Encrypt a password in order to save it in the database.
+		Encode a password in order to save it in the database.
 
 		@param string $password
-		@return string Encryptеd password
+		@return string Encoded password
 	*/
 	public static function encodePasswordDB($password) {
-		return md5_loop($password, self::PASS_RAW2DB_LOOPS);
+		return md5_loop($password, 1);
 	}
 
 
 	/**
-		Encrypt a password in order to save it in a cookie.
+		Encode a password in order to save it in a cookie.
 
 		@param string $password
-		@return string Encryptеd password
+		@param bool $rawpass Is this a real password or one already stored
+			encoded in the database
+		@return string Encoded password
 	*/
-	public static function encodePasswordCookie($password) {
-		return md5_loop($password, self::PASS_RAW2COOKIE_LOOPS);
+	public static function encodePasswordCookie($password, $rawpass = true) {
+		if ($rawpass) {
+			$password = self::encodePasswordDB($password);
+		}
+		return md5_loop($password, 5);
 	}
 
 
 	/**
 		Validate an entered password.
-		Encrypts an entered password and compares it to the password token in
-		the database.
+		Encodes an entered password and compares it to the password from the database.
 
 		@param string $inputPass The password from the input
 		@param string $dbPass The password stored in the database
@@ -128,16 +129,15 @@ class User {
 
 	/**
 		Validate a token from a cookie.
-		Properly encrypts the cookie token and compares it to the password token
-		in the database.
+		Properly encodes the password from the database and compares it to the token.
 
 		@param string $cookieToken The token from the cookie
-		@param string $dbToken The encrypted password stored in the database
+		@param string $dbPass The password stored in the database
 		@return bool
 	*/
-	public static function validateCookieToken($cookieToken, $dbToken) {
-		$loopDiff = self::PASS_RAW2DB_LOOPS - self::PASS_RAW2COOKIE_LOOPS;
-		return strcmp($dbToken, md5_loop($cookieToken, $loopDiff)) === 0;
+	public static function validateToken($cookieToken, $dbPass) {
+		$enc = self::encodePasswordCookie($dbPass, false);
+		return strcmp($enc, $cookieToken) === 0;
 	}
 
 
@@ -361,7 +361,7 @@ class User {
 			$set = array('touched' => date('Y-m-d H:i:s'));
 			$db->update(self::DB_TABLE, $set, $dbkey);
 			extract( $db->fetchAssoc($res) );
-			if ( self::validateCookieToken($_COOKIE[TOKEN_COOKIE], $password) ) {
+			if ( self::validateToken($_COOKIE[TOKEN_COOKIE], $password) ) {
 				$opts = self::unpackOptions($opts);
 				$opts['news'] = $db->s2b($news);
 				$opts['allowemail'] = $db->s2b($allowemail);

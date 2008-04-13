@@ -5,7 +5,7 @@ class WorkPage extends Page {
 		DEF_TMPFILE = 'http://',
 		DB_TABLE = DBT_WORK, DB_TABLE2 = DBT_WORK_MULTI,
 		FF_COMMENT = 'comment', FF_EDIT_COMMENT = 'editComment',
-		FF_VIEW_LIST = 'vl',
+		FF_VIEW_LIST = 'vl', FF_SUBACTION = 'sa',
 		MAX_SCAN_STATUS = 2;
 	protected
 		$tabs = array('Самостоятелна подготовка', 'Работа в екип'),
@@ -16,7 +16,13 @@ class WorkPage extends Page {
 		$viewLists = array(
 			'work' => 'списъка на подготвяните произведения',
 			'contrib' => 'списъка на помощниците'),
+		$viewTypes = array(
+			'' => 'Всички',
+			'my' => 'Мое участие',
+			'waiting' => 'Търси се редактор'
+		),
 		$defViewList = 'work',
+		$defListLimit = 10, $maxListLimit = 100,
 		$imgs = array('0', '25', '50', '75', '100'),
 		$progressBarWidth = '20',
 
@@ -35,7 +41,7 @@ class WorkPage extends Page {
 		$this->action = 'work';
 		$this->title = 'Подготовка на нови произведения';
 		$this->tmpDir = 'to-do/';
-		$this->subaction = $this->request->value('sa', '', 1);
+		$this->subaction = $this->request->value(self::FF_SUBACTION, '', 1);
 		$this->entry = (int) $this->request->value('entry', 0, 2);
 		$this->workType = (int) $this->request->value('workType', 0, 3);
 		$this->btitle = $this->request->value('title');
@@ -59,16 +65,20 @@ class WorkPage extends Page {
 		$this->showProgressbar = true;
 		$this->viewList = $this->request->value(self::FF_VIEW_LIST,
 			$this->defViewList, null, $this->viewLists);
-
+		if ( !empty($this->subaction) && !empty($this->viewTypes[$this->subaction]) ) {
+			$this->title .= ' — ' . $this->viewTypes[$this->subaction];
+		}
 		$this->multidata = array();
 		$this->tooltips = array();
+
+		$this->initPaginationFields();
 	}
 
 
 	protected function processSubmission() {
 		if ( !empty($this->entry) &&
 				!$this->thisUserCanEditEntry($this->entry, $this->workType) ) {
-			$this->addMessage('Нямате право да редактирате този запис.', true);
+			$this->addMessage('Нямате права да редактирате този запис.', true);
 			return $this->makeLists();
 		}
 		switch ($this->workType) {
@@ -179,7 +189,9 @@ class WorkPage extends Page {
 			return false;
 		}
 		$dest = $this->tmpDir . $this->uplfile;
-		if ( file_exists($dest) ) { $dest .= '.1'; }
+		if ( file_exists($dest) ) {
+			rename($dest, $dest .'-'. time());
+		}
 		if ( !move_uploaded_file($tmpfile, $dest) ) {
 			$this->addMessage("Файлът не успя да бъде качен. Опитайте пак!", true);
 			return false;
@@ -220,11 +232,12 @@ class WorkPage extends Page {
 
 
 	protected function makeLists() {
-		$this->addScript('prototype.js');
-		$this->addScript('tooltip.js');
 		$listFunc = 'make' . ucfirst($this->viewList) . 'List';
-		return $this->makePageHelp() . $this->makeNewEntryLink() .
-			$this->makeViewListSelector() . $this->$listFunc();
+		return $this->makePageHelp() .
+			'<div class="standalone">'. $this->makeNewEntryLink() .'</div>'.
+			'<div class="standalone">Преглед на записите: '. $this->makeViewWorksLinks() .'</div>'.
+			$this->makeViewListSelector() .
+			$this->$listFunc($this->llimit, $this->loffset);
 	}
 
 
@@ -244,15 +257,27 @@ $box
 EOS;
 	}
 
-	public function makeWorkList($limit = 0) {
-		$q = $this->makeSqlQuery($limit);
+	public function makeWorkList($limit = 0, $offset = 0, $order = null, $showPageLinks = true) {
+		$this->addScript('prototype.js');
+		$this->addScript('tooltip.js');
+		$q = $this->makeSqlQuery($limit, $offset);
 		$l = $this->db->iterateOverResult($q, 'makeWorkListItem', $this, true);
 		if ( empty($l) ) {
-			return '<p style="text-align:center"><strong>Няма подготвящи се произведения.</strong></p>';
+			return '<p class="standalone"><strong>Няма подготвящи се произведения.</strong></p>';
 		}
 		$tt = implode("\n", $this->tooltips);
+		$count = $this->db->getCount(self::DB_TABLE, $this->makeSqlWhere());
+		if ($showPageLinks) {
+			$pagelinks = $this->makePageLinks($count, $this->llimit, $this->loffset,
+				array(self::FF_SUBACTION => $this->subaction));
+			$limitform = $this->makeListLimitForm();
+		} else {
+			$pagelinks = $limitform = '';
+		}
 		return <<<EOS
 
+$pagelinks
+$limitform
 <table class="content sortable" cellpadding="0" cellspacing="0">
 <!--thead-->
 	<tr>
@@ -267,9 +292,24 @@ EOS;
 <tbody>$l
 </tbody>
 </table>
+$pagelinks
 $this->scriptStart
 $tt
 $this->scriptEnd
+EOS;
+	}
+
+
+	protected function makeListLimitForm() {
+		$subaction = $this->out->hiddenField(self::FF_SUBACTION, $this->subaction);
+		$label = $this->out->label('Показване по ', self::FF_LIMIT);
+		$label2 = $this->out->label(' записа на страница', self::FF_LIMIT);
+		$limit = $this->out->textField(self::FF_LIMIT, '', $this->llimit, 2);
+		return <<<EOS
+<form action="{FACTION}" class="standalone">
+$subaction
+$label$limit$label2
+</form>
 EOS;
 	}
 
@@ -281,10 +321,28 @@ EOS;
 			'LEFT JOIN' => array(
 				User::DB_TABLE .' u' => 'w.user = u.id',
 			),
+			'WHERE' => $this->makeSqlWhere('w'),
 			'ORDER BY' => 'date DESC, w.id DESC',
 			'LIMIT' => array($offset, $limit)
 		);
 		return $this->db->extselectQ($qa);
+	}
+
+
+	public function makeSqlWhere($pref = '') {
+		$w = array();
+		if ( !empty($pref) ) $pref .= '.';
+		if ($this->subaction == 'my') {
+			$pidQ = $this->db->selectQ(self::DB_TABLE2, array('user' => $this->user->id), 'pid');
+			$ors = array(
+				$pref.'user' => $this->user->id,
+				$pref.'id IN ('. $pidQ .')');
+			$w = array($ors);
+		} else if ($this->subaction == 'waiting') {
+			$w = array('type' => 1,
+				'status' => self::MAX_SCAN_STATUS);
+		}
+		return $w;
 	}
 
 
@@ -297,7 +355,7 @@ EOS;
 			: $this->makeExtraInfo($comment, isset($expandinfo) && $expandinfo);
 		$title = "<em>$title</em>";
 		if ( $this->userCanEditEntry($user, $type) ) {
-			$params = array(self::FF_ACTION=>$this->action, 'sa'=>'edit', 'entry'=>$id);
+			$params = array(self::FF_ACTION=>$this->action, self::FF_SUBACTION=>'edit', 'entry'=>$id);
 			$title = $this->out->internLink($title, $params, 3, 'Към страницата за редактиране');
 		}
 		$this->rowclass = $this->out->nextRowClass($this->rowclass);
@@ -409,10 +467,23 @@ EOS;
 		if ( !$this->userCanAddEntry() ) {
 			return '';
 		}
-		$params = array(self::FF_ACTION=>$this->action, 'sa'=>'edit');
-		$link = $this->out->internLink('Подготовка на ново произведение', $params, 2);
-		return "<p style='text-align:center; margin:1em 0'>$link</p>";
+		$params = array(self::FF_ACTION => $this->action, self::FF_SUBACTION => 'edit');
+		return $this->out->internLink('Подготовка на ново произведение', $params, 2);
 
+	}
+
+	protected function makeViewWorksLinks() {
+		$links = array();
+		foreach ($this->viewTypes as $type => $title) {
+			$attrs = array();
+			if ($this->subaction == $type) {
+				$attrs['class'] = 'selected';
+			}
+			$params = array(self::FF_ACTION => $this->action,
+				self::FF_SUBACTION => $type, self::FF_LIMIT => $this->llimit);
+			$links[] = $this->out->internLink($title, $params, 2, "Преглед на произведенията по критерий „{$title}“", $attrs);
+		}
+		return trim( implode(' | ', $links), ' |' );
 	}
 
 
@@ -426,7 +497,7 @@ EOS;
 			if ($this->workType == $type) {
 				$class = ' selected';
 			} else if ($this->thisUserCanDeleteEntry()) {
-				$params = array(self::FF_ACTION=>$this->action, 'sa'=>'edit',
+				$params = array(self::FF_ACTION=>$this->action, self::FF_SUBACTION=>'edit',
 					'entry'=>$this->entry, 'workType'=>$type);
 				$text = $this->out->internLink($text, $params, 4);
 			}
@@ -582,7 +653,7 @@ EOS;
 		$ulink = $this->makeUserLinkWithEmail($udata['username'],
 			$udata['email'], $udata['allowemail']);
 		$flink = $this->tmpfiles == self::DEF_TMPFILE ? ''
-			: $this->out->link($this->tmpfiles) .
+			: $this->out->link($this->tmpfiles, limitLength($this->tmpfiles)) .
 			($this->tfsize > 0 ? " ($this->tfsize&nbsp;MB)" : '');
 		$file = $this->out->fileField('file', '', 50);
 		$maxFileSize = $this->out->makeMaxFileSizeField();
@@ -728,7 +799,7 @@ EOS;
 		return <<<EOS
 
 <p>Тук можете да разгледате списък на произведенията, които се подготвят за добавяне в библиотеката.</p>
-<p>За да се включите в подготовката на нови текстове, $ext последвайте връзката „Подготовка на ново произведение“. В случай че нямате възможност сами да сканирате текстове, можете да се присъедините към редактирането на заглавията, отбелязани с иконката $teamicon (може и да няма такива).</p>
+<p>За да се включите в подготовката на нови текстове, $ext последвайте връзката „Подготовка на ново произведение“. В случай че нямате възможност сами да сканирате текстове, можете да се присъедините към редактирането на заглавията, отбелязани с иконката $teamicon (може и да няма такива). Те са достъпни и чрез връзката „{$this->viewTypes['waiting']}“.</p>
 EOS;
 	}
 
@@ -919,11 +990,11 @@ EOS;
 
 
 	public function isSingleUser($type = null) {
-		fillOnEmpty($type, $this->workType);
+		fillOnNull($type, $this->workType);
 		return $type == 0;
 	}
 	public function isMultiUser($type = null) {
-		fillOnEmpty($type, $this->workType);
+		fillOnNull($type, $this->workType);
 		return $type == 1;
 	}
 

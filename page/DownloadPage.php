@@ -6,7 +6,6 @@ class DownloadPage extends Page {
 		parent::__construct();
 		$this->action = 'download';
 		$this->title = 'Сваляне на текст';
-		$this->binaryDir = './content/img/';
 		$this->textIds = (array) $this->request->value('textId', null, 1);
 		require_once 'include/myzipfile.php';
 		$this->zf = new myzipfile();
@@ -79,7 +78,7 @@ class DownloadPage extends Page {
 			}
 		}
 		// add images
-		$dir = $this->binaryDir . $textId;
+		$dir = getContentFilePath('img', $textId);
 		if ( !is_dir($dir) ) { return; }
 		if ($dh = opendir($dir)) {
 			while (($file = readdir($dh)) !== false) {

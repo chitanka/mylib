@@ -100,7 +100,7 @@ EOS;
 
 
 	protected function initData() {
-		$this->labels = $this->db->getObjects(DBT_LABEL);
+		$this->labels = $this->db->getNames(DBT_LABEL);
 	}
 
 }

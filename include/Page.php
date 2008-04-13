@@ -12,6 +12,8 @@ class Page {
 		$request, $user, $db, $content, $messages, $jsContent, $style,
 		$scriptStart, $scriptEnd, $styleStart, $styleEnd,
 		$fullContent, $outputLength, $allowCaching,
+		/** extern javascripts */
+		$scripts = array(),
 		$maxCaptchaTries = 2, $defListLimit = 10, $maxListLimit = 50;
 
 
@@ -162,7 +164,7 @@ EOS;
 	}
 
 	public function addScript($file) {
-		$this->addHeadContent( $this->out->scriptInclude($file) . "\n" );
+		$this->scripts[] = $file;
 	}
 
 	public function allowCaching() {
@@ -210,6 +212,11 @@ EOS;
 		@return string
 	*/
 	public function makeFullContent($elapsedTime = NULL) {
+		if ( !empty($this->scripts) ) {
+			foreach ($this->scripts as $script) {
+				$this->addHeadContent( "\n\t". $this->out->scriptInclude($script) );
+			}
+		}
 		$nav = $this->makeNavigationBar();
 		$pageTitle = strtr($this->title(), array('<br />'=>' — '));
 		$pageTitle = strip_tags($pageTitle);
@@ -360,28 +367,13 @@ EOS;
 		$action = $this->out->selectBox(self::FF_ACTION, '', $options, $this->action);
 		$persTools = $this->makePersonalTools();
 		$links = array(
-'Автори' => array(
-	array('author', 'Съдържание', 'Начална страница за преглед на авторите'),
-	array(array('author', 'sortby'=>'last', 'mode'=>'simple'), 'Всички', 'Всички автори, подредени по фамилия'),
-),
-'Преводачи' => array(
-	array('translator', 'Съдържание', 'Начална страница за преглед на преводачите'),
-	array(array('translator', 'sortby'=>'last', 'mode'=>'simple'), 'Всички', 'Всички преводачи, подредени по фамилия'),
-),
-'Заглавия' => array(
-	array('title', 'Съдържание', 'Начална страница за преглед на заглавията'),
-	array(array('text', 'textId'=>'random', '_pos'=>2), 'Случайно', 'Показване на случайно заглавие'),
-	array(array('title', 'mode'=>'simple'), 'Всички', 'Всички заглавия'),
-),
-'Поредици' => array(
-	array('series', 'Съдържание', 'Начална страница за преглед на поредиците'),
-	array(array('series', 'mode'=>'simple'), 'Всички', 'Всички поредици'),
-),
-'Етикети' => array(
-	array('label', 'Съдържание', 'Начална страница за преглед на етикетите'),
-	array(array('label', 'mode'=>'simple'), 'Всички', 'Всички етикети'),
-),
-'Разни' => array(
+'Навигация' => array(
+	array('author', 'Автори', 'Начална страница за преглед на авторите'),
+	array('translator', 'Преводачи', 'Начална страница за преглед на преводачите'),
+	array('title', 'Заглавия', 'Начална страница за преглед на заглавията'),
+	array(array('text', 'textId'=>'random', '_pos'=>2), 'Случайно заглавие', 'Показване на случайно заглавие'),
+	array('series', 'Поредици', 'Начална страница за преглед на поредиците'),
+	array('label', 'Етикети', 'Начална страница за преглед на етикетите'),
 	array('news', 'Новини', 'Новини относно сайта'),
 	array('history', 'История', 'Списък на произведенията по месец на добавяне'),
 	array('work', 'Сканиране', 'Списък на произведения, подготвящи се за добавяне'),
@@ -420,10 +412,6 @@ EOS;
 <div id="navigation"><a name="navigation"> </a>
 <div id="logo"><a href="$this->root" title="Към началната страница">$this->sitename</a></div>
 
-<div class="propaganda" style="text-align:center">
-<a href="http://bg.wikipedia.org/wiki/WP:100000" style="margin-bottom:0.2ex"><img src="$this->rootd/img/wikipedia-banner-100000-138x115.jpg" alt="Уикипедия 100 000" width="138" title="Включете се в инициативата Уикипедия 100 000!" /></a>
-</div>
-
 $persTools
 
 <dl id="nav-main" title="Това са връзки, улесняващи разхождането из сайта">$navmenu
@@ -459,7 +447,10 @@ $this->extra
 <p>Желаете да помогнете?</p>
 <p>$helpus_link</p>
 </div>
-<div class="propaganda" style="text-align:center">
+<div class="propaganda">
+<a href="http://bg.wikipedia.org/wiki/WP:100000"><img src="$this->rootd/img/wikipedia-banner-100000-138x115.jpg" alt="Уикипедия 100 000" width="138" title="Включете се в инициативата Уикипедия 100 000!" /></a>
+</div>
+<div class="propaganda">
 <a href="http://protest.bloghub.org" style="margin-bottom:0.2ex"><img src="$this->rootd/img/protestlogo7um.138px.jpg" alt="Труд нападна сляп!" width="138" title="Протест срещу отношението на КК ТРУД и други издателства към електронните библиотеки" /></a>
 </div>
 </div>
@@ -589,7 +580,7 @@ EOS;
 		$p = array(self::FF_ACTION => 'download', 'textId' => $textId);
 		$title = "Сваляне във формат ZIP, $zfsize ".
 			chooseGrammNumber($zfsize, 'кибибайт', 'кибибайта');
-		$attrs = array('class' => 'download', 'rel' => 'nofollow');
+		$attrs = array('class' => 'download');
 		return $this->out->internLink($ltext, $p, 2, $title, $attrs);
 	}
 

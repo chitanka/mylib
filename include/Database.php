@@ -38,9 +38,20 @@ class Database {
 		return $this->getCount($table, $keys) > 0;
 	}
 
-	public function getObjects($table, $nfield = null, $kfield = null, $dbkey = array()) {
-		if ( is_null($nfield) ) $nfield = 'name';
-		if ( is_null($kfield) ) $kfield = 'id';
+
+	public function getObjects($table, $dbkey = array(), $kfield = null) {
+		fillOnNull($kfield, 'id');
+		$res = $this->select($table, $dbkey);
+		$objs = array();
+		while ( $row = mysql_fetch_assoc($res) ) {
+			$objs[ $row[$kfield] ] = $row;
+		}
+		return $objs;
+	}
+
+	public function getNames($table, $dbkey = array(), $nfield = null, $kfield = null) {
+		fillOnNull($nfield, 'name');
+		fillOnNull($kfield, 'id');
 		$sel = array($kfield, $nfield);
 		$res = $this->select($table, $dbkey, $sel, $nfield);
 		$objs = array();
@@ -181,7 +192,7 @@ class Database {
 
 	public function updateQ($table, $data, $keys) {
 		if ( empty($data) ) { return ''; }
-		if ( empty($keys) ) { return $this->insertQ($table, $data); }
+		if ( empty($keys) ) { return $this->insertQ($table, $data, true); }
 		if ( !is_array($keys) ) {
 			$keys = array('id' => $keys);
 		}
@@ -492,13 +503,13 @@ class Database {
 
 
 	protected function connect() {
-		$this->conn = @mysql_connect($this->server, $this->user, $this->pass)
+		$this->conn = mysql_connect($this->server, $this->user, $this->pass)
 			or $this->mydie("Could not connect to database server $this->server for $this->user!");
-		@mysql_select_db($this->dbName, $this->conn)
+		mysql_select_db($this->dbName, $this->conn)
 			or $this->mydie("Could not select database $this->dbName!");
-		@mysql_query("SET CHARACTER SET $this->charset")
+		mysql_query("SET CHARACTER SET $this->charset")
 			or $this->mydie("Could not set character set to '$this->charset':");
-		@mysql_query("SET SESSION collation_connection ='$this->collationConn'")
+		mysql_query("SET SESSION collation_connection ='$this->collationConn'")
 			or $this->mydie("Could not set collation_connection to '$this->collationConn':");
 	}
 

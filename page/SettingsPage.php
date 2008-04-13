@@ -312,15 +312,7 @@ EOS;
 
 
 	protected function makeOptionsOutput() {
-		$o = '';
-		foreach ($this->optKeys as $key) {
-			$o .= $key .'=' . (is_array($this->opts[$key])
-				? implode(',', $this->opts[$key]) : $this->opts[$key]) .';';
-		}
-		foreach ($this->optKeysCh as $key) {
-			$o .= $key .'=' . $this->opts[$key] .';';
-		}
-		return rtrim($o, ';');
+		return User::packOptions($this->opts);
 	}
 
 

@@ -129,11 +129,14 @@ EOS;
 	protected function makeLastForumPosts($limit = 10) {
 		$proc = new XSLTProcessor();
 		$xsl = new DOMDocument();
-		$xsl->load($this->forum_root .'templates/rss-compact.xsl');
-		$proc->importStyleSheet($xsl);
+		if ( $xsl->load($this->forum_root .'templates/rss-compact.xsl') ) {
+			$proc->importStyleSheet($xsl);
+		}
 		$rss = new DOMDocument();
-		$rss->load($this->forum_root ."rss.php?c=$limit");
-		return $proc->transformToXML($rss);
+		if ( $rss->load($this->forum_root ."rss.php?c=$limit") ) {
+			return $proc->transformToXML($rss);
+		}
+		return "<p class='error'>Неуспех при вземането на последните $limit форумни съобщения.</p>";
 	}
 
 
@@ -146,7 +149,9 @@ EOS;
 
 	protected function makeLastWorkTitles($limit = 10) {
 		$workpage = PageManager::buildPage('work');
-		return $workpage->makeWorkList($limit);
+		$list = $workpage->makeWorkList($limit, 0, null, false);
+		$this->scripts += $workpage->get('scripts');
+		return $list;
 	}
 
 

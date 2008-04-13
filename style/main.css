@@ -30,7 +30,6 @@ html, body {
 /* тялото на страницата */
 body {
 	line-height: 1.4em;
-	padding: 0.2em 0 0 0;
 	margin: 0;
 }
 
@@ -263,22 +262,22 @@ dl#personal {
 li.novel { list-style-image: url('<?php echo $skin->image('novel')?>'); }
 li.novella { list-style-image: url('<?php echo $skin->image('novella')?>'); }
 li.shortstory, li.novelette { list-style-image: url('<?php echo $skin->image('shortstory')?>'); }
-li.poetry, li.poem { list-style-image: url('<?php echo $skin->image('poetry')?>'); }
+li.poetry, li.poem, li.prosepoetry { list-style-image: url('<?php echo $skin->image('poetry')?>'); }
 li.tale, li.fable { list-style-image: url('<?php echo $skin->image('tale')?>'); }
 li.othergenre, li.essay, li.article, li.play, li.screenplay, li.anecdote,
 li.playbook, li.science, li.intro, li.outro, li.travelnotes, li.other, li.textbook,
-li.feuilleton, li.letter, li.ocherk {
+li.feuilleton, li.letter, li.ocherk, li.review {
 	list-style-image: url('<?php echo $skin->image('othergenre')?>');
 }
 span.novel:before { content: url('<?php echo $skin->image('novel')?>') ' '; vertical-align: bottom; }
 span.novella:before { content: url('<?php echo $skin->image('novella')?>') ' '; vertical-align: bottom; }
 span.shortstory:before, span.novelette:before { content: url('<?php echo $skin->image('shortstory')?>') ' '; vertical-align: bottom; }
-span.poetry:before, span.poem:before { content: url('<?php echo $skin->image('poetry')?>') ' '; vertical-align: bottom; }
+span.poetry:before, span.poem:before, span.prosepoetry:before { content: url('<?php echo $skin->image('poetry')?>') ' '; vertical-align: bottom; }
 span.tale:before, span.fable:before { content: url('<?php echo $skin->image('tale')?>') ' '; vertical-align: bottom; }
 span.othergenre:before, span.essay:before, span.article:before, span.play:before,
 span.screenplay:before, span.anecdote:before, span.playbook:before, span.science:before,
 span.intro:before, span.outro:before, span.travelnotes:before, span.other:before, span.textbook:before,
-span.feuilleton:before, span.letter:before, span.ocherk:before {
+span.feuilleton:before, span.letter:before, span.ocherk:before, span.review:before {
 	content: url('<?php echo $skin->image('othergenre')?>') ' '; vertical-align: bottom;
 }
 
@@ -351,8 +350,8 @@ dl#search {
 .propaganda img, #searchhelpbox {
 	border: thin solid <?php echo $navTitleBgColor?>;
 }
-#searchhelpbox {
-	margin: 0.4em 0;
+.propaganda, #searchhelpbox {
+	margin: 0.2em 0;
 	padding: 0.2em;
 }
 /* различни кутии — легенда, за авторските права, информационна */
@@ -507,7 +506,7 @@ pre.example, div.example {
 	margin-left: 10em; text-align: left;
 }
 .placeyear { font-size: small; }
-.letter, .cite { font-style: normal; }
+.cite { font-style: normal; }
 .subheader, .sign, .sign p {
 	font-weight: bold;
 	font-style: normal;
@@ -515,10 +514,13 @@ pre.example, div.example {
 }
 .notice, .notice p {
 	font-size: 0.95em;
+	font-style: italic;
 	text-align: center;
+	margin: 0.5em auto;
 }
 .epigraph .subheader { text-align: left; }
 .poetry h2, .poetry h3, .poetry h4, .poetry h5, .poetry h6,
+.poem h2, .poem h3, .poem h4, .poem h5, .poem h6,
 .poetry .subheader, .poetry .separator, .poem .subheader, .poem .separator {
 	text-align: left;
 	text-indent: 3em;
@@ -599,6 +601,7 @@ div.tabbedpanebody {
 	float: right;
 	font-size: .9em;
 	border-top: thin solid <?php echo $tocBordColor?>;
+	overflow: auto;
 }
 /* за таблици */
 .fieldname-left { text-align: right; }
@@ -614,4 +617,14 @@ div.tabbedpanebody {
 	border: medium dashed <?php echo $tocBordColor?>;
 }
 
-.date { white-space: nowrap; }
+.date {
+	white-space: nowrap;
+}
+
+.standalone {
+	text-align: center;
+	margin: 1em auto;
+}
+.selected {
+	font-weight: bold;
+}

@@ -61,7 +61,7 @@ class EditAltPersonPage extends Page {
 		$name = $this->out->textField('name', '', $this->name, 30);
 		$orig_name = $this->out->textField('orig_name', '', $this->orig_name, 30);
 		$person = $this->out->selectBox('person', '',
-			$this->db->getObjects(DBT_PERSON), $this->person);
+			$this->db->getNames(DBT_PERSON), $this->person);
 		$type = $this->makeTypeInput();
 		$showagain = $this->out->checkbox('showagain', '', $this->showagain,
 			'Показване на формуляра отново');

@@ -122,7 +122,7 @@ EOS;
 
 	protected function makeLabelInput() {
 		$cur = $other = '';
-		foreach ($this->db->getObjects(DBT_LABEL) as $id => $name) {
+		foreach ($this->db->getNames(DBT_LABEL) as $id => $name) {
 			if ( isset($this->labels[$id]) ) {
 				$oldL = $this->out->hiddenField('old[]', $id);
 				$l = $this->out->checkbox('cur[]', "l$id", true, $name, $id);

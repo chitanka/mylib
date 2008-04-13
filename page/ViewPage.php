@@ -166,42 +166,42 @@ EOS;
 	}
 
 
-	protected function makeModeInput() {
+	protected function makeModeInput($autoupdate = true) {
 		if ( !empty($this->startwith) ) { // save and show as hidden form field
 			$this->request->setValue(self::FF_QUERY, $this->startwith);
 		}
 		$ext = !empty($this->mode2) ? '-'.$this->mode2 : '';
 		$opts = array('simple'.$ext=>'Само имена', 'extended'.$ext=>'Имена и заглавия');
-		$box = $this->out->selectBox(self::FF_MODE, '', $opts, $this->mode1.$ext,
-			0, array('onchange'=>'this.form.submit()'));
+		$attrs = $autoupdate ? array('onchange'=>'this.form.submit()') : array();
+		$box = $this->out->selectBox(self::FF_MODE, '', $opts, $this->mode1.$ext, 0, $attrs);
 		$label = $this->out->label('Показване:', self::FF_MODE);
 		return $label .'&nbsp;' . $box;
 	}
 
 
-	protected function makeOrderInput() {
+	protected function makeOrderInput($autoupdate = true) {
 		$opts = array('alpha' => 'Азбучна', 'time' => 'Хронологична');
-		$box = $this->out->selectBox(self::FF_ORDER, '', $opts, $this->order,
-			0, array('onchange'=>'this.form.submit()'));
+		$attrs = $autoupdate ? array('onchange'=>'this.form.submit()') : array();
+		$box = $this->out->selectBox(self::FF_ORDER, '', $opts, $this->order, 0, $attrs);
 		$label = $this->out->label('Подредба:', self::FF_ORDER);
 		return $label .'&nbsp;' . $box;
 	}
 
 
-	protected function makeCountryInput() {
+	protected function makeCountryInput($autoupdate = true) {
 		global $countries;
 		$opts = array_merge(array('' => '(Всички)'), $countries);
-		$box = $this->out->selectBox(self::FF_COUNTRY, '', $opts, $this->country,
-			0, array('onchange'=>'this.form.submit()'));
+		$attrs = $autoupdate ? array('onchange'=>'this.form.submit()') : array();
+		$box = $this->out->selectBox(self::FF_COUNTRY, '', $opts, $this->country, 0, $attrs);
 		$label = $this->out->label('Държава:', self::FF_COUNTRY);
 		return $label .'&nbsp;' . $box;
 	}
 
 
-	protected function makeDlModeInput() {
+	protected function makeDlModeInput($autoupdate = true) {
 		$opts = array('one' => 'По единично', 'both' => 'И по много');
-		$box = $this->out->selectBox(self::FF_DLMODE, '', $opts, $this->dlMode,
-			0, array('onchange'=>'this.form.submit()'));
+		$attrs = $autoupdate ? array('onchange'=>'this.form.submit()') : array();
+		$box = $this->out->selectBox(self::FF_DLMODE, '', $opts, $this->dlMode, 0, $attrs);
 		$label = $this->out->label('Сваляне:', self::FF_DLMODE);
 		return $label .'&nbsp;' . $box;
 	}

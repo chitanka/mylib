@@ -180,6 +180,7 @@ class Setup {
 			'READER_OF' => 'reader_of',
 			'SER_AUTHOR_OF' => 'ser_author_of',
 			'SERIES' => 'series',
+			'SUBSERIES' => 'subseries',
 			'TEXT' => 'text',
 			'TEXT_LABEL' => 'text_label',
 			'TRANSLATOR_OF' => 'translator_of',

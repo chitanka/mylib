@@ -25,6 +25,9 @@ class Sfb2HTMLConverter {
 		AUTHOR_OL = '@', PLACE_OL = '@@',
 		SEPARATOR = '* * *', LINE = '--';
 
+	protected static
+		$objCount = 0;
+
 	protected
 		$blockStart = array(
 			'epigraph' => '<blockquote class="epigraph">',
@@ -53,6 +56,7 @@ class Sfb2HTMLConverter {
 		$debug = false, $i=0;
 
 	public function __construct($file, $imgDir = 'img/') {
+		self::$objCount++;
 		$this->file = $file;
 		$this->handle = fopen($this->file, 'r');
 		$this->text = $this->footnotes = '';
@@ -77,8 +81,8 @@ class Sfb2HTMLConverter {
 		'!(?<=[\s>])(http://[^])\s,;<]+)!' => '<a href="$1" title="$1">$1</a>',
 
 		'/{img:([^}|]+)\|([^}]+)(\|([^}]+))?}/Ue' =>
-			"'<img src=\"$this->imgDir$1\" alt=\"$2\" title=\"$2\"'.('$3'==''?'':' class=\"float-$4\"').' />'",
-		'/{img:([^}]+)}/U' => '<img src="'.$this->imgDir.'$1" alt="$1" />',
+			"'<a href=\"$this->imgDir$1\"><img src=\"$this->imgDir$1\" alt=\"$2\" title=\"$2\"'.('$3'==''?'':' class=\"float-$4\"').' /></a>'",
+		'/{img:([^}]+)}/U' => '<a href="'.$this->imgDir.'$1" title="Преглед на картинката в отделен прозорец"><img src="'.$this->imgDir.'$1" alt="$1" /></a>',
 		'/{img-thumb:([^}|]+)\|([^}]+)(\|([^}]+))?}/Ue' =>
 			"'<div class=\"thumb\" '.('$3'==''?'':' style=\"width: $4px\"').'><a href=\"$this->imgDir$1\" title=\"Щракнете за увеличен размер\"><img src=\"{$this->imgDir}thumb/$1\" alt=\"$2\" /></a><p><a href=\"$this->imgDir$1\" title=\"Щракнете за увеличен размер\"><img src=\"{IMGDIR}viewmag.png\" /></a> $2</p></div>'",
 		// foot notes
@@ -87,13 +91,17 @@ class Sfb2HTMLConverter {
 		$this->replPairs = array(
 			"\t" => '        ', // eight nbspaces
 			'`' => '&#768;', // ударение
+			'{sup}' => '<sup>', '{/sup}' => '</sup>',
+			'{sub}' => '<sub>', '{/sub}' => '</sub>',
 		);
 		$this->lcmd = $this->ltext = '';
 	}
 
 
 	public function __destruct() {
-		fclose($this->handle);
+		if ($this->handle) {
+			fclose($this->handle);
+		}
 	}
 
 
@@ -317,6 +325,7 @@ class Sfb2HTMLConverter {
 		case self::CITE_S: $this->doCite(); break;
 		case self::CITE_E: break;
 		case self::PLACE_OL: $this->doPlace(); break;
+		case self::TABLE_S: $this->doTable(); break;
 		default: $this->save($this->line);
 		}
 	}
@@ -348,6 +357,7 @@ class Sfb2HTMLConverter {
 
 	protected function doTable() {
 		$this->simpleSave('<table class="content">'."\n");
+		$this->curTrClass = 'odd';
 		do {
 			$this->nextLine();
 			$this->inTable();
@@ -391,15 +401,16 @@ class Sfb2HTMLConverter {
 			} else {
 				$this->curFn = $m[1];
 			}
-			$back = "<a href='#_ref-$this->curFn' title='Обратно'>[$this->curFn]</a>";
+			$rid = '-' . self::$objCount .'-'. $this->curFn;
+			$back = "<a href='#_ref$rid' title='Обратно'>[$this->curFn]</a>";
 			if ( empty($m[4]) ) { // no “]” at the end; more than one paragraph in the note
 				$this->inFn = true;
 				$this->curCont = &$this->footnotes;
-				$pref = "<div id='_note-$this->curFn'><p>";
+				$pref = "<div id='_note$rid'><p>";
 				$suf = '';
 			} else {
-				$pref = "<p id='_note-$this->curFn'>";
-				$suf = "<a href='#_ref-$this->curFn' title='Обратно'>↑</a>";
+				$pref = "<p id='_note$rid'>";
+				$suf = "<a href='#_ref$rid' title='Обратно'>↑</a>";
 			}
 			$line = empty($m[3]) ? '' : $this->wiki2html($m[3]);
 			$this->footnotes .= "$pref$back $line $suf</p>\n";
@@ -408,7 +419,8 @@ class Sfb2HTMLConverter {
 				$this->inFn = false;
 				$this->curCont = &$this->text;
 				$line = $m[1];
-				$suf = " <a href='#_ref-$this->curFn' title='Обратно'>↑</a></p>\n</div>\n";
+				$rid = '-' . self::$objCount .'-'. $this->curFn;
+				$suf = " <a href='#_ref$rid' title='Обратно'>↑</a></p>\n</div>\n";
 			} else { // just another paragraph in the foot note
 				$line = $this->ltext;
 				$suf = '</p>';
@@ -474,7 +486,8 @@ class Sfb2HTMLConverter {
 		} else {
 			$this->curRef = $num;
 		}
-		return "<sup id='_ref-$this->curRef' class='ref'><a href='#_note-$this->curRef' title='Към бележката'>[$this->curRef]</a></sup>";
+		$id = '-' . self::$objCount .'-'. $this->curRef;
+		return "<sup id='_ref$id' class='ref'><a href='#_note$id' title='Към бележката'>[$this->curRef]</a></sup>";
 	}
 
 }

@@ -3,17 +3,22 @@
 class TitlePage extends ViewPage {
 
 	const
-		FF_TYPE = 'type', FF_ORIGLANG = 'orig_lang';
+		FF_TYPE = 'type', FF_ORIGLANG = 'orig_lang',
+		FF_LICENSE_ORIG = 'license_orig', FF_LICENSE_TRANS = 'license_trans';
 	protected
-		$titles = array('simple' => 'Списък на заглавия — $1');
+		$titles = array('simple' => 'Списък на заглавия — $1'),
+		$whereFields = array(
+			self::FF_TYPE, self::FF_ORIGLANG,
+			self::FF_LICENSE_ORIG, self::FF_LICENSE_TRANS);
 
 
 	public function __construct() {
 		$this->titles['extended'] = $this->titles['simple'];
 		parent::__construct();
 		$this->action = 'title';
-		$this->type = $this->request->value(self::FF_TYPE, '');
-		$this->orig_lang = $this->request->value(self::FF_ORIGLANG, '');
+		foreach ($this->whereFields as $field) {
+			$this->$field = $this->request->value($field, '');
+		}
 		$this->woTransl = $this->request->value('woTransl', 0);
 		$this->woLabel = $this->request->value('woLabel', 0);
 		if ($this->order == 'time' && empty($this->startwith)) {
@@ -88,11 +93,10 @@ EOS;
 		if ( !empty($this->startwith) ) {
 			$qa['WHERE']['t.title'] = array('LIKE', $this->startwith .'%');
 		}
-		if ( !empty($this->type) ) {
-			$qa['WHERE']['t.type'] = $this->type;
-		}
-		if ( !empty($this->orig_lang) ) {
-			$qa['WHERE']['t.orig_lang'] = $this->orig_lang;
+		foreach ($this->whereFields as $field) {
+			if ( !empty($this->$field) ) {
+				$qa['WHERE']["t.$field"] = $this->$field;
+			}
 		}
 		return $this->db->extselectQ($qa);
 	}
@@ -121,11 +125,14 @@ EOS;
 	protected function makeNavElements() {
 		$toc = $this->makeNavButtons(array(self::FF_ORDER => $this->defOrder,
 			self::FF_TYPE => '', self::FF_DLMODE => $this->defDlMode,
-			self::FF_ORIGLANG => ''));
-		$orderInput = $this->makeOrderInput();
+			self::FF_ORIGLANG => '', self::FF_LICENSE_ORIG => '',
+			self::FF_LICENSE_TRANS => ''));
+		$orderInput = $this->makeOrderInput(false);
 		$typeInput = $this->makeTypeInput();
 		$origLangInput = $this->makeOrigLangInput();
-		$dlModeInput = $this->makeDlModeInput();
+		$licenseOrigInput = $this->makeLicenseInput(self::FF_LICENSE_ORIG, $this->license_orig, 'Лиценз на оригинала:');
+		$licenseTransInput = $this->makeLicenseInput(self::FF_LICENSE_TRANS, $this->license_trans, 'Лиценз на превода:');
+		$dlModeInput = $this->makeDlModeInput(false);
 		$inputFields = $this->request->makeInputFieldsForGetVars(
 			array(self::FF_ORDER, self::FF_TYPE, self::FF_DLMODE, self::FF_ORIGLANG));
 		$submit = $this->out->submitButton('Обновяване');
@@ -139,8 +146,10 @@ $toc
 $orderInput &nbsp;
 $typeInput &nbsp;
 $origLangInput &nbsp;
-$dlModeInput
-	<noscript><div style="display:inline">$submit</div></noscript>
+$dlModeInput &nbsp;
+$licenseOrigInput &nbsp;
+$licenseTransInput
+	<div style="display:inline">$submit</div>
 </div></form>
 EOS;
 	}
@@ -182,8 +191,7 @@ EOS;
 
 	protected function makeTypeInput() {
 		$opts = array_merge(array('' => '(Всички)'), workTypes(false));
-		$type = $this->out->selectBox(self::FF_TYPE, '', $opts, $this->type, 0,
-			array('onchange'=>'this.form.submit()'));
+		$type = $this->out->selectBox(self::FF_TYPE, '', $opts, $this->type);
 		$label = $this->out->label('Форма:', self::FF_TYPE);
 		return $label .'&nbsp;'. $type;
 
@@ -192,12 +200,26 @@ EOS;
 
 	protected function makeOrigLangInput() {
 		$opts = array_merge(array('' => '(Всички)'), $GLOBALS['langs']);
-		$lang = $this->out->selectBox(self::FF_ORIGLANG, '', $opts, $this->orig_lang,
-			0, array('onchange'=>'this.form.submit()'));
+		$lang = $this->out->selectBox(self::FF_ORIGLANG, '', $opts, $this->orig_lang);
 		$label = $this->out->label('Оригинален език:', self::FF_ORIGLANG);
 		return $label .'&nbsp;'. $lang;
 	}
 
+
+	protected function makeLicenseInput($id, $value, $label) {
+		if ( !isset($this->_licenses) ) {
+			$this->_licenses = array('' => '(Всички)');
+			$sel = array('id', 'name', 'fullname');
+			$res = $this->db->select(DBT_LICENSE, array(), $sel, 'name');
+			while ($row = $this->db->fetchRow($res)) {
+				$rid = array_shift($row);
+				$this->_licenses[$rid] = $row;
+			}
+		}
+		$box = $this->out->selectBox($id, '', $this->_licenses, $value);
+		$label = $this->out->label($label, $id);
+		return $label .'&nbsp;'. $box;
+	}
 
 	protected function addEmptyListMessage() {
 		$this->addMessage('Няма намерени заглавия.', true);

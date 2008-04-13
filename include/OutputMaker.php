@@ -97,11 +97,17 @@ class OutputMaker {
 		foreach ($opts as $key => $opt) {
 			if ( is_object($opt) ) {
 				$key = $opt->id;
-				$opt = $opt->name;
+				$val = $opt->name;
+				$title = isset($opt->title) ? $opt->title : '';
+			} else if ( is_array($opt) ) {
+				list($val, $title) = $opt;
+			} else {
+				$val = $opt;
+				$title = '';
 			}
-			$oattrs = array('value' => $key);
+			$oattrs = array('value' => $key, 'title' => $title);
 			if ($key == $selId) $oattrs['selected'] = 'selected';
-			$o .= "\n\t". $this->xmlElement('option', $opt, $oattrs);
+			$o .= "\n\t". $this->xmlElement('option', $val, $oattrs);
 		}
 		fillOnEmpty($id, $name);
 		$attrs = array(
@@ -191,6 +197,7 @@ class OutputMaker {
 		}
 		$q = array();
 		foreach ($params as $param => $value) {
+			if ( empty($value) ) continue;
 			$q[] = $param .'='. $this->urlencode($value);
 		}
 		$url .= implode($this->argSeparator, $q);

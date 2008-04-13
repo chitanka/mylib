@@ -1,3 +1,5 @@
+SET NAMES utf8;
+
 DROP TABLE IF EXISTS /*$prefix*/author_of;
 CREATE TABLE /*$prefix*/author_of (
   `person` mediumint(8) unsigned NOT NULL default '0',
@@ -120,24 +122,37 @@ DROP TABLE IF EXISTS /*$prefix*/license;
 CREATE TABLE /*$prefix*/license (
   `id` smallint(5) unsigned NOT NULL auto_increment,
   `code` varchar(20) NOT NULL,
-  `name` varchar(255) NOT NULL,
+  `name` varchar(15) NOT NULL,
+  `fullname` varchar(255) NOT NULL,
   `free` enum('false','true') NOT NULL COMMENT 'Free license?',
   `copyright` enum('false','true') NOT NULL default 'true' COMMENT 'Contains any copyright?',
   `uri` varchar(255) NOT NULL,
   PRIMARY KEY  (`id`),
   UNIQUE KEY `code` (`code`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 AUTO_INCREMENT=10 ;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8 AUTO_INCREMENT=22;
 
-
-INSERT INTO /*$prefix*/license VALUES (1, 'pd', 'Обществено достояние', 'true', 'false', 'http://bg.wikipedia.org/wiki/Public_domain'),
-(2, 'fc', 'Пълни авторски права', 'false', 'true', ''),
-(3, 'gfdl', 'Лиценз за свободна документация на ГНУ', 'true', 'true', 'http://www.gnu.org/copyleft/fdl.html'),
-(4, 'cc-by', 'Криейтив Комънс — Позоваване', 'true', 'true', 'http://creativecommons.org/licenses/by/2.5/'),
-(5, 'cc-by-sa', 'Криейтив Комънс — Позоваване — Споделяне на споделеното', 'true', 'true', 'http://creativecommons.org/licenses/by-sa/2.5/'),
-(6, 'cc-by-nc', 'Криейтив Комънс — Позоваване — Некомерсиално', 'false', 'true', 'http://creativecommons.org/licenses/by-nc/2.5/'),
-(7, 'cc-by-nc-sa', 'Криейтив Комънс — Позоваване — Некомерсиално — Споделяне на споделеното', 'false', 'true', 'http://creativecommons.org/licenses/by-nc-sa/2.5/'),
-(8, 'cc-by-nd', 'Криейтив Комънс — Позоваване — Без производни', 'false', 'true', 'http://creativecommons.org/licenses/by-nd/2.5/'),
-(9, 'cc-by-nc-nd', 'Криейтив Комънс — Позоваване — Некомерсиално — Без производни', 'false', 'true', 'http://creativecommons.org/licenses/by-nc-nd/2.5/');
+INSERT INTO /*$prefix*/license (`id`, `code`, `name`, `fullname`, `free`, `copyright`, `uri`) VALUES
+(1, 'pd', 'PD', 'Обществено достояние', 'true', 'false', 'http://bg.wikipedia.org/wiki/Public_domain'),
+(2, 'fc', 'COPY', 'Пълни авторски права', 'false', 'true', ''),
+(3, 'gfdl-1.2', 'GFDL-1.2', 'Лиценз за свободна документация на ГНУ, версия 1.2 или следваща', 'true', 'true', 'http://www.gnu.org/copyleft/fdl.html'),
+(4, 'cc-by-2.5', 'CC-BY-2.5', 'Криейтив Комънс — Позоваване, версия 2.5', 'true', 'true', 'http://creativecommons.org/licenses/by/2.5/'),
+(5, 'cc-by-sa-2.5', 'CC-BY-SA-2.5', 'Криейтив Комънс — Позоваване — Споделяне на споделеното, версия 2.5', 'true', 'true', 'http://creativecommons.org/licenses/by-sa/2.5/'),
+(6, 'cc-by-nc-2.5', 'CC-BY-NC-2.5', 'Криейтив Комънс — Позоваване — Некомерсиално, версия 2.5', 'false', 'true', 'http://creativecommons.org/licenses/by-nc/2.5/'),
+(7, 'cc-by-nc-sa-2.5', 'CC-BY-NC-SA-2.5', 'Криейтив Комънс — Позоваване — Некомерсиално — Споделяне на споделеното, версия 2.5', 'false', 'true', 'http://creativecommons.org/licenses/by-nc-sa/2.5/'),
+(8, 'cc-by-nd-2.5', 'CC-BY-ND-2.5', 'Криейтив Комънс — Позоваване — Без производни, версия 2.5', 'false', 'true', 'http://creativecommons.org/licenses/by-nd/2.5/'),
+(9, 'cc-by-nc-nd-2.5', 'CC-BY-NC-ND-2.5', 'Криейтив Комънс — Позоваване — Некомерсиално — Без производни, версия 2.5', 'false', 'true', 'http://creativecommons.org/licenses/by-nc-nd/2.5/'),
+(10, 'cc-by-2.0', 'CC-BY-2.0', 'Криейтив Комънс — Позоваване, версия 2.0', 'true', 'true', 'http://creativecommons.org/licenses/by/2.0/'),
+(11, 'cc-by-sa-2.0', 'CC-BY-SA-2.0', 'Криейтив Комънс — Позоваване — Споделяне на споделеното, версия 2.0', 'true', 'true', 'http://creativecommons.org/licenses/by-sa/2.0/'),
+(12, 'cc-by-nc-2.0', 'CC-BY-NC-2.0', 'Криейтив Комънс — Позоваване — Некомерсиално, версия 2.0', 'false', 'true', 'http://creativecommons.org/licenses/by-nc/2.0/'),
+(13, 'cc-by-nc-sa-2.0', 'CC-BY-NC-SA-2.0', 'Криейтив Комънс — Позоваване — Некомерсиално — Споделяне на споделеното, версия 2.0', 'false', 'true', 'http://creativecommons.org/licenses/by-nc-sa/2.0/'),
+(14, 'cc-by-nd-2.0', 'CC-BY-ND-2.0', 'Криейтив Комънс — Позоваване — Без производни, версия 2.0', 'false', 'true', 'http://creativecommons.org/licenses/by-nd/2.0/'),
+(15, 'cc-by-nc-nd-2.0', 'CC-BY-NC-ND-2.0', 'Криейтив Комънс — Позоваване — Некомерсиално — Без производни, версия 2.0', 'false', 'true', 'http://creativecommons.org/licenses/by-nc-nd/2.0/'),
+(16, 'cc-by-3.0', 'CC-BY-3.0', 'Криейтив Комънс — Позоваване, версия 3.0', 'true', 'true', 'http://creativecommons.org/licenses/by/3.0/'),
+(17, 'cc-by-sa-3.0', 'CC-BY-SA-3.0', 'Криейтив Комънс — Позоваване — Споделяне на споделеното, версия 3.0', 'true', 'true', 'http://creativecommons.org/licenses/by-sa/3.0/'),
+(18, 'cc-by-nc-3.0', 'CC-BY-NC-3.0', 'Криейтив Комънс — Позоваване — Некомерсиално, версия 3.0', 'false', 'true', 'http://creativecommons.org/licenses/by-nc/3.0/'),
+(19, 'cc-by-nc-sa-3.0', 'CC-BY-NC-SA-3.0', 'Криейтив Комънс — Позоваване — Некомерсиално — Споделяне на споделеното, версия 3.0', 'false', 'true', 'http://creativecommons.org/licenses/by-nc-sa/3.0/'),
+(20, 'cc-by-nd-3.0', 'CC-BY-ND-3.0', 'Криейтив Комънс — Позоваване — Без производни, версия 3.0', 'false', 'true', 'http://creativecommons.org/licenses/by-nd/3.0/'),
+(21, 'cc-by-nc-nd-3.0', 'CC-BY-NC-ND-3.0', 'Криейтив Комънс — Позоваване — Некомерсиално — Без производни, версия 3.0', 'false', 'true', 'http://creativecommons.org/licenses/by-nc-nd/3.0/');
 
 -- --------------------------------------------------------
 
@@ -342,7 +357,7 @@ CREATE TABLE /*$prefix*/user (
   `allowemail` enum('false','true') NOT NULL default 'false' COMMENT 'Allow email from other users',
   `group` enum('nu','c0','c','a','mod') NOT NULL default 'nu',
   `news` enum('false','true') NOT NULL default 'false' COMMENT 'Receive a monthly newsletter?',
-  `opts` varchar(255) NOT NULL,
+  `opts` blob NOT NULL,
   `login_tries` tinyint(3) unsigned NOT NULL,
   `registration` datetime NOT NULL COMMENT 'Registration date',
   `touched` datetime NOT NULL COMMENT 'Last user visit',

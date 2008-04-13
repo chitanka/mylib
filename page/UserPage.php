@@ -12,7 +12,6 @@ class UserPage extends Page {
 		$this->action = 'user';
 		$this->contentDir = $GLOBALS['contentDirs']['user'];
 		$this->username = $this->request->value('username', null, 1);
-		$this->setDefaultTitle();
 		$this->userpage = $this->request->value('userpage');
 		$this->climit = $this->request->value('climit', 1);
 		$this->q = $this->request->value(self::FF_QUERY, '');
@@ -51,6 +50,7 @@ class UserPage extends Page {
 			return false;
 		}
 		extract2object($data, $this);
+		$this->setDefaultTitle();
 		$this->filename = $this->contentDir . $this->userId;
 		return true;
 	}

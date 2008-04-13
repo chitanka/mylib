@@ -3,7 +3,7 @@ class EditPage extends Page {
 
 	const DB_TABLE = DBT_TEXT;
 	protected
-		$defLicense = 2, // 'fc' - full (fucking) copyright
+		$defLicense = 2, // 'fc' — fucking copyright
 		$defEditComment = '';
 
 	public function __construct() {
@@ -107,16 +107,6 @@ class EditPage extends Page {
 		if ($this->textId == 0) {
 			$set['entrydate'] = date('Y-m-d');
 			$this->textId = $this->db->autoIncrementId(self::DB_TABLE);
-			if ( !empty($this->scanUser) ) {
-				foreach ( explode(';', $this->scanUser) as $user_perc ) {
-					$up = explode(',', $user_perc);
-					$user = $up[0];
-					$perc = isset($up[1]) ? $up[1] : 100;
-					$setut = array('text' => $this->textId, 'user' => (int)$user,
-						'percent' => (int)$perc);
-					$qs[] = $this->db->insertQ(DBT_USER_TEXT, $setut);
-				}
-			}
 		}
 		$set['id'] = $this->textId;
 		$qs[] = $this->db->updateQ(self::DB_TABLE, $set, $key);
@@ -145,10 +135,20 @@ class EditPage extends Page {
 
 	protected function makeUpdateTextContentQueries() {
 		$qs = array();
+		if ( !empty($this->scanUser) ) {
+			foreach ( explode(';', $this->scanUser) as $user_perc ) {
+				$up = explode(',', $user_perc);
+				$user = $up[0];
+				$perc = isset($up[1]) ? $up[1] : 100;
+				$setut = array('text' => $this->textId, 'user' => (int)$user,
+					'percent' => (int)$perc);
+				$qs[] = $this->db->insertQ(DBT_USER_TEXT, $setut, true);
+			}
+		}
 		if ( is_uploaded_file($_FILES['file']['tmp_name']) ) {
 			$file = getContentFilePath('text', $this->textId);
 			mymove_uploaded_file($_FILES['file']['tmp_name'], $file);
-			$qs = $this->makeUpdateChunkQuery($file);
+			$qs += $this->makeUpdateChunkQuery($file);
 			$size = filesize($file);
 			$set = array('size' => $size, 'zsize' => $size/3.5,
 				'headlevel' => $this->headlevel);
@@ -159,7 +159,7 @@ class EditPage extends Page {
 			$this->addEditCommentQuery($qs);
 		} elseif ( $this->request->checkbox('usecurr') ) {
 			$file = getContentFilePath('text', $this->textId);
-			$qs = $this->makeUpdateChunkQuery($file);
+			$qs += $this->makeUpdateChunkQuery($file);
 		}
 		return $qs;
 	}
@@ -302,7 +302,7 @@ EOS;
 EOS;
 		$formBegin = $this->makeFormBegin();
 		$formEnd = $this->makeFormEnd();
-  fillOnEmpty($author, 'неизвестен автор');
+		fillOnEmpty($author, 'неизвестен автор');
 		$toText = '';
 		if ( !empty($this->textId) ) {
 			$tlink = $this->makeSimpleTextLink($this->ttitle, $this->textId);
@@ -342,7 +342,7 @@ EOS;
 		$lang = $this->out->selectBox('lang', '', $langs, $this->tlang);
 		$olang = $this->out->selectBox('orig_lang', '', $langs, $this->orig_lang);
 		$collection = $this->out->checkbox('collection', '', $this->collection, 'Колективен сборник');
-		$lopts = $this->db->getObjects(DBT_LICENSE);
+		$lopts = $this->db->getNames(DBT_LICENSE);
 		$lopts[0] = 'Неизвестен';
 		$license_orig = $this->out->selectBox('license_orig', '', $lopts, $this->license_orig);
 		$license_trans = $this->out->selectBox('license_trans', '', $lopts, $this->license_trans);
@@ -415,7 +415,7 @@ EOS;
 		$formEnd = $this->makeFormEnd();
 		$author = implode(',', $this->nauthor);
 		$author = $this->makeAuthorLink($author);
-  fillOnEmpty($author, 'неизвестен автор');
+		fillOnEmpty($author, 'неизвестен автор');
 		$contentInput = $this->makeTextarea();
 		$tlink = $this->makeSimpleTextLink($this->ttitle, $this->textId, $this->chunkId);
 		$otitle = $this->orig_title != $this->ttitle && !empty($this->orig_title)
@@ -440,7 +440,7 @@ EOS;
 		$formEnd = $this->makeFormEnd();
 		$author = implode(',', $this->nauthor);
 		$author = $this->makeAuthorLink($author);
-  fillOnEmpty($author, 'неизвестен автор');
+		fillOnEmpty($author, 'неизвестен автор');
 		$contentInput = $this->makeTextarea();
 		$tlink = $this->makeSimpleTextLink($this->ttitle, $this->textId, $this->chunkId);
 		$otitle = $this->orig_title != $this->ttitle && !empty($this->orig_title)
@@ -514,7 +514,7 @@ EOS;
 		$key = $keys[$ind];
 		$js = "\npersons['$key'] = {";
 		$dbkey = array("(role & $ind)");
-		foreach ($this->db->getObjects(DBT_PERSON, null, null, $dbkey) as $id => $name) {
+		foreach ($this->db->getNames(DBT_PERSON, $dbkey) as $id => $name) {
 			if ( empty($name) ) { $name = '(Неизвестен автор)'; }
 			$js .= "\n\t$id: '$name',";
 		}

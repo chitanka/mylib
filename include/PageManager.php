@@ -6,7 +6,7 @@ class PageManager {
 		$pageDir = 'page/', $defaultPage = 'main', $errorPage = 'noPage',
 		$cachedPagesServer = array('main', 'about', 'links', 'help',
 			'blacklist', 'title', 'series', 'author', 'translator', 'label',
-			'statistics', 'text'),
+			'statistics', 'rules', 'text'),
 		$cachedPagesClient = array('css', 'user', 'comment',
 			'download', 'history', 'sendNewPassword', 'add', 'liternews',
 			'suggestData');

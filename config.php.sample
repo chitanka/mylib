@@ -15,8 +15,8 @@ $cfg['forum_root'] = 'http://localhost/phpBB2/';
 
 // Следните три променливи се ползват при пращането на електронна поща
 $cfg['admin']       = 'Администратор';
-$cfg['admin_email'] = 'admin@bib.com';
-$cfg['site_email']  = 'bib@bib.com';
+$cfg['admin_email'] = 'admin@bib.org';
+$cfg['site_email']  = 'bib@bib.org';
 
 // This must be a valid timezone constant
 // See “List of Supported Timezones” [http://php.net/manual/en/timezones.php]
@@ -35,8 +35,8 @@ $cfg['has_path_info'] = false;
 $cfg['db'] = array(
 	// сървър (хост), потребител, парола и име на базата от данни
 	'server' => 'localhost',
-	'user'   => 'mylib-user',
-	'pass'   => 'mylib-userpass',
+	'user'   => 'root',
+	'pass'   => '',
 	'name'   => 'mylib',
 	// Евентуална представка на таблиците, например „ml“, което значи
 	// ml_author, ml_text и т.н.

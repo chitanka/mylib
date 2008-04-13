@@ -6,7 +6,7 @@ class CacheManager {
 	private static $dlDir = 'cache/dl/';
 	private static $sfbzipDir = 'sfbzip/';
 	/** Time to Live for download cache (in hours) */
-	private static $dlTtl = 1;
+	private static $dlTtl = 24;
 
 
 	public static function cacheExists($action, $id) {
@@ -80,7 +80,7 @@ class CacheManager {
 	public static function getPath($action, $id) {
 		$subdir = $action . '/';
 		settype($id, 'string');
-		$subsubdir = $id{0} . '/' . $id{1} . '/';
+		$subsubdir = $id{0} . '/' . $id{1} . '/' . $id{2} . '/';
 		return self::$cacheDir . $subdir . $subsubdir . $id;
 	}
 
