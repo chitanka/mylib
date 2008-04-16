@@ -2,7 +2,7 @@
 $defUser = 'root';
 $defPass = '';
 $defServer = 'localhost';
-$defDbname = 'mylib2';
+$defDbname = 'mylib';
 $initSql = 'tables.sql';
 $fillSql = 'mylib-db.sql';
 $validCommands = array('init', 'fill');

@@ -4,7 +4,7 @@ class LsPage extends Page {
 
 	protected
 		$maxSaveSize = 20000000,
-		$dirs = array('text', 'text-info', 'text-anno', 'cover', 'book', 'book-anno', 'wiki', 'info', 'user');
+		$dirs = array('text', 'text-info', 'text-anno', 'cover', 'book', 'book-anno', 'wiki', 'info', 'user', 'img');
 
 
 	public function __construct() {
